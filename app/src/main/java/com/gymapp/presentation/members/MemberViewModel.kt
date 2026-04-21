@@ -7,6 +7,7 @@ import com.gymapp.data.local.entity.PackageEntity
 import com.gymapp.data.local.entity.PaymentType
 import com.gymapp.data.repository.MemberRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -57,7 +58,7 @@ class MemberViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     private val _isLoading = MutableStateFlow(false)
 
-    @OptIn(FlowPreview::class)
+    @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
     val listUiState: StateFlow<MemberListUiState> =
         _searchQuery
             .debounce(300)

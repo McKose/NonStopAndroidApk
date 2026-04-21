@@ -18,7 +18,7 @@ import com.gymapp.data.local.entity.*
         OrderEntity::class,
         MeasurementEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class GymDatabase : RoomDatabase() {

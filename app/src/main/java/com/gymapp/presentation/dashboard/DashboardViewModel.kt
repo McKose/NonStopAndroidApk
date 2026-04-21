@@ -10,6 +10,7 @@ import com.gymapp.data.local.preferences.AppPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import java.util.Calendar
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 data class DashboardUiState(
@@ -78,13 +79,13 @@ class DashboardViewModel @Inject constructor(
         }
 
         // Expiring Memberships (Next 3 days)
-        val threeDaysLater = now + (3 * 24 * 60 * 60 * 1000)
-        members.filter { 
-            it.status == "ACTIVE" && 
-            it.endDateMs != null && 
-            it.endDateMs!! in now..threeDaysLater 
-        }.forEach {
-            alerts.add("Üyelik Bitiyor: ${it.fullName} (${java.text.SimpleDateFormat("dd/MM", java.util.Locale.getDefault()).format(java.util.Date(it.endDateMs!!))})")
+        val threeDaysLater = now + TimeUnit.DAYS.toMillis(3)
+        val dateFormat = java.text.SimpleDateFormat("dd/MM", java.util.Locale.getDefault())
+        members.forEach { member ->
+            val endDate = member.endDateMs ?: return@forEach
+            if (member.status == "ACTIVE" && endDate in now..threeDaysLater) {
+                alerts.add("Üyelik Bitiyor: ${member.fullName} (${dateFormat.format(java.util.Date(endDate))})")
+            }
         }
 
         // Pending Payments

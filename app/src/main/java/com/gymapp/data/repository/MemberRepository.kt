@@ -64,12 +64,14 @@ class MemberRepository @Inject constructor(
             calculateFinalPrice(it.basePrice, discount, paymentType, installmentCount)
         } ?: 0.0
 
+        val packageSessions = selectedPackage?.sessionCount ?: -1
         val member = MemberEntity(
             fullName = fullName.trim(),
             phone = phone.trim(),
             email = email,
             activePackageId = selectedPackage?.id,
-            remainingSessions = selectedPackage?.sessionCount ?: -1,
+            totalSessions = packageSessions,
+            remainingSessions = packageSessions,
             startDateMs = nowMs,
             endDateMs = endDateMs,
             status = MemberStatus.ACTIVE.name,
@@ -126,10 +128,11 @@ class MemberRepository @Inject constructor(
         
         val finalPrice = calculateFinalPrice(selectedPackage.basePrice, discount, paymentType, installmentCount)
 
+        val packageSessions = selectedPackage.sessionCount
         val updatedMember = member.copy(
             activePackageId = selectedPackage.id,
-            totalSessions = if (selectedPackage.sessionCount != -1) selectedPackage.sessionCount else -1,
-            remainingSessions = if (selectedPackage.sessionCount != -1) selectedPackage.sessionCount else -1,
+            totalSessions = packageSessions,
+            remainingSessions = packageSessions,
             startDateMs = baseDate,
             endDateMs = endDateMs,
             status = MemberStatus.ACTIVE.name,

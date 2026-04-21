@@ -159,16 +159,23 @@ fun SettingsScreen(
                 title = "Şifre Değiştir",
                 onDismiss = { showPasswordDialog = false }
             ) {
-                var passText by remember { mutableStateOf(viewModel.salonPassword) }
+                var passText by remember { mutableStateOf("") }
+                var error by remember { mutableStateOf<String?>(null) }
                 OutlinedTextField(
                     value = passText,
-                    onValueChange = { passText = it },
+                    onValueChange = { passText = it; error = null },
                     label = { Text("Yeni Şifre") },
+                    isError = error != null,
+                    supportingText = { error?.let { Text(it) } },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(16.dp))
                 Button(
                     onClick = {
+                        if (passText.isBlank()) {
+                            error = "Şifre boş olamaz"
+                            return@Button
+                        }
                         viewModel.updateSalonPassword(passText)
                         showPasswordDialog = false
                     },

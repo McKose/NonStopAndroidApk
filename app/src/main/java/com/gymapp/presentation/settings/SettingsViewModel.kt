@@ -16,7 +16,6 @@ class SettingsViewModel @Inject constructor(
     var commissionRate by mutableStateOf(prefs.commissionRate)
     var multiSportCommission by mutableStateOf(prefs.multiSportCommission)
     var salonName by mutableStateOf(prefs.salonName)
-    var salonPassword by mutableStateOf(prefs.salonPassword)
 
     fun updateCommissionRate(value: Float) {
         commissionRate = value
@@ -33,9 +32,8 @@ class SettingsViewModel @Inject constructor(
         prefs.salonName = value
     }
 
-    fun updateSalonPassword(value: String) {
-        salonPassword = value
-        prefs.salonPassword = value
+    fun updateSalonPassword(newPassword: String) {
+        prefs.updateSalonPassword(newPassword)
     }
 
     fun logout(onLogout: () -> Unit) {

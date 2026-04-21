@@ -2,6 +2,7 @@ package com.gymapp.data.local.dao
 
 import androidx.room.*
 import com.gymapp.data.local.entity.AppointmentEntity
+import com.gymapp.data.local.entity.TransactionEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -37,33 +38,44 @@ interface AppointmentDao {
             val member = memberDao.getMemberById(appointment.memberId) ?: return
             val staff = staffDao.getStaffById(appointment.staffId) ?: return
 
-            // 1. Üye dersinden düş — sadece COMPLETED'da
-            memberDao.decrementSession(appointment.memberId)
-
-            // 2. Personel hakediş hesapla — sadece COMPLETED'da
-            // Formül: (Paket Ücreti / Toplam Seans) * Personel Hakediş Oranı
+            // Yalnızca seans sayısı sınırlı üyeler için seans düş
             if (member.totalSessions > 0) {
-                val hourlyRateFromPackage = member.packagePrice / member.totalSessions
-                val commission = hourlyRateFromPackage * staff.commissionRate
+                memberDao.decrementSession(appointment.memberId)
+            }
 
-                if (commission > 0) {
-                    transactionDao.insertTransaction(
-                        com.gymapp.data.local.entity.TransactionEntity(
-                            amount = commission,
-                            type = "EXPENSE",
-                            category = "SALARY",
-                            description = "${staff.fullName} - ${member.fullName} Hakediş",
-                            date = System.currentTimeMillis(),
-                            isPending = false, // Finans ekranında anında gider olarak görünmesi için
-                            paymentMethod = "CASH" // Varsayılan ödeme tipi
-                        )
+            // Hakediş hesaplaması:
+            //  - Sınırlı seans paketinde: (Paket Ücreti / Toplam Seans) * Hakediş Oranı
+            //  - Sınırsız (ABONMAN) paketinde: Personel saatlik ücreti üzerinden hakediş
+            val perSessionRate: Double = when {
+                member.totalSessions > 0 && member.packagePrice > 0 ->
+                    member.packagePrice / member.totalSessions
+                staff.hourlyRate > 0 ->
+                    staff.hourlyRate
+                else -> 0.0
+            }
+            val commission = perSessionRate * staff.commissionRate
+
+            if (commission > 0) {
+                transactionDao.insertTransaction(
+                    TransactionEntity(
+                        memberId = member.id,
+                        amount = commission,
+                        type = "EXPENSE",
+                        category = "SALARY",
+                        description = "${staff.fullName} - ${member.fullName} Hakediş",
+                        date = System.currentTimeMillis(),
+                        isPending = false,
+                        paymentMethod = "CASH"
                     )
-                }
+                )
             }
         }
 
-        // Tek seferde tüm alanları güncelle — isProcessed dahil
-        val updatedAppointment = appointment.copy(status = status, notes = notes, isProcessed = true)
+        val updatedAppointment = appointment.copy(
+            status = status,
+            notes = notes,
+            isProcessed = true
+        )
         updateAppointment(updatedAppointment)
     }
 }

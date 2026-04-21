@@ -14,7 +14,7 @@ import javax.inject.Inject
 data class MarketUiState(
     val products: List<ProductEntity> = emptyList(),
     val members: List<MemberEntity> = emptyList(),
-    val cart: Map<Long, Int> = emptyMap(), // ProductId -> Quantity
+    val cart: Map<Long, Int> = emptyMap(),
     val selectedMemberId: Long? = null,
     val paymentType: String = "CASH",
     val paymentStatus: String = "PAID",
@@ -24,6 +24,16 @@ data class MarketUiState(
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
     val error: String? = null
+)
+
+private data class CheckoutOptions(
+    val paymentType: String,
+    val paymentStatus: String,
+    val deliveryStatus: String,
+    val notes: String,
+    val discount: Double,
+    val isSuccess: Boolean,
+    val error: String?
 )
 
 @HiltViewModel
@@ -40,34 +50,48 @@ class MarketViewModel @Inject constructor(
     private val _notes = MutableStateFlow("")
     private val _isSuccess = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
-    
     private val _discount = MutableStateFlow(0.0)
-    
+
+    private val checkoutOptions: Flow<CheckoutOptions> = combine(
+        _paymentType,
+        _paymentStatus,
+        _deliveryStatus,
+        _notes,
+        _discount,
+        _isSuccess,
+        _error
+    ) { values ->
+        @Suppress("UNCHECKED_CAST")
+        CheckoutOptions(
+            paymentType = values[0] as String,
+            paymentStatus = values[1] as String,
+            deliveryStatus = values[2] as String,
+            notes = values[3] as String,
+            discount = values[4] as Double,
+            isSuccess = values[5] as Boolean,
+            error = values[6] as String?
+        )
+    }
+
     val uiState: StateFlow<MarketUiState> = combine(
         repository.getAllProducts(),
         memberRepository.getAllMembers(),
         _cart,
         _selectedMemberId,
-        _paymentType,
-        _paymentStatus,
-        _deliveryStatus,
-        _notes,
-        _isSuccess,
-        _error,
-        _discount
-    ) { args: Array<Any?> ->
+        checkoutOptions
+    ) { products, members, cart, memberId, opts ->
         MarketUiState(
-            products = args[0] as List<ProductEntity>,
-            members = args[1] as List<MemberEntity>,
-            cart = args[2] as Map<Long, Int>,
-            selectedMemberId = args[3] as Long?,
-            paymentType = args[4] as String,
-            paymentStatus = args[5] as String,
-            deliveryStatus = args[6] as String,
-            notes = args[7] as String,
-            isSuccess = args[8] as Boolean,
-            error = args[9] as String?,
-            discount = args[10] as Double,
+            products = products,
+            members = members,
+            cart = cart,
+            selectedMemberId = memberId,
+            paymentType = opts.paymentType,
+            paymentStatus = opts.paymentStatus,
+            deliveryStatus = opts.deliveryStatus,
+            notes = opts.notes,
+            discount = opts.discount,
+            isSuccess = opts.isSuccess,
+            error = opts.error,
             isLoading = false
         )
     }.stateIn(

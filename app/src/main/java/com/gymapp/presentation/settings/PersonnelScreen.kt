@@ -22,7 +22,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gymapp.data.local.entity.StaffEntity
-import java.util.*
+import com.gymapp.data.security.PasswordHasher
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -159,7 +159,7 @@ fun EditStaffDialog(
     var salary by remember { mutableStateOf(staff.monthlySalary.toString()) }
     var phone by remember { mutableStateOf(staff.phone) }
     var nickname by remember { mutableStateOf(staff.nickname) }
-    var password by remember { mutableStateOf(staff.password) }
+    var newPassword by remember { mutableStateOf("") }
     var role by remember { mutableStateOf(staff.role) }
     var roleExpanded by remember { mutableStateOf(false) }
 
@@ -198,9 +198,9 @@ fun EditStaffDialog(
                 }
 
                 OutlinedTextField(
-                    value = password, 
-                    onValueChange = { password = it }, 
-                    label = { Text("Şifre") }, 
+                    value = newPassword,
+                    onValueChange = { newPassword = it },
+                    label = { Text("Yeni Şifre (değiştirmek için doldurun)") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
                 )
@@ -216,6 +216,8 @@ fun EditStaffDialog(
         },
         confirmButton = {
             Button(onClick = {
+                val updatedPassword = if (newPassword.isBlank()) staff.password
+                    else PasswordHasher.hash(newPassword)
                 onConfirm(staff.copy(
                     fullName = name,
                     title = title,
@@ -224,7 +226,7 @@ fun EditStaffDialog(
                     monthlySalary = salary.toDoubleOrNull() ?: 0.0,
                     phone = phone,
                     nickname = nickname,
-                    password = password,
+                    password = updatedPassword,
                     role = role
                 ))
             }) { Text("Güncelle") }
