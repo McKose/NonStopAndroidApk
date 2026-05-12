@@ -1,5 +1,7 @@
 package com.gymapp.presentation.finance
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +35,16 @@ fun FinanceScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        onResult = { uri ->
+            uri?.let {
+                ExcelExporter.exportTransactionsToExcel(context, it, uiState.transactions)
+            }
+        }
+    )
 
     Scaffold(
         topBar = {
@@ -41,6 +53,14 @@ fun FinanceScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        val timestamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
+                        exportLauncher.launch("Finans_Raporu_$timestamp.xlsx")
+                    }) {
+                        Icon(Icons.Default.Download, contentDescription = "Excel Dışa Aktar")
                     }
                 }
             )

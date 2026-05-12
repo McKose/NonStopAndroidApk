@@ -21,6 +21,7 @@ hiltNavCompose  = "1.2.0"
 
 # WorkManager
 workManager     = "2.10.1"
+poi             = "5.4.0"
 
 [libraries]
 # AndroidX Core
@@ -56,6 +57,7 @@ hilt-compiler         = { group = "androidx.hilt",      name = "hilt-compiler", 
 
 # WorkManager
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
+poi-ooxml = { group = "org.apache.poi", name = "poi-ooxml", version.ref = "poi" }
 
 # Test
 junit                    = { group = "junit",               name = "junit",          version.ref = "junit" }
