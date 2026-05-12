@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.entity.TransactionEntity
 import com.gymapp.data.repository.FinanceRepository
+import com.gymapp.domain.tax.TaxCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -23,7 +24,12 @@ data class FinanceUiState(
     val selectedYear: Int = Calendar.getInstance().get(Calendar.YEAR),
     val selectedFilter: String = "ALL", // ALL, INCOME, EXPENSE
     val selectedPaymentMethod: String = "ALL", // ALL, CASH, CARD, MULTISPORT
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    // Vergi özeti (seçili yıl)
+    val taxQuarters: List<TaxCalculator.QuarterResult> = emptyList(),
+    val taxVatTotal: Double = 0.0,
+    val taxIncomeTotal: Double = 0.0,
+    val taxableBaseYear: Double = 0.0
 )
 
 @HiltViewModel
@@ -44,19 +50,36 @@ class FinanceViewModel @Inject constructor(
         _methodFilter,
         repository.getAllTransactions()
     ) { month, year, filter, method, allTransactions ->
-        fun calculateRevenue(monthsBack: Int): Double {
-            val cal = Calendar.getInstance().apply {
-                add(Calendar.MONTH, -monthsBack)
-                set(Calendar.DAY_OF_MONTH, 1)
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-            return allTransactions
-                .filter { it.type == "INCOME" && it.date >= cal.timeInMillis && !it.isPending }
-                .sumOf { it.amount }
-        }
+        
+        // ─── Sabit Dönem Ciroları ──────────────────────────────────
+        
+        // Aylık: Seçili ay ve yıl içindeki gelirler
+        val monthlyRevenue = allTransactions.filter { 
+            val cal = Calendar.getInstance().apply { timeInMillis = it.date }
+            it.type == "INCOME" && !it.isPending && 
+            cal.get(Calendar.MONTH) == month && cal.get(Calendar.YEAR) == year
+        }.sumOf { it.amount }
+
+        // 3 Aylık: Yılın ilk 3 ayı (Ocak, Şubat, Mart)
+        val quarterlyRevenue = allTransactions.filter {
+            val cal = Calendar.getInstance().apply { timeInMillis = it.date }
+            it.type == "INCOME" && !it.isPending && 
+            cal.get(Calendar.YEAR) == year && cal.get(Calendar.MONTH) in 0..2
+        }.sumOf { it.amount }
+
+        // 6 Aylık: Yılın ilk 6 ayı (Ocak - Haziran)
+        val halfYearlyRevenue = allTransactions.filter {
+            val cal = Calendar.getInstance().apply { timeInMillis = it.date }
+            it.type == "INCOME" && !it.isPending && 
+            cal.get(Calendar.YEAR) == year && cal.get(Calendar.MONTH) in 0..5
+        }.sumOf { it.amount }
+
+        // Yıllık: Seçili yılın tamamı
+        val yearlyRevenue = allTransactions.filter {
+            val cal = Calendar.getInstance().apply { timeInMillis = it.date }
+            it.type == "INCOME" && !it.isPending && 
+            cal.get(Calendar.YEAR) == year
+        }.sumOf { it.amount }
 
         val startCal = Calendar.getInstance().apply {
             clear()
@@ -89,20 +112,31 @@ class FinanceViewModel @Inject constructor(
             filteredList = filteredList.filter { it.paymentMethod == method }
         }
 
+        // Vergi özeti — yıllık (CARD + MULTISPORT, !isPending)
+        val taxTz = TimeZone.getTimeZone("Europe/Istanbul")
+        val quarters = TaxCalculator.computeYear(year, allTransactions, tz = taxTz)
+        val vatTotal = quarters.sumOf { it.vat }
+        val incomeTaxTotal = quarters.sumOf { it.quarterIncomeTax }
+        val baseYear = quarters.lastOrNull()?.cumulativeTaxable ?: 0.0
+
         FinanceUiState(
             transactions = filteredList,
             totalIncome = income,
             totalExpense = expense,
             totalProfit = income - expense,
-            monthlyRevenue = calculateRevenue(1),
-            quarterlyRevenue = calculateRevenue(3),
-            halfYearlyRevenue = calculateRevenue(6),
-            yearlyRevenue = calculateRevenue(12),
+            monthlyRevenue = monthlyRevenue,
+            quarterlyRevenue = quarterlyRevenue,
+            halfYearlyRevenue = halfYearlyRevenue,
+            yearlyRevenue = yearlyRevenue,
             selectedMonth = month,
             selectedYear = year,
             selectedFilter = filter,
             selectedPaymentMethod = method,
-            isLoading = false
+            isLoading = false,
+            taxQuarters = quarters,
+            taxVatTotal = vatTotal,
+            taxIncomeTotal = incomeTaxTotal,
+            taxableBaseYear = baseYear
         )
     }.stateIn(
         scope = viewModelScope,
@@ -147,5 +181,10 @@ class FinanceViewModel @Inject constructor(
                 )
             )
         }
+    }
+
+    /** PENDING bir transaction'ı (örn. KDV/Gelir Vergisi) PAID olarak işaretler. */
+    fun markTransactionPaid(transactionId: Long) {
+        viewModelScope.launch { repository.markTransactionPaid(transactionId) }
     }
 }

@@ -16,9 +16,13 @@ import com.gymapp.data.local.entity.*
         AppointmentEntity::class,
         StaffEntity::class,
         OrderEntity::class,
-        MeasurementEntity::class
+        MeasurementEntity::class,
+        MemberPackageEntity::class,
+        MultiSportRateEntity::class,
+        InstallmentCommissionEntity::class,
+        PostureCommentEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class GymDatabase : RoomDatabase() {
@@ -31,6 +35,10 @@ abstract class GymDatabase : RoomDatabase() {
     abstract fun staffDao(): StaffDao
     abstract fun orderDao(): OrderDao
     abstract fun measurementDao(): MeasurementDao
+    abstract fun memberPackageDao(): MemberPackageDao
+    abstract fun multiSportRateDao(): MultiSportRateDao
+    abstract fun installmentCommissionDao(): InstallmentCommissionDao
+    abstract fun postureCommentDao(): PostureCommentDao
 
     companion object {
         @Volatile private var INSTANCE: GymDatabase? = null
@@ -42,6 +50,8 @@ abstract class GymDatabase : RoomDatabase() {
                     GymDatabase::class.java,
                     "gym_database"
                 )
+                    .addMigrations(MIGRATION_8_9)
+                    // Son çare: şema tutarsızlığında veriyi düşürür.
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }

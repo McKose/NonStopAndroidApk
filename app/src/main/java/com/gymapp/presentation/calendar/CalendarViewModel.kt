@@ -13,9 +13,9 @@ import java.util.Calendar
 import javax.inject.Inject
 
 import com.gymapp.data.local.dao.StaffDao
-import com.gymapp.data.local.dao.TransactionDao
 import com.gymapp.data.local.entity.StaffEntity
 import com.gymapp.data.local.preferences.AppPreferences
+import com.gymapp.domain.appointment.CompleteAppointmentUseCase
 
 data class CalendarUiState(
     val appointments: List<AppointmentEntity> = emptyList(),
@@ -29,8 +29,8 @@ class CalendarViewModel @Inject constructor(
     private val appointmentDao: AppointmentDao,
     private val memberDao: MemberDao,
     private val staffDao: StaffDao,
-    private val transactionDao: TransactionDao,
-    private val prefs: AppPreferences
+    private val prefs: AppPreferences,
+    private val completeAppointmentUseCase: CompleteAppointmentUseCase
 ) : ViewModel() {
 
     private val _selectedDate = MutableStateFlow(Calendar.getInstance())
@@ -96,14 +96,7 @@ class CalendarViewModel @Inject constructor(
 
     fun updateAppointmentStatus(appointmentId: Long, status: String, notes: String) {
         viewModelScope.launch {
-            appointmentDao.processAppointmentStatus(
-                appointmentId = appointmentId,
-                status = status,
-                notes = notes,
-                memberDao = memberDao,
-                transactionDao = transactionDao,
-                staffDao = staffDao
-            )
+            completeAppointmentUseCase(appointmentId, status, notes)
         }
     }
 }

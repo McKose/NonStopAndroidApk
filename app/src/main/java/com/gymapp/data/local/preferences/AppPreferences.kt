@@ -13,13 +13,10 @@ class AppPreferences @Inject constructor(
 ) {
     private val prefs: SharedPreferences = context.getSharedPreferences("gym_app_prefs", Context.MODE_PRIVATE)
 
-    var commissionRate: Float
-        get() = prefs.getFloat("commission_rate", 10f)
-        set(value) = prefs.edit().putFloat("commission_rate", value).apply()
-
-    var multiSportCommission: Float
-        get() = prefs.getFloat("multisport_commission", 15f)
-        set(value) = prefs.edit().putFloat("multisport_commission", value).apply()
+    // Not: Hakediş oranları artık per-staff (StaffEntity.commissionRate) tutuluyor.
+    // MultiSport seans ücreti time-versioned (MultiSportRateEntity) tutuluyor.
+    // Legacy anahtarlar (commission_rate, multisport_commission) v9 migration sonrası
+    // okunmuyor — silinmelerine gerek yok, prefs'te boş yere yer tutar ama zararsız.
 
     var salonName: String
         get() = prefs.getString("salon_name", "NonStop Gym") ?: "NonStop Gym"
@@ -51,6 +48,10 @@ class AppPreferences @Inject constructor(
     var currentUserId: Long
         get() = prefs.getLong("current_user_id", -1L)
         set(value) = prefs.edit().putLong("current_user_id", value).apply()
+
+    var isLoggedIn: Boolean
+        get() = prefs.getBoolean("is_logged_in", false)
+        set(value) = prefs.edit().putBoolean("is_logged_in", value).apply()
 
     companion object {
         const val DEFAULT_ADMIN_PASSWORD = "1234"

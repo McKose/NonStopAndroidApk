@@ -24,8 +24,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import com.gymapp.presentation.common.GlobalErrorHandler
+import com.gymapp.domain.tax.TaxAutoPostingUseCase
 import javax.inject.Inject
 import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gymapp.presentation.calendar.CalendarScreen
 import com.gymapp.presentation.dashboard.DashboardScreen
@@ -34,8 +37,14 @@ import com.gymapp.presentation.packages.AddPackageScreen
 import com.gymapp.presentation.packages.PackageListScreen
 import com.gymapp.presentation.members.MemberDetailScreen
 import com.gymapp.presentation.members.MemberListScreen
+import com.gymapp.presentation.members.MeasurementEntryScreen
+import com.gymapp.presentation.members.PostureCommentScreen
 import com.gymapp.presentation.members.RegisterMemberScreen
+import com.gymapp.data.local.preferences.AppPreferences
 import com.gymapp.presentation.finance.FinanceScreen
+import com.gymapp.presentation.finance.FinanceRevenueScreen
+import com.gymapp.presentation.finance.FinanceExpensesScreen
+import com.gymapp.presentation.finance.FinanceTaxScreen
 import com.gymapp.presentation.market.MarketScreen
 import com.gymapp.presentation.market.OrderHistoryScreen
 import com.gymapp.presentation.settings.SettingsScreen
@@ -47,11 +56,18 @@ import com.gymapp.ui.theme.GymAppTheme
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var errorHandler: GlobalErrorHandler
+    @Inject lateinit var taxAutoPostingUseCase: TaxAutoPostingUseCase
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val prefs = AppPreferences(this)
+        val startDest = if (prefs.isLoggedIn) "dashboard" else "login"
+        
         enableEdgeToEdge()
+        // Geçmiş aylar için eksik KDV ve yıl sonları için eksik gelir vergisi
+        // PENDING EXPENSE kayıtlarını oluştur (idempotent, açılışta 1 kez).
+        lifecycleScope.launch { taxAutoPostingUseCase() }
         setContent {
             val context = LocalContext.current
             LaunchedEffect(Unit) {
@@ -64,7 +80,7 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     NavHost(
                         navController = navController,
-                        startDestination = "login"
+                        startDestination = startDest
                     ) {
                         composable("login") {
                             LoginScreen(
@@ -114,7 +130,21 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("finance") {
-                            FinanceScreen(onNavigateBack = { navController.popBackStack() })
+                            FinanceScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                onNavigateToRevenue = { navController.navigate("finance_revenue") },
+                                onNavigateToExpenses = { navController.navigate("finance_expenses") },
+                                onNavigateToTaxes = { navController.navigate("finance_taxes") }
+                            )
+                        }
+                        composable("finance_revenue") {
+                            FinanceRevenueScreen(onNavigateBack = { navController.popBackStack() })
+                        }
+                        composable("finance_expenses") {
+                            FinanceExpensesScreen(onNavigateBack = { navController.popBackStack() })
+                        }
+                        composable("finance_taxes") {
+                            FinanceTaxScreen(onNavigateBack = { navController.popBackStack() })
                         }
                         composable("market") {
                             MarketScreen(
@@ -141,7 +171,12 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("register_member") {
                             RegisterMemberScreen(
-                                onNavigateBack = { navController.popBackStack() }
+                                onNavigateBack = { navController.popBackStack() },
+                                onRequestMeasurement = { id ->
+                                    navController.navigate("measurement_entry/$id/0") {
+                                        popUpTo("register_member") { inclusive = true }
+                                    }
+                                }
                             )
                         }
                         composable(
@@ -152,7 +187,12 @@ class MainActivity : ComponentActivity() {
                             RegisterMemberScreen(
                                 isRenewal = true,
                                 memberId = memberId,
-                                onNavigateBack = { navController.popBackStack() }
+                                onNavigateBack = { navController.popBackStack() },
+                                onRequestMeasurement = { id ->
+                                    navController.navigate("measurement_entry/$id/0") {
+                                        popUpTo("renew_package/$memberId") { inclusive = true }
+                                    }
+                                }
                             )
                         }
                         composable(
@@ -161,6 +201,40 @@ class MainActivity : ComponentActivity() {
                         ) { backStackEntry ->
                             val memberId = backStackEntry.arguments?.getLong("memberId") ?: 0L
                             MemberDetailScreen(
+                                memberId = memberId,
+                                onNavigateBack = { navController.popBackStack() },
+                                onAddMeasurement = {
+                                    navController.navigate("measurement_entry/$memberId/0")
+                                },
+                                onEditMeasurement = { measurementId ->
+                                    navController.navigate("measurement_entry/$memberId/$measurementId")
+                                },
+                                onOpenPosture = {
+                                    navController.navigate("posture/$memberId")
+                                }
+                            )
+                        }
+                        composable(
+                            route = "measurement_entry/{memberId}/{measurementId}",
+                            arguments = listOf(
+                                navArgument("memberId") { type = NavType.LongType },
+                                navArgument("measurementId") { type = NavType.LongType }
+                            )
+                        ) { backStackEntry ->
+                            val memberId = backStackEntry.arguments?.getLong("memberId") ?: 0L
+                            val measurementId = backStackEntry.arguments?.getLong("measurementId") ?: 0L
+                            MeasurementEntryScreen(
+                                memberId = memberId,
+                                measurementId = measurementId,
+                                onDone = { navController.popBackStack() }
+                            )
+                        }
+                        composable(
+                            route = "posture/{memberId}",
+                            arguments = listOf(navArgument("memberId") { type = NavType.LongType })
+                        ) { backStackEntry ->
+                            val memberId = backStackEntry.arguments?.getLong("memberId") ?: 0L
+                            PostureCommentScreen(
                                 memberId = memberId,
                                 onNavigateBack = { navController.popBackStack() }
                             )

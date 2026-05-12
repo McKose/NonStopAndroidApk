@@ -1,10 +1,11 @@
 package com.gymapp.presentation.members
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -13,13 +14,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.gymapp.data.local.entity.MeasurementEntity
 import com.gymapp.data.local.entity.MemberEntity
+import com.gymapp.data.local.entity.MemberPackageEntity
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -28,11 +32,14 @@ import java.util.*
 fun MemberDetailScreen(
     memberId: Long,
     onNavigateBack: () -> Unit,
+    onAddMeasurement: () -> Unit = {},
+    onEditMeasurement: (Long) -> Unit = {},
+    onOpenPosture: () -> Unit = {},
     viewModel: MemberViewModel = hiltViewModel()
 ) {
     val member by viewModel.getMemberById(memberId).collectAsState(initial = null)
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Genel", "Sağlık", "Ölçümler", "Paketler")
+    val tabs = listOf("Genel", "Sağlık", "Ölçümler", "Paketler", "Postür")
 
     Scaffold(
         topBar = {
@@ -56,10 +63,11 @@ fun MemberDetailScreen(
     ) { padding ->
         member?.let { m ->
             Column(modifier = Modifier.padding(padding)) {
-                TabRow(
+                ScrollableTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    edgePadding = 8.dp
                 ) {
                     tabs.forEachIndexed { index, title ->
                         Tab(
@@ -73,13 +81,16 @@ fun MemberDetailScreen(
                 when (selectedTab) {
                     0 -> GeneralInfoTab(m, viewModel)
                     1 -> HealthProfileTab(m, viewModel)
-                    2 -> MeasurementsTab(m, viewModel)
+                    2 -> MeasurementsTab(m, viewModel, onAddMeasurement, onEditMeasurement)
                     3 -> PackagesTab(m, viewModel)
+                    4 -> PostureTab(m, viewModel, onOpenPosture)
                 }
             }
         } ?: LoadingState()
     }
 }
+
+// ─── GENEL ───────────────────────────────────────────────────────────────────
 
 @Composable
 fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewModel()) {
@@ -93,9 +104,9 @@ fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewMo
                 DetailRow(label = "Telefon", value = member.phone)
                 member.email?.let { DetailRow(label = "E-posta", value = it) }
                 DetailRow(label = "Durum", value = member.status)
-                
+
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                
+
                 DetailRow(label = "Ödeme Durumu", value = if (member.paymentStatus == "PAID") "Ödendi" else "Ödeme Bekliyor")
                 if (member.paymentStatus == "PENDING") {
                     Button(
@@ -110,7 +121,7 @@ fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewMo
                 }
             }
         }
-        
+
         Text("Üyelik Bilgileri", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -121,6 +132,8 @@ fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewMo
         }
     }
 }
+
+// ─── SAĞLIK ──────────────────────────────────────────────────────────────────
 
 @Composable
 fun HealthProfileTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewModel()) {
@@ -166,7 +179,7 @@ fun HealthProfileTab(member: MemberEntity, viewModel: MemberViewModel = hiltView
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = when(riskLevel) {
+                containerColor = when (riskLevel) {
                     "HIGH" -> MaterialTheme.colorScheme.errorContainer
                     "MEDIUM" -> Color(0xFFFFEB3B).copy(alpha = 0.3f)
                     else -> MaterialTheme.colorScheme.primaryContainer
@@ -192,7 +205,7 @@ fun HealthProfileTab(member: MemberEntity, viewModel: MemberViewModel = hiltView
                 }
             }
         }
-        
+
         if (isEditing) {
             OutlinedTextField(
                 value = healthRisks,
@@ -211,19 +224,25 @@ fun HealthProfileTab(member: MemberEntity, viewModel: MemberViewModel = hiltView
         } else {
             Text("Kronik Rahatsızlıklar", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
             Text(text = member.healthRisks ?: "Belirtilmemiş", style = MaterialTheme.typography.bodyLarge)
-            
+
             Spacer(Modifier.height(8.dp))
-            
+
             Text("Sağlık Notları", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
             Text(text = member.healthNotes ?: "Not yok", style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
 
+// ─── ÖLÇÜMLER ────────────────────────────────────────────────────────────────
+
 @Composable
-fun MeasurementsTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewModel()) {
+fun MeasurementsTab(
+    member: MemberEntity,
+    viewModel: MemberViewModel,
+    onAddMeasurement: () -> Unit,
+    onEditMeasurement: (Long) -> Unit
+) {
     val measurements by viewModel.getMeasurements(member.id).collectAsState(initial = emptyList())
-    var showAddDialog by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
@@ -231,12 +250,23 @@ fun MeasurementsTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewM
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Son Ölçümler", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Button(onClick = { showAddDialog = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
+            Text("Ölçümler", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Button(
+                onClick = onAddMeasurement,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+            ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("Ölçüm Ekle", style = MaterialTheme.typography.labelLarge)
+                Text("Ekle", style = MaterialTheme.typography.labelLarge)
             }
+        }
+
+        // Kilo trend grafiği — son 30 kayıt
+        val weightSeries = remember(measurements) {
+            measurements.filter { it.weight > 0 }.sortedBy { it.dateMs }.takeLast(30)
+        }
+        if (weightSeries.size >= 2) {
+            WeightTrendCard(weightSeries)
         }
 
         if (measurements.isEmpty()) {
@@ -246,41 +276,96 @@ fun MeasurementsTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewM
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                 items(measurements) { measurement ->
-                    MeasurementHistoryItem(measurement)
+                    MeasurementHistoryItem(
+                        measurement = measurement,
+                        onEdit = { onEditMeasurement(measurement.id) },
+                        onDelete = { viewModel.deleteMeasurement(measurement) }
+                    )
                 }
             }
         }
     }
+}
 
-    if (showAddDialog) {
-        AddMeasurementDialog(
-            memberId = member.id,
-            onDismiss = { showAddDialog = false },
-            onConfirm = { m ->
-                viewModel.addMeasurement(m)
-                showAddDialog = false
+@Composable
+private fun WeightTrendCard(series: List<MeasurementEntity>) {
+    val weights = series.map { it.weight }
+    val minW = weights.min()
+    val maxW = weights.max()
+    val range = (maxW - minW).takeIf { it > 0 } ?: 1.0
+    val primary = MaterialTheme.colorScheme.primary
+    val secondary = MaterialTheme.colorScheme.secondary
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Kilo Trendi (son ${series.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text("%.1f → %.1f kg".format(weights.first(), weights.last()), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             }
-        )
+            Spacer(Modifier.height(8.dp))
+            Canvas(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+                val w = size.width
+                val h = size.height
+                val stepX = if (series.size > 1) w / (series.size - 1).toFloat() else w
+                val path = Path()
+                series.forEachIndexed { i, m ->
+                    val normY = ((m.weight - minW) / range).toFloat()
+                    val x = stepX * i
+                    val y = h - normY * h * 0.9f - h * 0.05f
+                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                drawPath(path = path, color = primary, style = Stroke(width = 4f))
+                series.forEachIndexed { i, m ->
+                    val normY = ((m.weight - minW) / range).toFloat()
+                    val x = stepX * i
+                    val y = h - normY * h * 0.9f - h * 0.05f
+                    drawCircle(color = secondary, radius = 5f, center = Offset(x, y))
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("min %.1f".format(minW), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                Text("max %.1f".format(maxW), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+            }
+        }
     }
 }
 
 @Composable
-fun MeasurementHistoryItem(measurement: com.gymapp.data.local.entity.MeasurementEntity) {
+fun MeasurementHistoryItem(
+    measurement: MeasurementEntity,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     val sdf = remember { SimpleDateFormat("dd MMMM yyyy", Locale("tr")) }
+    var confirmDelete by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(sdf.format(Date(measurement.dateMs)), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Text("${measurement.weight} kg / ${measurement.height} cm", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                Row {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Düzenle", modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(onClick = { confirmDelete = true }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Sil", modifier = Modifier.size(18.dp), tint = Color.Red)
+                    }
+                }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(6.dp))
+            Text("${measurement.weight} kg / ${measurement.height} cm", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
             HorizontalDivider(thickness = 0.5.dp)
-            Spacer(Modifier.height(12.dp))
-            
-            // Grid layout for measurements
+            Spacer(Modifier.height(8.dp))
+
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     MeasurementLabelValue("Omuz", "${measurement.shoulder} cm", Modifier.weight(1f))
@@ -293,12 +378,25 @@ fun MeasurementHistoryItem(measurement: com.gymapp.data.local.entity.Measurement
                     MeasurementLabelValue("Kol", "${measurement.arm} cm", Modifier.weight(1f))
                 }
             }
-            
+
             if (measurement.notes.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Not: ${measurement.notes}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             }
         }
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Ölçümü Sil") },
+            text = { Text("Bu ölçüm kaydı silinsin mi? Geri alınamaz.") },
+            confirmButton = {
+                TextButton(onClick = { onDelete(); confirmDelete = false }) {
+                    Text("Sil", color = Color.Red)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("İptal") } }
+        )
     }
 }
 
@@ -310,121 +408,167 @@ fun MeasurementLabelValue(label: String, value: String, modifier: Modifier = Mod
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddMeasurementDialog(
-    memberId: Long,
-    onDismiss: () -> Unit,
-    onConfirm: (com.gymapp.data.local.entity.MeasurementEntity) -> Unit
-) {
-    var weight by remember { mutableStateOf("") }
-    var height by remember { mutableStateOf("") }
-    var shoulder by remember { mutableStateOf("") }
-    var chest by remember { mutableStateOf("") }
-    var waist by remember { mutableStateOf("") }
-    var hips by remember { mutableStateOf("") }
-    var leg by remember { mutableStateOf("") }
-    var arm by remember { mutableStateOf("") }
-    var notes by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Yeni Ölçüm Kaydı") },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = weight, onValueChange = { weight = it }, label = { Text("Kilo (kg)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                    OutlinedTextField(value = height, onValueChange = { height = it }, label = { Text("Boy (cm)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = shoulder, onValueChange = { shoulder = it }, label = { Text("Omuz") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                    OutlinedTextField(value = chest, onValueChange = { chest = it }, label = { Text("Göğüs") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = waist, onValueChange = { waist = it }, label = { Text("Karın") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                    OutlinedTextField(value = hips, onValueChange = { hips = it }, label = { Text("Kalça") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = leg, onValueChange = { leg = it }, label = { Text("Bacak") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                    OutlinedTextField(value = arm, onValueChange = { arm = it }, label = { Text("Kol") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                }
-                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notlar") }, modifier = Modifier.fillMaxWidth())
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                onConfirm(com.gymapp.data.local.entity.MeasurementEntity(
-                    memberId = memberId,
-                    weight = weight.toDoubleOrNull() ?: 0.0,
-                    height = height.toDoubleOrNull() ?: 0.0,
-                    shoulder = shoulder.toDoubleOrNull() ?: 0.0,
-                    chest = chest.toDoubleOrNull() ?: 0.0,
-                    waist = waist.toDoubleOrNull() ?: 0.0,
-                    hips = hips.toDoubleOrNull() ?: 0.0,
-                    leg = leg.toDoubleOrNull() ?: 0.0,
-                    arm = arm.toDoubleOrNull() ?: 0.0,
-                    notes = notes
-                ))
-            }) { Text("Kaydet") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("İptal") } }
-    )
-}
+// ─── PAKETLER ────────────────────────────────────────────────────────────────
 
 @Composable
 fun PackagesTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewModel()) {
-    val packages by viewModel.packages.collectAsState()
-    val activePackage = packages.find { it.id == member.activePackageId }
-    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
+    val actives by viewModel.getActivePackages(member.id).collectAsState(initial = emptyList())
+    val history by viewModel.getPackageHistory(member.id).collectAsState(initial = emptyList())
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale("tr")) }
 
-    Column(modifier = Modifier.padding(16.dp).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        if (activePackage != null) {
-            Text("Aktif Paket", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Inventory2, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.width(12.dp))
-                        Text(activePackage.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    DetailRow(label = "Paket Türü", value = if (activePackage.type == "ABONMAN") "Abonman" else "Ders Paketi")
-                    DetailRow(label = "Bitiş Tarihi", value = member.endDateMs?.let { dateFormat.format(Date(it)) } ?: "-")
-                    DetailRow(
-                        label = "Kalan Hak", 
-                        value = if (activePackage.type == "ABONMAN") "Sınırsız" else "${member.remainingSessions} Seans"
-                    )
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text("Aktif Paketler (${actives.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+        if (actives.isEmpty()) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                    Text("Aktif paket yok.", color = Color.Gray)
                 }
             }
         } else {
-            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Inventory2, contentDescription = null, modifier = Modifier.size(48.dp), tint = Color.Gray)
-                    Spacer(Modifier.height(8.dp))
-                    Text("Aktif paket bulunamadı.", color = Color.Gray)
-                }
+            items(actives, key = { it.id }) { pkg ->
+                MemberPackageCard(pkg = pkg, dateFormat = dateFormat, isActive = true)
             }
         }
-        
-        HorizontalDivider()
-        Text("Paket Geçmişi", style = MaterialTheme.typography.titleSmall, color = Color.Gray)
-        Text("Henüz geçmiş işlem bulunmuyor.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+
+        item {
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(4.dp))
+            Text("Geçmiş Paketler (${history.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.Gray)
+        }
+        if (history.isEmpty()) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth().height(60.dp), contentAlignment = Alignment.Center) {
+                    Text("Henüz geçmiş işlem yok.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        } else {
+            items(history, key = { it.id }) { pkg ->
+                MemberPackageCard(pkg = pkg, dateFormat = dateFormat, isActive = false)
+            }
+        }
     }
 }
 
 @Composable
-fun MeasurementCard(label: String, value: String, icon: ImageVector, modifier: Modifier) {
-    Card(modifier = modifier) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-            Text(label, style = MaterialTheme.typography.labelMedium)
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+private fun MemberPackageCard(
+    pkg: MemberPackageEntity,
+    dateFormat: SimpleDateFormat,
+    isActive: Boolean
+) {
+    val used = if (pkg.totalSessions > 0) (pkg.totalSessions - pkg.remainingSessions).coerceAtLeast(0) else 0
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isActive) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Inventory2,
+                        contentDescription = null,
+                        tint = if (isActive) MaterialTheme.colorScheme.primary else Color.Gray
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(pkg.packageNameSnapshot, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+                Text(
+                    if (isActive) "AKTİF" else "GEÇMİŞ",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isActive) MaterialTheme.colorScheme.primary else Color.Gray
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            DetailRow("Tür", pkg.packageType)
+            DetailRow("Başlangıç", dateFormat.format(Date(pkg.startDateMs)))
+            DetailRow("Bitiş", dateFormat.format(Date(pkg.endDateMs)))
+            DetailRow(
+                "Seans",
+                when {
+                    pkg.totalSessions == -1 -> "Sınırsız"
+                    pkg.totalSessions > 0 -> "$used / ${pkg.totalSessions} kullanıldı"
+                    else -> "-"
+                }
+            )
+            DetailRow("Ödeme", "${pkg.paymentType}${if (pkg.installmentCount > 1) " (${pkg.installmentCount}x)" else ""}")
+            DetailRow("Tutar", "₺%.2f".format(pkg.pricePaid))
+            if (pkg.installmentSurcharge > 0) {
+                DetailRow("Taksit Komisyonu", "+₺%.2f".format(pkg.installmentSurcharge))
+            }
         }
     }
 }
+
+// ─── POSTÜR ──────────────────────────────────────────────────────────────────
+
+@Composable
+fun PostureTab(
+    member: MemberEntity,
+    viewModel: MemberViewModel,
+    onOpenPosture: () -> Unit
+) {
+    val comments by viewModel.getPostureComments(member.id).collectAsState(initial = emptyList())
+    val sdf = remember { SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("tr")) }
+
+    Column(modifier = Modifier.padding(16.dp).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Postür Gözlemleri", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Button(onClick = onOpenPosture, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Yeni", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+
+        if (comments.isEmpty()) {
+            Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                Text("Henüz postür gözlemi yok.", color = Color.Gray)
+            }
+        } else {
+            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(comments, key = { it.id }) { c ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                        )
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(
+                                sdf.format(Date(c.dateMs)),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(c.comment, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─── Ortak ──────────────────────────────────────────────────────────────────
 
 @Composable
 fun LoadingState() {

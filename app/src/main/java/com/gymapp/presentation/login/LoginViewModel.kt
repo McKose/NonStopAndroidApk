@@ -33,6 +33,7 @@ class LoginViewModel @Inject constructor(
             ) {
                 prefs.currentUserRole = "admin"
                 prefs.currentUserId = -1L
+                prefs.isLoggedIn = true
                 _error.value = null
                 onLoginSuccess()
                 return@launch
@@ -42,6 +43,7 @@ class LoginViewModel @Inject constructor(
             if (staff != null && staff.isActive && PasswordHasher.verify(password, staff.password)) {
                 prefs.currentUserRole = staff.role
                 prefs.currentUserId = staff.id
+                prefs.isLoggedIn = true
                 _error.value = null
                 onLoginSuccess()
             } else {
