@@ -31,6 +31,7 @@ fun FinanceScreen(
     onNavigateToRevenue: () -> Unit,
     onNavigateToExpenses: () -> Unit,
     onNavigateToTaxes: () -> Unit,
+    onNavigateToCommissions: () -> Unit,
     viewModel: FinanceViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -138,6 +139,14 @@ fun FinanceScreen(
                 icon = Icons.Default.Gavel,
                 color = Color(0xFF7C4DFF),
                 onClick = onNavigateToTaxes
+            )
+
+            FinanceNavigationButton(
+                label = "Personel Hakedişleri",
+                description = "Antrenör hakediş takibi ve ödeme işlemleri",
+                icon = Icons.Default.Groups,
+                color = Color(0xFF4CAF50),
+                onClick = onNavigateToCommissions
             )
         }
     }

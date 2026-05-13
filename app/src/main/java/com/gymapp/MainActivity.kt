@@ -45,6 +45,7 @@ import com.gymapp.presentation.finance.FinanceScreen
 import com.gymapp.presentation.finance.FinanceRevenueScreen
 import com.gymapp.presentation.finance.FinanceExpensesScreen
 import com.gymapp.presentation.finance.FinanceTaxScreen
+import com.gymapp.presentation.finance.FinanceCommissionScreen
 import com.gymapp.presentation.market.MarketScreen
 import com.gymapp.presentation.market.OrderHistoryScreen
 import com.gymapp.presentation.settings.SettingsScreen
@@ -134,7 +135,8 @@ class MainActivity : ComponentActivity() {
                                 onNavigateBack = { navController.popBackStack() },
                                 onNavigateToRevenue = { navController.navigate("finance_revenue") },
                                 onNavigateToExpenses = { navController.navigate("finance_expenses") },
-                                onNavigateToTaxes = { navController.navigate("finance_taxes") }
+                                onNavigateToTaxes = { navController.navigate("finance_taxes") },
+                                onNavigateToCommissions = { navController.navigate("finance_commissions") }
                             )
                         }
                         composable("finance_revenue") {
@@ -145,6 +147,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("finance_taxes") {
                             FinanceTaxScreen(onNavigateBack = { navController.popBackStack() })
+                        }
+                        composable("finance_commissions") {
+                            FinanceCommissionScreen(onNavigateBack = { navController.popBackStack() })
                         }
                         composable("market") {
                             MarketScreen(

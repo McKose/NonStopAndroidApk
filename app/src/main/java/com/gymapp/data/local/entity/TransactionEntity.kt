@@ -53,5 +53,6 @@ object TransactionCategory {
     // Otomatik vergi kayıtları (PENDING EXPENSE olarak yazılır)
     const val TAX_VAT = "TAX_VAT"
     const val TAX_INCOME = "TAX_INCOME"
+    const val STAFF_PAYMENT = "STAFF_PAYMENT"
     const val OTHER = "OTHER"
 }

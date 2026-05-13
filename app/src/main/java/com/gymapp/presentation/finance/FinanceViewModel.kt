@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.entity.TransactionEntity
 import com.gymapp.data.repository.FinanceRepository
 import com.gymapp.domain.tax.TaxCalculator
+import com.gymapp.data.local.dao.StaffDao
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -29,12 +30,14 @@ data class FinanceUiState(
     val taxQuarters: List<TaxCalculator.QuarterResult> = emptyList(),
     val taxVatTotal: Double = 0.0,
     val taxIncomeTotal: Double = 0.0,
-    val taxableBaseYear: Double = 0.0
+    val taxableBaseYear: Double = 0.0,
+    val allStaff: List<com.gymapp.data.local.entity.StaffEntity> = emptyList()
 )
 
 @HiltViewModel
 class FinanceViewModel @Inject constructor(
-    private val repository: FinanceRepository
+    private val repository: FinanceRepository,
+    private val staffDao: StaffDao
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow("ALL")
@@ -44,12 +47,16 @@ class FinanceViewModel @Inject constructor(
     
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<FinanceUiState> = combine(
-        _selectedMonth,
-        _selectedYear,
-        _filter,
-        _methodFilter,
-        repository.getAllTransactions()
-    ) { month, year, filter, method, allTransactions ->
+        combine(_selectedMonth, _selectedYear, _filter, _methodFilter) { m, y, f, meth ->
+            listOf(m, y, f, meth)
+        },
+        repository.getAllTransactions(),
+        staffDao.getAllStaff()
+    ) { params, allTransactions, staffList ->
+        val month = params[0] as Int
+        val year = params[1] as Int
+        val filter = params[2] as String
+        val method = params[3] as String
         
         // ─── Sabit Dönem Ciroları ──────────────────────────────────
         
@@ -136,7 +143,8 @@ class FinanceViewModel @Inject constructor(
             taxQuarters = quarters,
             taxVatTotal = vatTotal,
             taxIncomeTotal = incomeTaxTotal,
-            taxableBaseYear = baseYear
+            taxableBaseYear = baseYear,
+            allStaff = staffList
         )
     }.stateIn(
         scope = viewModelScope,
