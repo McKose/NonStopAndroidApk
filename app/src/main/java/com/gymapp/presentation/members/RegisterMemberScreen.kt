@@ -22,6 +22,7 @@ fun RegisterMemberScreen(
     onNavigateBack: () -> Unit,
     isRenewal: Boolean = false,
     memberId: Long = 0L,
+    onRequestMeasurement: (Long) -> Unit = {},
     viewModel: MemberViewModel = hiltViewModel()
 ) {
     val formState by viewModel.formState.collectAsState()
@@ -35,9 +36,14 @@ fun RegisterMemberScreen(
         }
     }
 
-    LaunchedEffect(formState.submitSuccess) {
+    LaunchedEffect(formState.submitSuccess, formState.createdMemberId, formState.measureOnRegistration) {
         if (formState.submitSuccess) {
-            onNavigateBack()
+            val id = formState.createdMemberId ?: memberId.takeIf { it != 0L }
+            if (formState.measureOnRegistration && id != null && id > 0L) {
+                onRequestMeasurement(id)
+            } else {
+                onNavigateBack()
+            }
         }
     }
 
@@ -193,7 +199,7 @@ fun RegisterMemberScreen(
 
             if (formState.paymentType == PaymentType.CARD) {
                 var expanded by remember { mutableStateOf(false) }
-                val installmentOptions = listOf(1, 2, 3, 6, 9, 12)
+                val installmentOptions = (1..12).toList()
 
                 ExposedDropdownMenuBox(
                     expanded = expanded,
@@ -249,6 +255,15 @@ fun RegisterMemberScreen(
                                 Text("-₺${formState.discount}", color = MaterialTheme.colorScheme.error)
                             }
                         }
+                        if (formState.previewSurcharge > 0.0) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Taksit Komisyonu (${"%.2f".format(formState.previewRatePercent)}%)")
+                                Text("+₺${"%.2f".format(formState.previewSurcharge)}")
+                            }
+                        }
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -274,6 +289,34 @@ fun RegisterMemberScreen(
                 modifier = Modifier.fillMaxWidth().height(100.dp),
                 maxLines = 4
             )
+
+            // ─── Ölçüm Prompt ─────────────────────────────────────────────
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Ölçüm almak ister misiniz?", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Kayıt tamamlanınca Boy/Kilo/Omuz/Göğüs/Karın/Kalça/Bacak/Kol girişi açılır. İstediğiniz zaman üye detayından da girebilirsiniz.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = formState.measureOnRegistration,
+                        onCheckedChange = viewModel::onMeasureOnRegistrationToggle
+                    )
+                }
+            }
 
             formState.submitError?.let { error ->
                 Card(

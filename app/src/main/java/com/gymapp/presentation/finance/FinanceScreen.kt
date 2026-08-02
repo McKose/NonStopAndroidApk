@@ -1,26 +1,21 @@
 package com.gymapp.presentation.finance
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -33,18 +28,40 @@ import java.util.*
 @Composable
 fun FinanceScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToRevenue: () -> Unit,
+    onNavigateToExpenses: () -> Unit,
+    onNavigateToTaxes: () -> Unit,
+    onNavigateToCommissions: () -> Unit,
     viewModel: FinanceViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        onResult = { uri ->
+            uri?.let {
+                ExcelExporter.exportTransactionsToExcel(context, it, uiState.transactions)
+            }
+        }
+    )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Finansal Durum", fontWeight = FontWeight.Bold) },
+                title = { Text("Finansal Panel", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        val timestamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
+                        exportLauncher.launch("Finans_Raporu_$timestamp.xlsx")
+                    }) {
+                        Icon(Icons.Default.Download, contentDescription = "Excel Dışa Aktar")
                     }
                 }
             )
@@ -55,42 +72,34 @@ fun FinanceScreen(
             }
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            // ─── Dönem Seçici ──────────────────────────────────────────
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
             MonthYearPicker(
                 selectedMonth = uiState.selectedMonth,
                 selectedYear = uiState.selectedYear,
-                onMonthChanged = { month, year ->
-                    viewModel.setPeriod(month, year)
-                }
+                onMonthChanged = { month, year -> viewModel.setPeriod(month, year) }
             )
 
-            // ─── Ciro Kartları (Aylık, 3 Aylık, 6 Aylık, Yıllık) ───────────────────
-            LazyRow(
-                modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                item { RevenueCard("Aylık Ciro", uiState.monthlyRevenue) }
-                item { RevenueCard("3 Aylık Ciro", uiState.quarterlyRevenue) }
-                item { RevenueCard("6 Aylık Ciro", uiState.halfYearlyRevenue) }
-                item { RevenueCard("Yıllık Ciro", uiState.yearlyRevenue) }
-            }
-
-            // ─── Finansal Özet Kartları ─────────────────────────────────
+            // Finansal Özet Kartları
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FinanceSummaryCard(
-                    label = "Aylık Gelir",
+                    label = "Gelir",
                     amount = uiState.totalIncome,
                     icon = Icons.Default.TrendingUp,
                     color = Color(0xFF4CAF50),
                     modifier = Modifier.weight(1f)
                 )
                 FinanceSummaryCard(
-                    label = "Aylık Gider",
+                    label = "Gider",
                     amount = uiState.totalExpense,
                     icon = Icons.Default.TrendingDown,
                     color = Color(0xFFF44336),
@@ -105,64 +114,40 @@ fun FinanceScreen(
                 )
             }
 
-            // ─── Filtre Çipleri ──────────────────────────────────────────
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = uiState.selectedFilter == "ALL",
-                    onClick = { viewModel.setFilter("ALL") },
-                    label = { Text("Tümü") }
-                )
-                FilterChip(
-                    selected = uiState.selectedFilter == "INCOME",
-                    onClick = { viewModel.setFilter("INCOME") },
-                    label = { Text("Gelir") }
-                )
-                FilterChip(
-                    selected = uiState.selectedFilter == "EXPENSE",
-                    onClick = { viewModel.setFilter("EXPENSE") },
-                    label = { Text("Gider") }
-                )
-                FilterChip(
-                    selected = uiState.selectedFilter == "PENDING",
-                    onClick = { viewModel.setFilter("PENDING") },
-                    label = { Text("Bekleyen") }
-                )
-            }
-
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf("ALL" to "Tümü", "CASH" to "Nakit", "CARD" to "Kart", "MULTISPORT" to "Multi").forEach { (id, label) ->
-                    FilterChip(
-                        selected = uiState.selectedPaymentMethod == id,
-                        onClick = { viewModel.setMethodFilter(id) },
-                        label = { Text(label) }
-                    )
-                }
-            }
-
             Spacer(Modifier.height(8.dp))
+            Text("Detaylar ve Hareketler", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
-            // ─── İşlem Listesi ──────────────────────────────────────────
-            if (uiState.transactions.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Bu dönemde işlem bulunamadı.", color = Color.Gray)
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(uiState.transactions) { transaction ->
-                        TransactionListItem(transaction)
-                    }
-                }
-            }
+            FinanceNavigationButton(
+                label = "Ciro Detayları",
+                description = "Aylık, 3/6 aylık ve yıllık ciro raporları",
+                icon = Icons.Default.BarChart,
+                color = MaterialTheme.colorScheme.primary,
+                onClick = onNavigateToRevenue
+            )
+
+            FinanceNavigationButton(
+                label = "Gider Detayları",
+                description = "Manuel giderler ve otomatik vergi kayıtları",
+                icon = Icons.Default.Payments,
+                color = Color(0xFFF44336),
+                onClick = onNavigateToExpenses
+            )
+
+            FinanceNavigationButton(
+                label = "Vergi Detayları",
+                description = "KDV ve Gelir Vergisi çeyreklik matrah raporu",
+                icon = Icons.Default.Gavel,
+                color = Color(0xFF7C4DFF),
+                onClick = onNavigateToTaxes
+            )
+
+            FinanceNavigationButton(
+                label = "Personel Hakedişleri",
+                description = "Antrenör hakediş takibi ve ödeme işlemleri",
+                icon = Icons.Default.Groups,
+                color = Color(0xFF4CAF50),
+                onClick = onNavigateToCommissions
+            )
         }
     }
 
@@ -185,6 +170,43 @@ fun FinanceScreen(
 }
 
 @Composable
+fun FinanceNavigationButton(
+    label: String,
+    description: String,
+    icon: ImageVector,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.08f))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                color = color.copy(alpha = 0.1f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = color)
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+        }
+    }
+}
+
+@Composable
 fun MonthYearPicker(
     selectedMonth: Int,
     selectedYear: Int,
@@ -193,7 +215,7 @@ fun MonthYearPicker(
     val months = listOf("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık")
     
     Card(
-        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
         Row(
@@ -228,7 +250,7 @@ fun MonthYearPicker(
 }
 
 @Composable
-fun FinanceSummaryCard(label: String, amount: Double, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier) {
+fun FinanceSummaryCard(label: String, amount: Double, icon: ImageVector, color: Color, modifier: Modifier) {
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f)),
@@ -239,8 +261,8 @@ fun FinanceSummaryCard(label: String, amount: Double, icon: androidx.compose.ui.
             Spacer(Modifier.height(8.dp))
             Text(label, style = MaterialTheme.typography.labelMedium, color = color)
             Text(
-                "₺${String.format(Locale.getDefault(), "%,.2f", amount)}",
-                style = MaterialTheme.typography.titleLarge,
+                "₺${String.format(Locale.getDefault(), "%,.0f", amount)}",
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = color
             )
@@ -266,7 +288,10 @@ fun RevenueCard(label: String, amount: Double) {
 }
 
 @Composable
-fun TransactionListItem(transaction: TransactionEntity) {
+fun TransactionListItem(
+    transaction: TransactionEntity,
+    onMarkPaid: (() -> Unit)? = null
+) {
     val sdf = remember { SimpleDateFormat("dd MMM, HH:mm", Locale("tr")) }
     val isIncome = transaction.type == "INCOME"
     
@@ -322,9 +347,13 @@ fun TransactionListItem(transaction: TransactionEntity) {
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
                     Text(
-                        text = transaction.category,
+                        text = categoryLabel(transaction.category),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = if (transaction.category == "TAX_VAT" || transaction.category == "TAX_INCOME")
+                                    Color(0xFFD32F2F)
+                                else MaterialTheme.colorScheme.primary,
+                        fontWeight = if (transaction.category == "TAX_VAT" || transaction.category == "TAX_INCOME")
+                                        FontWeight.Bold else FontWeight.Normal,
                         modifier = Modifier.padding(end = 8.dp)
                     )
                     Text(
@@ -349,16 +378,39 @@ fun TransactionListItem(transaction: TransactionEntity) {
                         )
                     }
                 }
+                if (transaction.isPending && onMarkPaid != null) {
+                    OutlinedButton(
+                        onClick = onMarkPaid,
+                        modifier = Modifier.padding(top = 6.dp).height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                    ) {
+                        Text("Ödendi olarak işaretle", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
-            
+
             Text(
-                "${if (isIncome) "+" else "-"}₺${String.format(Locale.getDefault(), "%,.2f", transaction.amount)}",
+                "${if (isIncome) "+" else "-"}₺${String.format(Locale.getDefault(), "%,.0f", transaction.amount)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = if (isIncome) Color(0xFF4CAF50) else Color(0xFFF44336)
             )
         }
     }
+}
+
+private fun categoryLabel(category: String): String = when (category) {
+    "MEMBERSHIP" -> "Üyelik"
+    "MULTISPORT_SESSION" -> "MultiSport Seans"
+    "TRAINER_COMMISSION" -> "Antrenör Hakedişi"
+    "SALARY" -> "Maaş"
+    "RENT" -> "Kira"
+    "UTILITY" -> "Fatura"
+    "MARKET_SALE" -> "Market Satışı"
+    "TAX_VAT" -> "KDV (Otomatik)"
+    "TAX_INCOME" -> "Gelir Vergisi (Otomatik)"
+    "OTHER" -> "Diğer"
+    else -> category
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -23,4 +23,17 @@ interface TransactionDao {
     
     @Query("SELECT * FROM transactions WHERE category = :category")
     fun getTransactionsByCategory(category: String): Flow<List<TransactionEntity>>
+
+    // ─── Otomatik vergi kaydı için yardımcılar ────────────────────────────────
+    @Query("SELECT * FROM transactions ORDER BY date ASC")
+    suspend fun getAllTransactionsOnce(): List<TransactionEntity>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM transactions WHERE description = :desc LIMIT 1)")
+    suspend fun existsByDescription(desc: String): Boolean
+
+    @Query("SELECT date FROM transactions WHERE type = 'INCOME' ORDER BY date ASC LIMIT 1")
+    suspend fun getEarliestIncomeDate(): Long?
+
+    @Query("UPDATE transactions SET isPending = 0, date = :paidAt WHERE id = :id")
+    suspend fun markTransactionPaid(id: Long, paidAt: Long)
 }

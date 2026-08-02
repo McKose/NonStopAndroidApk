@@ -2,11 +2,15 @@ package com.gymapp.presentation.members
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gymapp.data.local.dao.PostureCommentDao
 import com.gymapp.data.local.entity.MemberEntity
+import com.gymapp.data.local.entity.MemberPackageEntity
 import com.gymapp.data.local.entity.PackageEntity
 import com.gymapp.data.local.entity.PaymentType
+import com.gymapp.data.local.entity.PostureCommentEntity
 import com.gymapp.data.repository.MemberRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -28,27 +32,30 @@ data class RegisterFormState(
     val installmentCount: Int = 1,
     val selectedPackage: PackageEntity? = null,
     val discount: String = "0",
-    val paymentStatus: String = "PAID", // PAID, PENDING
+    val paymentStatus: String = "PAID",
     val paymentDateMs: Long? = System.currentTimeMillis(),
     val healthRisks: String = "",
     val healthNotes: String = "",
     val notes: String = "",
-    // Validation
+    val measureOnRegistration: Boolean = false,
     val fullNameError: String? = null,
     val phoneError: String? = null,
     val isSubmitting: Boolean = false,
     val submitSuccess: Boolean = false,
+    val createdMemberId: Long? = null,
     val submitError: String? = null,
     val isRenewal: Boolean = false,
     val memberId: Long? = null,
-    // Calculated price
-    val previewPrice: Double = 0.0
+    val previewPrice: Double = 0.0,
+    val previewSurcharge: Double = 0.0,
+    val previewRatePercent: Double = 0.0
 )
 
 @HiltViewModel
 class MemberViewModel @Inject constructor(
     private val repository: MemberRepository,
-    private val packageRepository: com.gymapp.data.repository.PackageRepository
+    private val packageRepository: com.gymapp.data.repository.PackageRepository,
+    private val postureCommentDao: PostureCommentDao
 ) : ViewModel() {
 
     val packages = packageRepository.getAllPackages()
@@ -57,7 +64,7 @@ class MemberViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     private val _isLoading = MutableStateFlow(false)
 
-    @OptIn(FlowPreview::class)
+    @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
     val listUiState: StateFlow<MemberListUiState> =
         _searchQuery
             .debounce(300)
@@ -78,98 +85,67 @@ class MemberViewModel @Inject constructor(
                 initialValue = MemberListUiState(isLoading = true)
             )
 
-    fun onSearchQueryChange(query: String) {
-        _searchQuery.value = query
-    }
+    fun onSearchQueryChange(query: String) { _searchQuery.value = query }
 
     private val _formState = MutableStateFlow(RegisterFormState())
     val formState: StateFlow<RegisterFormState> = _formState.asStateFlow()
 
-    fun onFullNameChange(value: String) {
-        _formState.update { it.copy(fullName = value, fullNameError = null) }
-    }
-
-    fun onPhoneChange(value: String) {
-        _formState.update { it.copy(phone = value, phoneError = null) }
-    }
-
-    fun onEmailChange(value: String) {
-        _formState.update { it.copy(email = value) }
-    }
+    fun onFullNameChange(value: String) = _formState.update { it.copy(fullName = value, fullNameError = null) }
+    fun onPhoneChange(value: String) = _formState.update { it.copy(phone = value, phoneError = null) }
+    fun onEmailChange(value: String) = _formState.update { it.copy(email = value) }
+    fun onHealthRisksChange(value: String) = _formState.update { it.copy(healthRisks = value) }
+    fun onHealthNotesChange(value: String) = _formState.update { it.copy(healthNotes = value) }
+    fun onNotesChange(value: String) = _formState.update { it.copy(notes = value) }
+    fun onMeasureOnRegistrationToggle(value: Boolean) =
+        _formState.update { it.copy(measureOnRegistration = value) }
+    fun onPaymentStatusChange(status: String) =
+        _formState.update { it.copy(paymentStatus = status) }
 
     fun onDiscountChange(value: String) {
-        _formState.update {
-            val disc = value.toDoubleOrNull() ?: 0.0
-            it.copy(
-                discount = value,
-                previewPrice = repository.calculateFinalPrice(
-                    it.selectedPackage?.basePrice ?: 0.0,
-                    disc,
-                    it.paymentType,
-                    it.installmentCount
-                )
-            )
-        }
-    }
-
-    fun onPaymentStatusChange(status: String) {
-        _formState.update { it.copy(paymentStatus = status) }
-    }
-
-    fun onHealthRisksChange(value: String) {
-        _formState.update { it.copy(healthRisks = value) }
-    }
-
-    fun onHealthNotesChange(value: String) {
-        _formState.update { it.copy(healthNotes = value) }
+        _formState.update { it.copy(discount = value) }
+        recalcPrice()
     }
 
     fun onPaymentTypeChange(type: PaymentType) {
-        _formState.update {
-            val newInstallment = if (type == PaymentType.CASH || type == PaymentType.MULTISPORT) 1 else it.installmentCount
-            it.copy(
-                paymentType = type,
-                installmentCount = newInstallment,
-                previewPrice = repository.calculateFinalPrice(
-                    it.selectedPackage?.basePrice ?: 0.0,
-                    it.discount.toDoubleOrNull() ?: 0.0,
-                    type,
-                    newInstallment
-                )
-            )
+        _formState.update { state ->
+            val newInstallment = if (type == PaymentType.CASH || type == PaymentType.MULTISPORT) 1
+                                 else state.installmentCount
+            state.copy(paymentType = type, installmentCount = newInstallment)
         }
+        recalcPrice()
     }
 
     fun onInstallmentChange(count: Int) {
-        _formState.update {
-            it.copy(
-                installmentCount = count,
-                previewPrice = repository.calculateFinalPrice(
-                    it.selectedPackage?.basePrice ?: 0.0,
-                    it.discount.toDoubleOrNull() ?: 0.0,
-                    it.paymentType,
-                    count
-                )
-            )
-        }
+        _formState.update { it.copy(installmentCount = count) }
+        recalcPrice()
     }
 
     fun onPackageSelected(pkg: PackageEntity?) {
-        _formState.update {
-            it.copy(
-                selectedPackage = pkg,
-                previewPrice = repository.calculateFinalPrice(
-                    pkg?.basePrice ?: 0.0,
-                    it.discount.toDoubleOrNull() ?: 0.0,
-                    it.paymentType,
-                    it.installmentCount
-                )
-            )
-        }
+        _formState.update { it.copy(selectedPackage = pkg) }
+        recalcPrice()
     }
 
-    fun onNotesChange(value: String) {
-        _formState.update { it.copy(notes = value) }
+    private fun recalcPrice() {
+        val s = _formState.value
+        val pkg = s.selectedPackage ?: run {
+            _formState.update { it.copy(previewPrice = 0.0, previewSurcharge = 0.0, previewRatePercent = 0.0) }
+            return
+        }
+        viewModelScope.launch {
+            val bd = repository.calculatePriceBreakdown(
+                packagePrice = pkg.basePrice,
+                discount = s.discount.toDoubleOrNull() ?: 0.0,
+                paymentType = s.paymentType,
+                installmentCount = s.installmentCount
+            )
+            _formState.update {
+                it.copy(
+                    previewPrice = bd.finalPrice,
+                    previewSurcharge = bd.surcharge,
+                    previewRatePercent = bd.ratePercent
+                )
+            }
+        }
     }
 
     fun submitRegistration() {
@@ -193,8 +169,8 @@ class MemberViewModel @Inject constructor(
 
         viewModelScope.launch {
             _formState.update { it.copy(isSubmitting = true, submitError = null) }
-            
-            val result = if (state.isRenewal && state.memberId != null && state.selectedPackage != null) {
+
+            val result: Result<Long> = if (state.isRenewal && state.memberId != null && state.selectedPackage != null) {
                 repository.renewPackage(
                     memberId = state.memberId,
                     selectedPackage = state.selectedPackage,
@@ -222,8 +198,12 @@ class MemberViewModel @Inject constructor(
             }
 
             result.fold(
-                onSuccess = { _formState.update { it.copy(isSubmitting = false, submitSuccess = true) } },
-                onFailure = { error -> _formState.update { it.copy(isSubmitting = false, submitError = error.message) } }
+                onSuccess = { id ->
+                    _formState.update { it.copy(isSubmitting = false, submitSuccess = true, createdMemberId = id) }
+                },
+                onFailure = { err ->
+                    _formState.update { it.copy(isSubmitting = false, submitError = err.message) }
+                }
             )
         }
     }
@@ -244,42 +224,70 @@ class MemberViewModel @Inject constructor(
         }
     }
 
-    fun getMemberById(id: Long): Flow<MemberEntity?> {
-        return repository.getMemberById(id)
-    }
+    fun getMemberById(id: Long): Flow<MemberEntity?> = repository.getMemberById(id)
 
     fun getMeasurements(memberId: Long): Flow<List<com.gymapp.data.local.entity.MeasurementEntity>> =
         repository.getMeasurementsForMember(memberId)
 
+    suspend fun getMeasurementById(id: Long): com.gymapp.data.local.entity.MeasurementEntity? =
+        repository.getMeasurementById(id)
+
     fun addMeasurement(measurement: com.gymapp.data.local.entity.MeasurementEntity) {
-        viewModelScope.launch {
-            repository.addMeasurement(measurement)
-        }
+        viewModelScope.launch { repository.addMeasurement(measurement) }
+    }
+
+    fun updateMeasurement(measurement: com.gymapp.data.local.entity.MeasurementEntity) {
+        viewModelScope.launch { repository.updateMeasurement(measurement) }
+    }
+
+    fun deleteMeasurement(measurement: com.gymapp.data.local.entity.MeasurementEntity) {
+        viewModelScope.launch { repository.deleteMeasurement(measurement) }
     }
 
     fun updateMember(member: MemberEntity) {
-        viewModelScope.launch {
-            repository.updateMemberInfo(member)
-        }
+        viewModelScope.launch { repository.updateMemberInfo(member) }
     }
 
     fun deleteMember(memberId: Long) {
-        viewModelScope.launch {
-            repository.deleteMember(memberId)
-        }
+        viewModelScope.launch { repository.deleteMember(memberId) }
     }
 
-    fun resetForm() {
-        _formState.value = RegisterFormState()
-    }
-
-    fun dismissError() {
-        _formState.update { it.copy(submitError = null) }
-    }
+    fun resetForm() { _formState.value = RegisterFormState() }
+    fun dismissError() { _formState.update { it.copy(submitError = null) } }
 
     fun markAsPaid(memberId: Long) {
+        viewModelScope.launch { repository.updatePaymentStatus(memberId, true) }
+    }
+
+    // ─── Paket geçmişi / aktif paketler ──────────────────────────────────────
+    fun getActivePackages(memberId: Long): Flow<List<MemberPackageEntity>> =
+        repository.getActivePackagesForMember(memberId)
+
+    fun getPackageHistory(memberId: Long): Flow<List<MemberPackageEntity>> =
+        repository.getPackageHistoryForMember(memberId)
+
+    // ─── Postür notları ──────────────────────────────────────────────────────
+    fun getPostureComments(memberId: Long): Flow<List<PostureCommentEntity>> =
+        postureCommentDao.getForMember(memberId)
+
+    fun addPostureComment(memberId: Long, comment: String, dateMs: Long = System.currentTimeMillis()) {
+        if (comment.isBlank()) return
         viewModelScope.launch {
-            repository.updatePaymentStatus(memberId, true)
+            postureCommentDao.insert(
+                PostureCommentEntity(
+                    memberId = memberId,
+                    dateMs = dateMs,
+                    comment = comment.trim()
+                )
+            )
         }
+    }
+
+    fun updatePostureComment(entity: PostureCommentEntity) {
+        viewModelScope.launch { postureCommentDao.update(entity) }
+    }
+
+    fun deletePostureComment(entity: PostureCommentEntity) {
+        viewModelScope.launch { postureCommentDao.delete(entity) }
     }
 }

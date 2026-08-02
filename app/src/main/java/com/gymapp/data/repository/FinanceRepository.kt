@@ -22,4 +22,9 @@ class FinanceRepository @Inject constructor(
     suspend fun addTransaction(transaction: TransactionEntity) {
         transactionDao.insertTransaction(transaction)
     }
+
+    /** PENDING transaction'ı PAID olarak işaretler ve ödeme tarihini günceller. */
+    suspend fun markTransactionPaid(id: Long, paidAt: Long = System.currentTimeMillis()) {
+        transactionDao.markTransactionPaid(id, paidAt)
+    }
 }
