@@ -60,4 +60,12 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideMeasurementDao(db: GymDatabase): MeasurementDao = db.measurementDao()
+
+    @Provides
+    @Singleton
+    fun provideLedgerDao(db: GymDatabase): LedgerDao = db.ledgerDao()
+
+    @Provides
+    @Singleton
+    fun provideStockMovementDao(db: GymDatabase): StockMovementDao = db.stockMovementDao()
 }
