@@ -6,6 +6,8 @@ import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.PackageEntity
 import com.gymapp.data.local.entity.PaymentType
 import com.gymapp.data.repository.MemberRepository
+import com.gymapp.domain.PhoneNumber
+import com.gymapp.domain.Pricing
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
@@ -84,6 +86,9 @@ class MemberViewModel @Inject constructor(
 
     private val _formState = MutableStateFlow(RegisterFormState())
     val formState: StateFlow<RegisterFormState> = _formState.asStateFlow()
+
+    /** Taksit seçenekleri vade farkı tablosuyla aynı kaynaktan gelir; ikisi sapamaz. */
+    val installmentOptions: List<Int> = Pricing.installmentOptions
 
     fun onFullNameChange(value: String) {
         _formState.update { it.copy(fullName = value, fullNameError = null) }
@@ -181,8 +186,20 @@ class MemberViewModel @Inject constructor(
             newState = newState.copy(fullNameError = "Ad Soyad zorunludur")
             hasError = true
         }
-        if (state.phone.isBlank()) {
-            newState = newState.copy(phoneError = "Telefon zorunludur")
+        when {
+            state.phone.isBlank() -> {
+                newState = newState.copy(phoneError = "Telefon zorunludur")
+                hasError = true
+            }
+            // Kayıttan önce doğrula: numara E.164'e çevrilemiyorsa tekillik kontrolü de anlamsız.
+            PhoneNumber.normalizeTr(state.phone) == null -> {
+                newState = newState.copy(phoneError = "Geçerli bir cep telefonu giriniz (5XX XXX XX XX)")
+                hasError = true
+            }
+        }
+        // Paket zorunlu: pakedsiz üyenin bitiş tarihi olmaz ve üyelik hiç sona ermez.
+        if (state.selectedPackage == null) {
+            newState = newState.copy(submitError = "Lütfen bir üyelik paketi seçiniz.")
             hasError = true
         }
 

@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,8 +19,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
-import java.text.SimpleDateFormat
-import java.util.*
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -34,23 +38,44 @@ fun CalendarScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
-    val dateFormat = remember { SimpleDateFormat("dd MMMM yyyy", Locale("tr")) }
-    
+    val dateFormatter = remember {
+        DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale("tr"))
+    }
+
     var showAddSheet by remember { mutableStateOf(false) }
     var selectedAppointment by remember { mutableStateOf<AppointmentEntity?>(null) }
     val sheetState = rememberModalBottomSheetState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Çakışma / seans hakkı gibi reddedilme sebepleri artık kullanıcıya gösteriliyor.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is CalendarEvent.AppointmentSaved -> {
+                    showAddSheet = false
+                    snackbarHostState.showSnackbar("Randevu oluşturuldu.")
+                }
+                is CalendarEvent.StatusUpdated -> {
+                    selectedAppointment = null
+                    snackbarHostState.showSnackbar("Randevu güncellendi.")
+                }
+                is CalendarEvent.Failed -> snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Randevu Takvimi") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.setDate(Calendar.getInstance()) }) {
+                    IconButton(onClick = { viewModel.setDate(LocalDate.now()) }) {
                         Text("Bugün", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -72,25 +97,17 @@ fun CalendarScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { 
-                        val newDate = selectedDate.clone() as Calendar
-                        newDate.add(Calendar.DAY_OF_MONTH, -1)
-                        viewModel.setDate(newDate)
-                    }) {
+                    IconButton(onClick = { viewModel.setDate(selectedDate.minusDays(1)) }) {
                         Icon(Icons.Default.ChevronLeft, contentDescription = null)
                     }
-                    
+
                     Text(
-                        text = dateFormat.format(selectedDate.time),
+                        text = selectedDate.format(dateFormatter),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
-                    
-                    IconButton(onClick = { 
-                        val newDate = selectedDate.clone() as Calendar
-                        newDate.add(Calendar.DAY_OF_MONTH, 1)
-                        viewModel.setDate(newDate)
-                    }) {
+
+                    IconButton(onClick = { viewModel.setDate(selectedDate.plusDays(1)) }) {
                         Icon(Icons.Default.ChevronRight, contentDescription = null)
                     }
                 }
@@ -103,9 +120,9 @@ fun CalendarScreen(
             ) {
                 item { Spacer(modifier = Modifier.height(8.dp)) }
                 items((9..21).toList()) { hour ->
-                    val appointmentsInHour = uiState.appointments.filter { 
-                        val cal = Calendar.getInstance().apply { timeInMillis = it.startTimeMs }
-                        cal.get(Calendar.HOUR_OF_DAY) == hour
+                    val appointmentsInHour = uiState.appointments.filter {
+                        Instant.ofEpochMilli(it.startTimeMs)
+                            .atZone(ZoneId.systemDefault()).hour == hour
                     }
                     TimeSlotRow(
                         hour = hour,
@@ -124,10 +141,9 @@ fun CalendarScreen(
                 members = uiState.members,
                 staffList = uiState.staffList,
                 onDismiss = { showAddSheet = false },
-                onConfirm = { memberId, staffId, hour, type ->
-                    viewModel.addAppointment(memberId, staffId, hour, type)
-                    showAddSheet = false
-                },
+                // Sheet burada kapatılmaz: kayıt reddedilirse (çakışma, seans hakkı yok)
+                // kullanıcı formunu kaybetmesin diye açık kalır.
+                onConfirm = viewModel::addAppointment,
                 sheetState = sheetState
             )
         }
@@ -137,9 +153,9 @@ fun CalendarScreen(
                 appointment = selectedAppointment!!,
                 member = uiState.members.find { it.id == selectedAppointment!!.memberId },
                 onDismiss = { selectedAppointment = null },
+                // Diyalog StatusUpdated olayında kapanır; hata olursa açık kalıp mesaj gösterir.
                 onConfirm = { status, notes ->
                     viewModel.updateAppointmentStatus(selectedAppointment!!.id, status, notes)
-                    selectedAppointment = null
                 }
             )
         }

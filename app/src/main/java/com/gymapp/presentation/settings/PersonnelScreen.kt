@@ -19,9 +19,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gymapp.data.local.entity.StaffEntity
+import com.gymapp.domain.CommissionRate
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,8 +78,8 @@ fun PersonnelScreen(
                 showAddDialog = false
                 viewModel.clearError()
             },
-            onConfirm = { name, title, branch, rate, salary, phone, nickname, role ->
-                viewModel.addStaff(name, title, branch, rate, salary, phone, nickname, role)
+            onConfirm = { name, title, branch, commissionFraction, salary, phone, nickname, role ->
+                viewModel.addStaff(name, title, branch, commissionFraction, salary, phone, nickname, role)
             }
         )
     }
@@ -138,7 +140,11 @@ fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit) {
             
             Column(horizontalAlignment = Alignment.End) {
                 Text("₺${staff.monthlySalary}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                Text("Hakediş: %${staff.hourlyRate}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                Text(
+                    "Hakediş: %${CommissionRate.toPercentDisplay(staff.commissionRate)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
             }
         }
     }
@@ -155,7 +161,7 @@ fun EditStaffDialog(
     var name by remember { mutableStateOf(staff.fullName) }
     var title by remember { mutableStateOf(staff.title) }
     var branch by remember { mutableStateOf(staff.branch) }
-    var rate by remember { mutableStateOf(staff.hourlyRate.toString()) }
+    var rate by remember { mutableStateOf(CommissionRate.toPercentDisplay(staff.commissionRate).toString()) }
     var salary by remember { mutableStateOf(staff.monthlySalary.toString()) }
     var phone by remember { mutableStateOf(staff.phone) }
     var nickname by remember { mutableStateOf(staff.nickname) }
@@ -198,10 +204,12 @@ fun EditStaffDialog(
                 }
 
                 OutlinedTextField(
-                    value = password, 
-                    onValueChange = { password = it }, 
-                    label = { Text("Şifre") }, 
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Şifre") },
                     modifier = Modifier.fillMaxWidth(),
+                    // Şifre omuz üstünden okunabiliyordu.
+                    visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
                 )
 
@@ -217,13 +225,15 @@ fun EditStaffDialog(
         confirmButton = {
             Button(onClick = {
                 onConfirm(staff.copy(
-                    fullName = name,
-                    title = title,
-                    branch = branch,
-                    hourlyRate = rate.toDoubleOrNull() ?: 0.0,
+                    fullName = name.trim(),
+                    title = title.trim(),
+                    branch = branch.trim(),
+                    // DÜZELTME: "Hakediş %" alanı daha önce hourlyRate'e yazıyordu; hakediş
+                    // hesabı commissionRate'i okuduğu için oran her zaman 0 kalıyordu.
+                    commissionRate = CommissionRate.fromPercentInput(rate.toDoubleOrNull()),
                     monthlySalary = salary.toDoubleOrNull() ?: 0.0,
-                    phone = phone,
-                    nickname = nickname,
+                    phone = phone.trim(),
+                    nickname = nickname.trim(),
                     password = password,
                     role = role
                 ))
@@ -298,13 +308,14 @@ fun AddStaffDialog(
         confirmButton = {
             Button(onClick = {
                 onConfirm(
-                    name,
-                    title,
-                    branch,
-                    rate.toDoubleOrNull() ?: 0.0,
+                    name.trim(),
+                    title.trim(),
+                    branch.trim(),
+                    // Yüzde girdisi kesre çevrilerek commissionRate'e yazılır.
+                    CommissionRate.fromPercentInput(rate.toDoubleOrNull()),
                     salary.toDoubleOrNull() ?: 0.0,
-                    phone,
-                    nickname,
+                    phone.trim(),
+                    nickname.trim(),
                     role
                 )
             }) { Text("Ekle") }

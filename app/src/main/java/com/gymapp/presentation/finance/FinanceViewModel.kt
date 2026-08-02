@@ -4,10 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.entity.TransactionEntity
 import com.gymapp.data.repository.FinanceRepository
+import com.gymapp.domain.Periods
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.util.*
+import java.time.LocalDate
 import javax.inject.Inject
 
 data class FinanceUiState(
@@ -19,8 +20,8 @@ data class FinanceUiState(
     val quarterlyRevenue: Double = 0.0,
     val halfYearlyRevenue: Double = 0.0,
     val yearlyRevenue: Double = 0.0,
-    val selectedMonth: Int = Calendar.getInstance().get(Calendar.MONTH),
-    val selectedYear: Int = Calendar.getInstance().get(Calendar.YEAR),
+    val selectedMonth: Int = LocalDate.now().monthValue - 1, // 0 tabanlı
+    val selectedYear: Int = LocalDate.now().year,
     val selectedFilter: String = "ALL", // ALL, INCOME, EXPENSE
     val selectedPaymentMethod: String = "ALL", // ALL, CASH, CARD, MULTISPORT
     val isLoading: Boolean = false
@@ -33,8 +34,8 @@ class FinanceViewModel @Inject constructor(
 
     private val _filter = MutableStateFlow("ALL")
     private val _methodFilter = MutableStateFlow("ALL")
-    private val _selectedMonth = MutableStateFlow(Calendar.getInstance().get(Calendar.MONTH))
-    private val _selectedYear = MutableStateFlow(Calendar.getInstance().get(Calendar.YEAR))
+    private val _selectedMonth = MutableStateFlow(LocalDate.now().monthValue - 1)
+    private val _selectedYear = MutableStateFlow(LocalDate.now().year)
     
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<FinanceUiState> = combine(
@@ -44,20 +45,23 @@ class FinanceViewModel @Inject constructor(
         _methodFilter,
         repository.getAllTransactions()
     ) { month, year, filter, method, allTransactions ->
-        val calendar = Calendar.getInstance()
-        
-        fun calculateRevenue(monthsBack: Int): Double {
-            val cal = Calendar.getInstance()
-            cal.add(Calendar.MONTH, -monthsBack)
-            return allTransactions.filter { it.type == "INCOME" && it.date >= cal.timeInMillis && !it.isPending }.sumOf { it.amount }
+        val nowMs = System.currentTimeMillis()
+
+        /**
+         * Son [monthsBack] aylık ciro.
+         *
+         * Üst sınır artık `nowMs`: ileri tarihli (yanlış girilmiş) kayıtlar ciroyu şişiremez.
+         */
+        fun calculateRevenue(monthsBack: Long): Double {
+            val window = Periods.lastMonths(monthsBack, nowMs)
+            return allTransactions
+                .filter { it.type == "INCOME" && !it.isPending && it.date in window }
+                .sumOf { it.amount }
         }
 
-        calendar.set(year, month, 1, 0, 0, 0)
-        val startTime = calendar.timeInMillis
-        calendar.set(year, month, calendar.getActualMaximum(Calendar.DAY_OF_MONTH), 23, 59, 59)
-        val endTime = calendar.timeInMillis
-
-        val transactionsInPeriod = allTransactions.filter { it.date in startTime..endTime }
+        // Yarı açık aralık: `23:59:59` + temizlenmeyen milisaniye kaynaklı sınır hataları biter.
+        val period = Periods.month(year, month)
+        val transactionsInPeriod = allTransactions.filter { it.date in period }
         
         val income = transactionsInPeriod.filter { it.type == "INCOME" && !it.isPending }.sumOf { it.amount }
         val expense = transactionsInPeriod.filter { it.type == "EXPENSE" && !it.isPending }.sumOf { it.amount }
@@ -78,10 +82,10 @@ class FinanceViewModel @Inject constructor(
             totalIncome = income,
             totalExpense = expense,
             totalProfit = income - expense,
-            monthlyRevenue = calculateRevenue(1),
-            quarterlyRevenue = calculateRevenue(3),
-            halfYearlyRevenue = calculateRevenue(6),
-            yearlyRevenue = calculateRevenue(12),
+            monthlyRevenue = calculateRevenue(1L),
+            quarterlyRevenue = calculateRevenue(3L),
+            halfYearlyRevenue = calculateRevenue(6L),
+            yearlyRevenue = calculateRevenue(12L),
             selectedMonth = month,
             selectedYear = year,
             selectedFilter = filter,

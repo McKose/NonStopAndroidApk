@@ -5,7 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,7 +47,7 @@ fun RegisterMemberScreen(
                 title = { Text(if (isRenewal) "Paket Yenileme" else "Yeni Üye Kaydı") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
                 }
             )
@@ -193,7 +193,7 @@ fun RegisterMemberScreen(
 
             if (formState.paymentType == PaymentType.CARD) {
                 var expanded by remember { mutableStateOf(false) }
-                val installmentOptions = listOf(1, 2, 3, 6, 9, 12)
+                val installmentOptions = viewModel.installmentOptions
 
                 ExposedDropdownMenuBox(
                     expanded = expanded,

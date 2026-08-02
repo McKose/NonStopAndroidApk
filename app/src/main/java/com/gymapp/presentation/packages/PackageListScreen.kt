@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gymapp.data.local.entity.PackageEntity
+import com.gymapp.domain.Membership
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,7 +82,9 @@ fun PackageItem(pkg: PackageEntity, onDelete: () -> Unit, onClick: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
-                    text = if (pkg.type == "ABONMAN") "Sınırsız Seans" else "${pkg.sessionCount} Seans",
+                    // Sınırsızlık paket türünden değil, seans sayısından (-1) anlaşılır.
+                    text = if (Membership.isUnlimited(pkg.sessionCount)) "Sınırsız Seans"
+                    else "${pkg.sessionCount} Seans",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray
                 )
