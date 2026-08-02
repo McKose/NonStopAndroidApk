@@ -2,17 +2,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Android 13+ bildirim izni -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- WorkManager için -->
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <!-- İleride Firebase sync için -->
+    <!--
+      KALDIRILDI: POST_NOTIFICATIONS (bildirim gönderen kod yok) ve
+      SCHEDULE_EXACT_ALARM (WorkManager için gerekmiyor, Play Console'da gerekçe isteyen
+      hassas bir izin). Üyelik bitişi artık arka plan işiyle değil, okuma anında türetiliyor.
+    -->
+    <!-- İleride sunucu senkronizasyonu için -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".GymApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"

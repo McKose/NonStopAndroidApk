@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gymapp.data.local.entity.MemberEntity
+import com.gymapp.domain.Membership
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -32,7 +33,28 @@ fun MemberDetailScreen(
 ) {
     val member by viewModel.getMemberById(memberId).collectAsState(initial = null)
     var selectedTab by remember { mutableIntStateOf(0) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val tabs = listOf("Genel", "Sağlık", "Ölçümler", "Paketler")
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Üyeyi sil") },
+            text = {
+                Text("${member?.fullName ?: "Bu üye"} pasife alınacak. Devam edilsin mi?")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    viewModel.deleteMember(memberId)
+                    onNavigateBack()
+                }) { Text("Sil", color = Color.Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Vazgeç") }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -44,10 +66,8 @@ fun MemberDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        viewModel.deleteMember(memberId)
-                        onNavigateBack()
-                    }) {
+                    // Silme geri alınamaz bir işlem; tek dokunuşla tetiklenmemeli.
+                    IconButton(onClick = { showDeleteConfirm = true }) {
                         Icon(Icons.Default.Delete, contentDescription = "Sil", tint = Color.Red)
                     }
                 }
@@ -391,11 +411,15 @@ fun PackagesTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewModel
                         Text(activePackage.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     }
                     Spacer(Modifier.height(12.dp))
-                    DetailRow(label = "Paket Türü", value = if (activePackage.type == "ABONMAN") "Abonman" else "Ders Paketi")
+                    // DÜZELTME: "ABONMAN" hiçbir yerde yazılmayan bir değerdi; sınırsızlık
+                    // paketin seans sayısından (-1) anlaşılır. Önceden sınırsız paketler
+                    // ekranda "-1 Seans" olarak görünüyordu.
+                    val unlimited = Membership.isUnlimited(activePackage.sessionCount)
+                    DetailRow(label = "Paket Türü", value = if (unlimited) "Abonman" else "Ders Paketi")
                     DetailRow(label = "Bitiş Tarihi", value = member.endDateMs?.let { dateFormat.format(Date(it)) } ?: "-")
                     DetailRow(
-                        label = "Kalan Hak", 
-                        value = if (activePackage.type == "ABONMAN") "Sınırsız" else "${member.remainingSessions} Seans"
+                        label = "Kalan Hak",
+                        value = if (unlimited) "Sınırsız" else "${member.remainingSessions} Seans"
                     )
                 }
             }

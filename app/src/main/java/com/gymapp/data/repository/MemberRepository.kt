@@ -3,8 +3,9 @@ package com.gymapp.data.repository
 import com.gymapp.data.local.dao.MemberDao
 import com.gymapp.data.local.dao.TransactionDao
 import com.gymapp.data.local.entity.*
+import com.gymapp.domain.PhoneNumber
+import com.gymapp.domain.Pricing
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.firstOrNull
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,26 +16,13 @@ class MemberRepository @Inject constructor(
     private val transactionDao: TransactionDao,
     private val measurementDao: com.gymapp.data.local.dao.MeasurementDao
 ) {
-    private val commissionRates = mapOf(
-        1  to 0.0,
-        2  to 3.0,
-        3  to 5.0,
-        6  to 10.0,
-        9  to 15.0,
-        12 to 20.0
-    )
-
+    /** Fiyat mantığı [Pricing] içinde; burası yalnızca yönlendirir. */
     fun calculateFinalPrice(
         packagePrice: Double,
         discount: Double,
         paymentType: PaymentType,
         installmentCount: Int
-    ): Double {
-        val baseAfterDiscount = (packagePrice - discount).coerceAtLeast(0.0)
-        if (paymentType == PaymentType.CASH || paymentType == PaymentType.MULTISPORT) return baseAfterDiscount
-        val rate = commissionRates.getOrDefault(installmentCount, 0.0)
-        return baseAfterDiscount * (1.0 + rate / 100.0)
-    }
+    ): Double = Pricing.finalPrice(packagePrice, discount, paymentType, installmentCount)
 
     suspend fun registerMember(
         fullName: String,
@@ -50,33 +38,40 @@ class MemberRepository @Inject constructor(
         healthNotes: String?,
         notes: String?
     ): Result<Long> = runCatching {
-        val existing = memberDao.getMemberByPhone(phone)
+        // Paket zorunlu: pakedsiz üyenin bitiş tarihi olmaz ve üyelik hiçbir zaman sona ermez.
+        val pkg = selectedPackage
+            ?: throw IllegalArgumentException("Üyelik paketi seçilmelidir.")
+
+        // Numara E.164'e normalize edilmeden yazılırsa UNIQUE index'i işe yaramaz.
+        val normalizedPhone = PhoneNumber.normalizeTr(phone)
+            ?: throw IllegalArgumentException("Geçerli bir cep telefonu numarası giriniz.")
+
+        val existing = memberDao.getMemberByPhone(normalizedPhone)
         if (existing != null) {
             throw IllegalArgumentException("Bu telefon numarası zaten kayıtlı.")
         }
 
         val nowMs = System.currentTimeMillis()
-        val endDateMs = selectedPackage?.let {
-            nowMs + TimeUnit.DAYS.toMillis(it.validityDays.toLong())
-        }
+        val endDateMs = nowMs + TimeUnit.DAYS.toMillis(pkg.validityDays.toLong())
 
-        val finalPrice = selectedPackage?.let {
-            calculateFinalPrice(it.basePrice, discount, paymentType, installmentCount)
-        } ?: 0.0
+        val finalPrice = calculateFinalPrice(pkg.basePrice, discount, paymentType, installmentCount)
 
         val member = MemberEntity(
             fullName = fullName.trim(),
-            phone = phone.trim(),
-            email = email,
-            activePackageId = selectedPackage?.id,
-            remainingSessions = selectedPackage?.sessionCount ?: -1,
+            phone = normalizedPhone,
+            email = email?.trim()?.takeIf { it.isNotEmpty() },
+            activePackageId = pkg.id,
+            // DÜZELTME: totalSessions daha önce hiç yazılmıyordu; -1 kalınca personel
+            // hakedişi hesaplayan koşul (`totalSessions > 0`) hiçbir zaman sağlanmıyordu.
+            totalSessions = pkg.sessionCount,
+            remainingSessions = pkg.sessionCount,
             startDateMs = nowMs,
             endDateMs = endDateMs,
             status = MemberStatus.ACTIVE.name,
             paymentType = paymentType.name,
             installmentCount = installmentCount,
-            packagePrice = selectedPackage?.basePrice ?: 0.0,
-            discount = discount,
+            packagePrice = pkg.basePrice,
+            discount = discount.coerceIn(0.0, pkg.basePrice),
             pricePaid = finalPrice,
             paymentStatus = paymentStatus,
             paymentDateMs = paymentDateMs ?: nowMs,
@@ -87,7 +82,13 @@ class MemberRepository @Inject constructor(
             updatedAtMs = nowMs
         )
 
-        val memberId = memberDao.insertMember(member)
+        // Kontrol ile insert arasındaki yarışta UNIQUE index devreye girer;
+        // ham SQLite hatası yerine anlaşılır mesaj döndür.
+        val memberId = try {
+            memberDao.insertMember(member)
+        } catch (e: android.database.sqlite.SQLiteConstraintException) {
+            throw IllegalArgumentException("Bu telefon numarası zaten kayıtlı.", e)
+        }
 
         // Ödeme yapıldıysa Finans'a işle
         if (paymentStatus == "PAID") {
@@ -97,7 +98,7 @@ class MemberRepository @Inject constructor(
                     amount = finalPrice,
                     type = "INCOME",
                     category = "MEMBERSHIP",
-                    description = "${fullName} - ${selectedPackage?.name ?: "Üyelik"}",
+                    description = "${member.fullName} - ${pkg.name}",
                     paymentMethod = paymentType.name,
                     date = paymentDateMs ?: nowMs,
                     note = notes
@@ -126,17 +127,19 @@ class MemberRepository @Inject constructor(
         
         val finalPrice = calculateFinalPrice(selectedPackage.basePrice, discount, paymentType, installmentCount)
 
+        // NOT (Faz 1): yenileme, önceki paketin ödenmemiş bakiyesini sessizce siliyor.
+        // Kalıcı çözüm append-only finans defteri; o gelene kadar davranış korundu.
         val updatedMember = member.copy(
             activePackageId = selectedPackage.id,
-            totalSessions = if (selectedPackage.sessionCount != -1) selectedPackage.sessionCount else -1,
-            remainingSessions = if (selectedPackage.sessionCount != -1) selectedPackage.sessionCount else -1,
+            totalSessions = selectedPackage.sessionCount,
+            remainingSessions = selectedPackage.sessionCount,
             startDateMs = baseDate,
             endDateMs = endDateMs,
             status = MemberStatus.ACTIVE.name,
             paymentType = paymentType.name,
             installmentCount = installmentCount,
             packagePrice = selectedPackage.basePrice,
-            discount = discount,
+            discount = discount.coerceIn(0.0, selectedPackage.basePrice),
             pricePaid = finalPrice,
             paymentStatus = paymentStatus,
             paymentDateMs = paymentDateMs ?: nowMs,

@@ -2,11 +2,12 @@ package com.gymapp.presentation.market
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.gymapp.data.local.entity.ProductEntity
 import com.gymapp.data.local.entity.MemberEntity
+import com.gymapp.data.local.entity.ProductEntity
 import com.gymapp.data.repository.MemberRepository
 import com.gymapp.data.repository.ProductRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -22,8 +23,25 @@ data class MarketUiState(
     val discount: Double = 0.0,
     val notes: String = "",
     val isLoading: Boolean = false,
-    val isSuccess: Boolean = false,
-    val error: String? = null
+    val isCheckingOut: Boolean = false,
+)
+
+/** Bir kez tüketilen kullanıcı bildirimleri (Snackbar). */
+sealed interface MarketEvent {
+    data class OrderCompleted(val orderId: Long) : MarketEvent
+    data class Failed(val message: String) : MarketEvent
+}
+
+/** Kullanıcının form üzerinde değiştirdiği alanlar tek bir state'te toplanır. */
+private data class MarketForm(
+    val cart: Map<Long, Int> = emptyMap(),
+    val selectedMemberId: Long? = null,
+    val paymentType: String = "CASH",
+    val paymentStatus: String = "PAID",
+    val deliveryStatus: String = "POST_DELIVERY",
+    val discount: Double = 0.0,
+    val notes: String = "",
+    val isCheckingOut: Boolean = false,
 )
 
 @HiltViewModel
@@ -32,43 +50,30 @@ class MarketViewModel @Inject constructor(
     private val memberRepository: MemberRepository
 ) : ViewModel() {
 
-    private val _cart = MutableStateFlow<Map<Long, Int>>(emptyMap())
-    private val _selectedMemberId = MutableStateFlow<Long?>(null)
-    private val _paymentType = MutableStateFlow("CASH")
-    private val _paymentStatus = MutableStateFlow("PAID")
-    private val _deliveryStatus = MutableStateFlow("POST_DELIVERY")
-    private val _notes = MutableStateFlow("")
-    private val _isSuccess = MutableStateFlow(false)
-    private val _error = MutableStateFlow<String?>(null)
-    
-    private val _discount = MutableStateFlow(0.0)
-    
+    private val _form = MutableStateFlow(MarketForm())
+
+    /**
+     * Önceki sürümde 11 ayrı akış `Array<Any?>` üzerinden `combine` edilip tek tek
+     * cast'leniyordu; dizideki sıra değişince çalışma anında `ClassCastException` riski vardı.
+     * Form alanları tek bir veri sınıfında toplandığı için artık tip güvenli.
+     */
     val uiState: StateFlow<MarketUiState> = combine(
         repository.getAllProducts(),
         memberRepository.getAllMembers(),
-        _cart,
-        _selectedMemberId,
-        _paymentType,
-        _paymentStatus,
-        _deliveryStatus,
-        _notes,
-        _isSuccess,
-        _error,
-        _discount
-    ) { args: Array<Any?> ->
+        _form,
+    ) { products, members, form ->
         MarketUiState(
-            products = args[0] as List<ProductEntity>,
-            members = args[1] as List<MemberEntity>,
-            cart = args[2] as Map<Long, Int>,
-            selectedMemberId = args[3] as Long?,
-            paymentType = args[4] as String,
-            paymentStatus = args[5] as String,
-            deliveryStatus = args[6] as String,
-            notes = args[7] as String,
-            isSuccess = args[8] as Boolean,
-            error = args[9] as String?,
-            discount = args[10] as Double,
-            isLoading = false
+            products = products,
+            members = members,
+            cart = form.cart,
+            selectedMemberId = form.selectedMemberId,
+            paymentType = form.paymentType,
+            paymentStatus = form.paymentStatus,
+            deliveryStatus = form.deliveryStatus,
+            discount = form.discount,
+            notes = form.notes,
+            isLoading = false,
+            isCheckingOut = form.isCheckingOut,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -76,86 +81,75 @@ class MarketViewModel @Inject constructor(
         initialValue = MarketUiState(isLoading = true)
     )
 
+    private val _events = Channel<MarketEvent>(Channel.BUFFERED)
+    val events: Flow<MarketEvent> = _events.receiveAsFlow()
+
     fun addToCart(product: ProductEntity) {
-        val current = _cart.value.toMutableMap()
-        val count = current.getOrDefault(product.id, 0)
-        if (count < product.stockCount) {
-            current[product.id] = count + 1
-            _cart.value = current
+        _form.update { form ->
+            val count = form.cart[product.id] ?: 0
+            if (count >= product.stockCount) return@update form
+            form.copy(cart = form.cart + (product.id to count + 1))
         }
     }
 
     fun removeFromCart(productId: Long) {
-        val current = _cart.value.toMutableMap()
-        val count = current.getOrDefault(productId, 0)
-        if (count > 1) {
-            current[productId] = count - 1
-        } else {
-            current.remove(productId)
+        _form.update { form ->
+            val count = form.cart[productId] ?: return@update form
+            val cart = if (count > 1) form.cart + (productId to count - 1) else form.cart - productId
+            form.copy(cart = cart)
         }
-        _cart.value = current
     }
 
-    fun selectMember(memberId: Long?) {
-        _selectedMemberId.value = memberId
-    }
-
-    fun setPaymentType(type: String) {
-        _paymentType.value = type
-    }
-
-    fun setPaymentStatus(status: String) {
-        _paymentStatus.value = status
-    }
-
-    fun setDeliveryStatus(status: String) {
-        _deliveryStatus.value = status
-    }
+    fun selectMember(memberId: Long?) = _form.update { it.copy(selectedMemberId = memberId) }
+    fun setPaymentType(type: String) = _form.update { it.copy(paymentType = type) }
+    fun setPaymentStatus(status: String) = _form.update { it.copy(paymentStatus = status) }
+    fun setDeliveryStatus(status: String) = _form.update { it.copy(deliveryStatus = status) }
+    fun setNotes(notes: String) = _form.update { it.copy(notes = notes) }
 
     fun setDiscount(amount: Double) {
-        _discount.value = amount
+        val safe = if (amount.isFinite() && amount > 0.0) amount else 0.0
+        _form.update { it.copy(discount = safe) }
     }
 
-    fun setNotes(notes: String) {
-        _notes.value = notes
-    }
-
+    /**
+     * Siparişi tamamlar.
+     *
+     * Sonuç artık **her zaman** kullanıcıya bildirilir; önceki sürümde hata state'i hiçbir
+     * ekranda okunmadığı için başarısız satış başarılı satıştan ayırt edilemiyordu.
+     */
     fun checkout() {
-        val state = uiState.value
-        if (state.cart.isEmpty()) {
-            _error.value = "Sepet boş"
+        val form = _form.value
+        if (form.cart.isEmpty()) {
+            _events.trySend(MarketEvent.Failed("Sepet boş."))
             return
         }
+        if (form.isCheckingOut) return // çift tıklama koruması
 
         viewModelScope.launch {
-            _error.value = null
+            _form.update { it.copy(isCheckingOut = true) }
+
             val result = repository.processOrder(
-                memberId = state.selectedMemberId,
-                cartItems = state.cart,
-                products = state.products,
-                paymentType = state.paymentType,
-                paymentStatus = state.paymentStatus,
-                deliveryStatus = state.deliveryStatus,
-                discount = state.discount,
-                notes = state.notes
+                memberId = form.selectedMemberId,
+                cartItems = form.cart,
+                paymentType = form.paymentType,
+                paymentStatus = form.paymentStatus,
+                deliveryStatus = form.deliveryStatus,
+                discount = form.discount,
+                notes = form.notes.takeIf { it.isNotBlank() },
             )
 
             result.fold(
-                onSuccess = {
-                    _cart.value = emptyMap()
-                    _discount.value = 0.0
-                    _isSuccess.value = true
+                onSuccess = { orderId ->
+                    // Yalnızca başarıda sepeti temizle.
+                    _form.value = MarketForm()
+                    _events.send(MarketEvent.OrderCompleted(orderId))
                 },
-                onFailure = {
-                    _error.value = it.message
+                onFailure = { error ->
+                    _form.update { it.copy(isCheckingOut = false) }
+                    _events.send(MarketEvent.Failed(error.message ?: "Sipariş tamamlanamadı."))
                 }
             )
         }
-    }
-
-    fun resetStatus() {
-        _isSuccess.value = false
-        _error.value = null
     }
 
     fun addProduct(id: Long = 0, name: String, category: String, price: Double, stock: Int) {
@@ -163,10 +157,10 @@ class MarketViewModel @Inject constructor(
             repository.saveProduct(
                 ProductEntity(
                     id = id,
-                    name = name,
-                    category = category,
-                    price = price,
-                    stockCount = stock
+                    name = name.trim(),
+                    category = category.trim(),
+                    price = price.coerceAtLeast(0.0),
+                    stockCount = stock.coerceAtLeast(0)
                 )
             )
         }

@@ -19,23 +19,44 @@ class LoginViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error = _error.asStateFlow()
 
-    fun login(nickname: String, password: String, onLoginSuccess: () -> Unit) {
-        viewModelScope.launch {
-            if (nickname == "admin" && password == prefs.salonPassword) {
-                prefs.currentUserRole = "admin"
-                prefs.currentUserId = -1L
-                onLoginSuccess()
-                return@launch
-            }
+    private val _isSubmitting = MutableStateFlow(false)
+    val isSubmitting = _isSubmitting.asStateFlow()
 
-            val staff = staffDao.getStaffByNickname(nickname)
-            if (staff != null && staff.password == password) {
-                prefs.currentUserRole = staff.role
-                prefs.currentUserId = staff.id
-                onLoginSuccess()
-            } else {
-                _error.value = "Kullanıcı adı veya şifre hatalı!"
+    fun login(nickname: String, password: String, onLoginSuccess: () -> Unit) {
+        if (_isSubmitting.value) return // çift tıklama koruması
+
+        viewModelScope.launch {
+            _isSubmitting.value = true
+            _error.value = null // önceki denemenin hatası ekranda kalmasın
+            try {
+                // Kullanıcı adı büyük/küçük harf ve boşluğa duyarlı olmamalı.
+                val user = nickname.trim()
+
+                if (user.equals(ADMIN_USER, ignoreCase = true) && password == prefs.salonPassword) {
+                    prefs.currentUserRole = "admin"
+                    prefs.currentUserId = ADMIN_USER_ID
+                    onLoginSuccess()
+                    return@launch
+                }
+
+                val staff = staffDao.getStaffByNickname(user)
+                // NOT (Faz 1): şifreler hash'lenerek saklanmalı ve karşılaştırma
+                // sabit zamanlı olmalı; kimlik doğrulama sunucuya taşınacak.
+                if (staff != null && staff.isActive && staff.password == password) {
+                    prefs.currentUserRole = staff.role
+                    prefs.currentUserId = staff.id
+                    onLoginSuccess()
+                } else {
+                    _error.value = "Kullanıcı adı veya şifre hatalı!"
+                }
+            } finally {
+                _isSubmitting.value = false
             }
         }
+    }
+
+    private companion object {
+        const val ADMIN_USER = "admin"
+        const val ADMIN_USER_ID = -1L
     }
 }

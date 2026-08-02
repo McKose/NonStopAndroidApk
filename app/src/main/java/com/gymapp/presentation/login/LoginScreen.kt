@@ -21,6 +21,7 @@ fun LoginScreen(
     var nickname by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val error by viewModel.error.collectAsState()
+    val isSubmitting by viewModel.isSubmitting.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -58,14 +59,19 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
-            onClick = {
-                viewModel.login(nickname, password, onLoginSuccess)
-            },
+            onClick = { viewModel.login(nickname, password, onLoginSuccess) },
+            enabled = !isSubmitting && nickname.isNotBlank() && password.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             contentPadding = PaddingValues(16.dp)
         ) {
-            Text("Giriş Yap")
+            if (isSubmitting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else Text("Giriş Yap")
         }
     }
 }

@@ -20,7 +20,8 @@ class PersonnelViewModel @Inject constructor(
 
     val staffList: Flow<List<StaffEntity>> = staffDao.getAllStaff()
 
-    fun addStaff(name: String, title: String, branch: String, rate: Double, salary: Double, phone: String, nickname: String, role: String) {
+    /** @param commissionFraction hakediş **kesri** (0.40 = %40) — ekran yüzdeyi burada çevirir. */
+    fun addStaff(name: String, title: String, branch: String, commissionFraction: Double, salary: Double, phone: String, nickname: String, role: String) {
         if (name.isBlank() || nickname.isBlank() || phone.isBlank()) {
             _error.value = "Lütfen zorunlu alanları (Ad, Kullanıcı Adı, Telefon) doldurun."
             return
@@ -39,12 +40,15 @@ class PersonnelViewModel @Inject constructor(
                         fullName = name,
                         title = title,
                         branch = branch,
-                        hourlyRate = rate,
+                        // DÜZELTME: hakediş oranı daha önce hourlyRate'e yazılıyor, hesapta ise
+                        // commissionRate okunuyordu; bu yüzden hakediş her zaman 0 çıkıyordu.
+                        commissionRate = commissionFraction,
                         monthlySalary = salary,
                         phone = phone,
                         nickname = nickname,
                         role = role,
-                        password = "123" // Varsayılan şifre
+                        // NOT (Faz 1): şifreler hash'lenmeli ve ilk girişte değiştirme zorunlu olmalı.
+                        password = DEFAULT_STAFF_PASSWORD
                     )
                 )
                 _error.value = null
@@ -60,7 +64,18 @@ class PersonnelViewModel @Inject constructor(
 
     fun updateStaff(staff: StaffEntity) {
         viewModelScope.launch {
+            // Kullanıcı adı başka bir personele aitse güncellemeyi reddet.
+            val clash = staffDao.getStaffByNickname(staff.nickname)
+            if (clash != null && clash.id != staff.id) {
+                _error.value = "Bu kullanıcı adı zaten alınmış."
+                return@launch
+            }
             staffDao.updateStaff(staff)
+            _error.value = null
         }
+    }
+
+    private companion object {
+        const val DEFAULT_STAFF_PASSWORD = "123"
     }
 }

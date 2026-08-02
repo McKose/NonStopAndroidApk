@@ -1,8 +1,6 @@
 package com.gymapp.data.local.db
 
-import android.content.Context
 import androidx.room.Database
-import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.gymapp.data.local.dao.*
 import com.gymapp.data.local.entity.*
@@ -31,20 +29,9 @@ abstract class GymDatabase : RoomDatabase() {
     abstract fun staffDao(): StaffDao
     abstract fun orderDao(): OrderDao
     abstract fun measurementDao(): MeasurementDao
-
-    companion object {
-        @Volatile private var INSTANCE: GymDatabase? = null
-
-        fun getInstance(context: Context): GymDatabase =
-            INSTANCE ?: synchronized(this) {
-                INSTANCE ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    GymDatabase::class.java,
-                    "gym_database"
-                )
-                    .fallbackToDestructiveMigration()
-                    .build()
-                    .also { INSTANCE = it }
-            }
-    }
 }
+
+// KALDIRILDI: `getInstance()` companion singleton'ı, Hilt'in sağladığıyla aynı isimli
+// ("gym_database") ikinci bir Room örneği kurabiliyordu. İki örnek aynı dosyayı açtığında
+// invalidation tracker kopar (Flow'lar güncellenmez) ve yazma kilitleri çakışır.
+// Veritabanının tek kaynağı artık com.gymapp.di.DatabaseModule.

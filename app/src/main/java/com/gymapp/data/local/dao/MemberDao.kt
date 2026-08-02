@@ -59,6 +59,23 @@ interface MemberDao {
     suspend fun decrementSession(memberId: Long, nowMs: Long = System.currentTimeMillis())
 
     /**
+     * Tamamlanmış bir randevu geri alındığında seans hakkını iade eder.
+     *
+     * Abonman (-1) etkilenmez ve iade `totalSessions` tavanını aşamaz.
+     */
+    @Query("""
+        UPDATE gym_members
+        SET remainingSessions = CASE
+            WHEN totalSessions < 0 OR remainingSessions < totalSessions
+                THEN remainingSessions + 1
+            ELSE remainingSessions
+        END,
+        updatedAtMs = :nowMs
+        WHERE id = :memberId AND remainingSessions != -1
+    """)
+    suspend fun incrementSession(memberId: Long, nowMs: Long = System.currentTimeMillis())
+
+    /**
      * DÜZELTME #3 — WorkManager tarafından çağrılır.
      * endDate geçmiş tüm ACTIVE üyeleri toplu PASSIVE yapar.
      */

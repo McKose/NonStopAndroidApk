@@ -37,8 +37,24 @@ fun MarketScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var showCheckoutSheet by remember { mutableStateOf(false) }
     var productToEdit by remember { mutableStateOf<ProductEntity?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Sipariş sonucu her durumda kullanıcıya bildirilir.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is MarketEvent.OrderCompleted -> {
+                    showCheckoutSheet = false
+                    snackbarHostState.showSnackbar("Sipariş tamamlandı (#${event.orderId})")
+                }
+                is MarketEvent.Failed ->
+                    snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Market / POS", fontWeight = FontWeight.Bold) },
@@ -153,10 +169,9 @@ fun MarketScreen(
                 onPaymentStatusSelect = viewModel::setPaymentStatus,
                 onDeliveryStatusSelect = viewModel::setDeliveryStatus,
                 onDiscountChange = { viewModel.setDiscount(it.toDoubleOrNull() ?: 0.0) },
-                onConfirm = {
-                    viewModel.checkout()
-                    showCheckoutSheet = false
-                }
+                // Sheet burada kapatılmaz: sonuç OrderCompleted olayıyla gelince kapanır,
+                // böylece başarısız sipariş sessizce "başarılı" gibi görünmez.
+                onConfirm = viewModel::checkout
             )
         }
     }
@@ -284,9 +299,16 @@ fun CheckoutContent(
 
         Button(
             onClick = onConfirm,
+            enabled = !uiState.isCheckingOut,
             modifier = Modifier.fillMaxWidth().height(56.dp)
         ) {
-            Text("SİPARİŞİ ONAYLA")
+            if (uiState.isCheckingOut) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else Text("SİPARİŞİ ONAYLA")
         }
         Spacer(Modifier.height(32.dp))
     }
