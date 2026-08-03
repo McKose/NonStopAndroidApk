@@ -120,6 +120,34 @@ class LedgerRepository @Inject constructor(
         reversal.id
     }
 
+    /**
+     * Üyenin tüm aktif tahsilatlarını ters kayıtla iptal eder.
+     *
+     * "Ödemeyi geri al" akışının karşılığı: eski kurguda `updatePaymentStatus(id, false)`
+     * hiçbir şey yapmıyordu çünkü geri alma yolu yoktu.
+     *
+     * @return iptal edilen kayıt sayısı
+     */
+    suspend fun reversePaymentsForMember(
+        memberId: String,
+        reason: String,
+        occurredAtMs: Long = System.currentTimeMillis(),
+        tenantId: String = Ids.DEFAULT_TENANT,
+    ): Result<Int> = runCatching {
+        val active = ledgerDao.activePaymentsForMember(tenantId, memberId)
+        val reversals = active.map { original ->
+            original.copy(
+                id = Ids.new(),
+                description = "İPTAL — $reason",
+                occurredAtMs = occurredAtMs,
+                reversesId = original.id,
+                createdAtMs = System.currentTimeMillis(),
+            )
+        }
+        if (reversals.isNotEmpty()) ledgerDao.insertAll(reversals)
+        reversals.size
+    }
+
     /** Bir randevunun doğurduğu tüm aktif kayıtları iptal eder (randevu geri alınınca). */
     suspend fun reverseForAppointment(
         appointmentId: String,
