@@ -32,7 +32,7 @@ data class MarketUiState(
 
 /** Bir kez tüketilen kullanıcı bildirimleri (Snackbar). */
 sealed interface MarketEvent {
-    data class OrderCompleted(val orderId: Long) : MarketEvent
+    data class OrderCompleted(val orderId: String) : MarketEvent
     data class Failed(val message: String) : MarketEvent
 }
 
