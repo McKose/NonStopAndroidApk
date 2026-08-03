@@ -84,6 +84,24 @@ interface LedgerDao {
     @Query("SELECT EXISTS(SELECT 1 FROM ledger_entries WHERE reversesId = :entryId)")
     suspend fun isReversed(entryId: String): Boolean
 
+    /**
+     * Üyenin henüz iptal edilmemiş tahsilat kayıtları.
+     *
+     * Ödeme geri alındığında bunlar ters kayıtla iptal edilir.
+     */
+    @Query("""
+        SELECT * FROM ledger_entries e
+        WHERE e.tenantId = :tenantId
+          AND e.memberId = :memberId
+          AND e.type = 'PAYMENT'
+          AND e.reversesId IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM ledger_entries r WHERE r.reversesId = e.id
+          )
+        ORDER BY e.occurredAtMs DESC
+    """)
+    suspend fun activePaymentsForMember(tenantId: String, memberId: String): List<LedgerEntryEntity>
+
     /** Bir randevudan doğan, henüz iptal edilmemiş hakediş kayıtları. */
     @Query("""
         SELECT * FROM ledger_entries e
