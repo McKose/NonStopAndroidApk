@@ -22,9 +22,13 @@ data class MarketUiState(
     val deliveryStatus: String = "POST_DELIVERY",
     val discount: Double = 0.0,
     val notes: String = "",
+    /** Ürün kimliği → eldeki stok (hareketlerin toplamı). */
+    val stockByProduct: Map<Long, Int> = emptyMap(),
     val isLoading: Boolean = false,
     val isCheckingOut: Boolean = false,
-)
+) {
+    fun stockOf(productId: Long): Int = stockByProduct[productId] ?: 0
+}
 
 /** Bir kez tüketilen kullanıcı bildirimleri (Snackbar). */
 sealed interface MarketEvent {
@@ -59,11 +63,13 @@ class MarketViewModel @Inject constructor(
      */
     val uiState: StateFlow<MarketUiState> = combine(
         repository.getAllProducts(),
+        repository.observeStockByProduct(),
         memberRepository.getAllMembers(),
         _form,
-    ) { products, members, form ->
+    ) { products, stock, members, form ->
         MarketUiState(
             products = products,
+            stockByProduct = stock,
             members = members,
             cart = form.cart,
             selectedMemberId = form.selectedMemberId,
@@ -85,9 +91,10 @@ class MarketViewModel @Inject constructor(
     val events: Flow<MarketEvent> = _events.receiveAsFlow()
 
     fun addToCart(product: ProductEntity) {
+        val onHand = uiState.value.stockOf(product.id)
         _form.update { form ->
             val count = form.cart[product.id] ?: 0
-            if (count >= product.stockCount) return@update form
+            if (count >= onHand) return@update form
             form.copy(cart = form.cart + (product.id to count + 1))
         }
     }
@@ -155,14 +162,17 @@ class MarketViewModel @Inject constructor(
     fun addProduct(id: Long = 0, name: String, category: String, price: Double, stock: Int) {
         viewModelScope.launch {
             repository.saveProduct(
-                ProductEntity(
+                product = ProductEntity(
                     id = id,
                     name = name.trim(),
                     category = category.trim(),
                     price = price.coerceAtLeast(0.0),
-                    stockCount = stock.coerceAtLeast(0)
-                )
-            )
+                    // Sayaç kolonu geçiş süresince duruyor ama artık doğruluk kaynağı değil;
+                    // eldeki stok hareket toplamından geliyor.
+                    stockCount = 0,
+                ),
+                desiredStock = stock.coerceAtLeast(0),
+            ).onFailure { _events.send(MarketEvent.Failed(it.message ?: "Ürün kaydedilemedi.")) }
         }
     }
 

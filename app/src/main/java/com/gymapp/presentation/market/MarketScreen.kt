@@ -26,6 +26,8 @@ import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.ProductEntity
 import java.util.Locale
 
+private const val LOW_STOCK_THRESHOLD = 5
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MarketScreen(
@@ -85,6 +87,7 @@ fun MarketScreen(
                 items(uiState.products) { product ->
                     ProductGridItem(
                         product = product,
+                        onHand = uiState.stockOf(product.id),
                         cartCount = uiState.cart[product.id] ?: 0,
                         onAdd = { viewModel.addToCart(product) },
                         onRemove = { viewModel.removeFromCart(product.id) },
@@ -143,6 +146,7 @@ fun MarketScreen(
     if (productToEdit != null) {
         AddProductDialog(
             product = productToEdit,
+            currentStock = uiState.stockOf(productToEdit!!.id),
             onDismiss = { productToEdit = null },
             onConfirm = { name, category, price, stock ->
                 viewModel.addProduct(
@@ -318,13 +322,15 @@ fun CheckoutContent(
 @Composable
 fun ProductGridItem(
     product: ProductEntity,
+    /** Eldeki stok — ürün satırındaki sayaçtan değil, hareket toplamından gelir. */
+    onHand: Int,
     cartCount: Int,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val isLowStock = product.stockCount < 5
+    val isLowStock = onHand < LOW_STOCK_THRESHOLD
     var showMenu by remember { mutableStateOf(false) }
 
     OutlinedCard(
@@ -350,7 +356,7 @@ fun ProductGridItem(
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(product.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
-                Text("Stok: ${product.stockCount}", style = MaterialTheme.typography.bodySmall, color = if (isLowStock) Color.Red else Color.Gray)
+                Text("Stok: $onHand", style = MaterialTheme.typography.bodySmall, color = if (isLowStock) Color.Red else Color.Gray)
                 Spacer(Modifier.weight(1f))
                 Text("₺${product.price}", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
             }
@@ -412,12 +418,14 @@ fun ProductGridItem(
 fun AddProductDialog(
     product: ProductEntity? = null,
     onDismiss: () -> Unit,
-    onConfirm: (String, String, Double, Int) -> Unit
+    onConfirm: (String, String, Double, Int) -> Unit,
+    /** Düzenlemede mevcut eldeki stok; kaydedilen değer düzeltme hareketine dönüşür. */
+    currentStock: Int = 0,
 ) {
     var name by remember { mutableStateOf(product?.name ?: "") }
     var category by remember { mutableStateOf(product?.category ?: "Market Ürünleri") }
     var price by remember { mutableStateOf(product?.price?.toString() ?: "") }
-    var stock by remember { mutableStateOf(product?.stockCount?.toString() ?: "") }
+    var stock by remember { mutableStateOf(if (product != null) currentStock.toString() else "") }
     var categoryExpanded by remember { mutableStateOf(false) }
     val categories = listOf("Market Ürünleri", "Supplement", "Ekipman")
 
