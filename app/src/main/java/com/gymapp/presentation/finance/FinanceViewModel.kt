@@ -49,21 +49,18 @@ class FinanceViewModel @Inject constructor(
     val events: Flow<FinanceEvent> = _events.receiveAsFlow()
 
     /**
-     * Geçiş süresince iki kaynak birden okunur; yazıcılar deftere taşındıkça
-     * eski kaynağın katkısı kendiliğinden boşalır ve sonunda kaldırılır.
+     * Tek kaynak: finans defteri.
      *
      * Ters kayıtla iptal edilmiş kayıtlar listede görünür (denetim izi) ama
      * toplamlara girmez.
      */
-    private val allEntries: Flow<List<FinanceEntry>> = combine(
-        repository.getLegacyTransactions(),
-        repository.observeLedgerBetween(startMs = 0L, endMs = Long.MAX_VALUE),
-    ) { legacy, ledger ->
-        val reversedIds = ledger.mapNotNull { it.reversesId }.toSet()
-        val merged = legacy.map { it.toFinanceEntry() } +
-            ledger.map { it.toFinanceEntry(reversedIds) }
-        merged.sortedByDescending { it.occurredAtMs }
-    }
+    private val allEntries: Flow<List<FinanceEntry>> =
+        repository.observeLedgerBetween(startMs = 0L, endMs = Long.MAX_VALUE)
+            .map { ledger ->
+                val reversedIds = ledger.mapNotNull { it.reversesId }.toSet()
+                ledger.map { it.toFinanceEntry(reversedIds) }
+                    .sortedByDescending { entry -> entry.occurredAtMs }
+            }
 
     val uiState: StateFlow<FinanceUiState> = combine(
         _selectedMonth,
@@ -173,12 +170,8 @@ class FinanceViewModel @Inject constructor(
         }
     }
 
-    /** Hatalı kaydı ters kayıtla iptal eder. Eski kaynaktaki kayıtlar iptal edilemez. */
+    /** Hatalı kaydı ters kayıtla iptal eder; kayıt silinmez, denetim izi korunur. */
     fun voidEntry(entry: FinanceEntry, reason: String = "Kullanıcı düzeltmesi") {
-        if (entry.id.startsWith("legacy-")) {
-            _events.trySend(FinanceEvent.Failed("Bu kayıt eski kaynaktan geliyor, iptal edilemez."))
-            return
-        }
         viewModelScope.launch {
             repository.voidEntry(entry.id, reason).fold(
                 onSuccess = { _events.send(FinanceEvent.Saved) },

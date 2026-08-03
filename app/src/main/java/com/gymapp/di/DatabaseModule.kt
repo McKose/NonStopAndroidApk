@@ -43,10 +43,6 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideTransactionDao(db: GymDatabase): TransactionDao = db.transactionDao()
-
-    @Provides
-    @Singleton
     fun provideAppointmentDao(db: GymDatabase): AppointmentDao = db.appointmentDao()
 
     @Provides
