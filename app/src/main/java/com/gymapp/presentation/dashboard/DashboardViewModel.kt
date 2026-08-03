@@ -37,7 +37,7 @@ class DashboardViewModel @Inject constructor(
     private val memberRepository: MemberRepository,
     private val appointmentDao: com.gymapp.data.local.dao.AppointmentDao,
     private val staffDao: com.gymapp.data.local.dao.StaffDao,
-    private val productDao: com.gymapp.data.local.dao.ProductDao,
+    private val productRepository: com.gymapp.data.repository.ProductRepository,
     private val prefs: AppPreferences
 ) : ViewModel() {
 
@@ -45,8 +45,9 @@ class DashboardViewModel @Inject constructor(
         memberRepository.getAllMembers(),
         appointmentDao.getAllAppointments(),
         staffDao.getAllStaff(),
-        productDao.getAllProducts()
-    ) { members, appointments, staff, products ->
+        productRepository.getAllProducts(),
+        productRepository.observeStockByProduct(),
+    ) { members, appointments, staff, products, stockByProduct ->
         val now = System.currentTimeMillis()
         val today = Periods.dayOf(now)
 
@@ -70,8 +71,11 @@ class DashboardViewModel @Inject constructor(
 
         // Stock Alerts (Admin/Manager only)
         if (userRole != "antrenör") {
-            products.filter { it.stockCount < LOW_STOCK_THRESHOLD }.forEach {
-                alerts.add("Kritik Stok: ${it.name} (${it.stockCount} adet kaldı)")
+            products.forEach { product ->
+                val onHand = stockByProduct[product.id] ?: 0
+                if (onHand < LOW_STOCK_THRESHOLD) {
+                    alerts.add("Kritik Stok: ${product.name} ($onHand adet kaldı)")
+                }
             }
         }
 

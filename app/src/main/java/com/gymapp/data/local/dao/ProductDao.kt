@@ -12,16 +12,11 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE id = :id")
     suspend fun getProductById(id: Long): ProductEntity?
 
-    /**
-     * Stoğu **koşullu** düşer: yalnızca yeterli stok varsa günceller.
-     *
-     * @return güncellenen satır sayısı; `0` ise stok yetersizdi (yarış koşulu dahil).
-     */
-    @Query("UPDATE products SET stockCount = stockCount - :quantity WHERE id = :id AND stockCount >= :quantity")
-    suspend fun decreaseStock(id: Long, quantity: Int): Int
+    // KALDIRILDI: decreaseStock — stok artık ürün satırındaki mutlak sayaçtan değil,
+    // `stock_movements` tablosundaki hareketlerin toplamından türetiliyor.
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertProduct(product: ProductEntity)
+    suspend fun insertProduct(product: ProductEntity): Long
 
     @Update
     suspend fun updateProduct(product: ProductEntity)

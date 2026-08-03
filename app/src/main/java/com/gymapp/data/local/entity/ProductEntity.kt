@@ -10,6 +10,10 @@ data class ProductEntity(
     val name: String,
     val category: String, // Ayarlar'dan eklenecek
     val price: Double,
+    /**
+     * ARTIK KULLANILMIYOR — eldeki stok `stock_movements` toplamından türetiliyor.
+     * Kolon yalnızca şema geçişi tamamlanana kadar duruyor; entity cutover'da düşecek.
+     */
     val stockCount: Int,
     val imageUrl: String? = null,
     val isActive: Boolean = true
