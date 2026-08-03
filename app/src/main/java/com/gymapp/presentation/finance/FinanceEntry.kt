@@ -1,19 +1,18 @@
 package com.gymapp.presentation.finance
 
 import com.gymapp.data.local.entity.LedgerEntryEntity
-import com.gymapp.data.local.entity.TransactionEntity
 import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.LedgerType
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 
 /**
- * Finans ekranının kaynaktan bağımsız kayıt modeli.
+ * Finans ekranının kayıt modeli.
  *
- * Geçiş süresince iki kaynak birden okunuyor (**dual-read**): eski `transactions`
- * tablosu ve yeni `ledger_entries` defteri. Yazıcılar tek tek deftere taşınırken
- * finans ekranı kesintisiz doğru çalışsın diye bu ara model gerekiyor; tüm
- * yazıcılar taşındıktan sonra eski kaynak ve bu dönüşüm kaldırılacak.
+ * Geçiş süresince eski `transactions` tablosu ile defteri birleştirmek için
+ * kullanılıyordu; tüm yazıcılar deftere taşındığı için artık yalnızca defterden
+ * besleniyor. Ekranı entity'ye doğrudan bağlamamak, ileriki şema değişikliklerinde
+ * UI'ı korumaya devam ediyor.
  */
 data class FinanceEntry(
     val id: String,
@@ -41,21 +40,6 @@ private val categoryLabels = mapOf(
     "BILL" to "Fatura",
     "PURCHASE" to "Alım",
     "OTHER" to "Diğer",
-)
-
-/** Eski `transactions` kaydı → ortak model. */
-fun TransactionEntity.toFinanceEntry(): FinanceEntry = FinanceEntry(
-    id = "legacy-$id",
-    isIncome = type == "INCOME",
-    amount = Money.ofMajor(amount),
-    category = category,
-    description = description,
-    paymentMethod = runCatching { PaymentMethod.valueOf(paymentMethod) }
-        .getOrDefault(PaymentMethod.CASH),
-    occurredAtMs = date,
-    isPending = isPending,
-    isVoided = false, // eski tabloda ters kayıt kavramı yoktu
-    note = note,
 )
 
 /**

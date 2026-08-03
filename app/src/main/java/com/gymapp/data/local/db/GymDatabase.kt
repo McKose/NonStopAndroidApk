@@ -12,15 +12,17 @@ import com.gymapp.data.local.entity.*
  * en sonda eskiler düşürülür. Böylece her adımda derlenebilir ve test edilebilir
  * bir durum korunur.
  *
- * v8'de eklenenler: [LedgerEntryEntity] (append-only finans defteri) ve
- * [StockMovementEntity] (toplanabilir stok hareketleri).
+ * v8: [LedgerEntryEntity] (append-only finans defteri) ve [StockMovementEntity]
+ * (toplanabilir stok hareketleri) eklendi.
+ *
+ * v9: contract adımı — tüm yazıcılar deftere taşındığı için eski `transactions`
+ * tablosu düşürüldü.
  */
 @Database(
     entities = [
         MemberEntity::class,
         PackageEntity::class,
         ProductEntity::class,
-        TransactionEntity::class,
         AppointmentEntity::class,
         StaffEntity::class,
         OrderEntity::class,
@@ -29,7 +31,7 @@ import com.gymapp.data.local.entity.*
         LedgerEntryEntity::class,
         StockMovementEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -38,7 +40,6 @@ abstract class GymDatabase : RoomDatabase() {
     abstract fun memberDao(): MemberDao
     abstract fun packageDao(): PackageDao
     abstract fun productDao(): ProductDao
-    abstract fun transactionDao(): TransactionDao
     abstract fun appointmentDao(): AppointmentDao
     abstract fun staffDao(): StaffDao
     abstract fun orderDao(): OrderDao

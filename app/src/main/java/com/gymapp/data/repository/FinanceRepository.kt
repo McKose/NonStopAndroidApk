@@ -1,9 +1,7 @@
 package com.gymapp.data.repository
 
 import com.gymapp.data.local.dao.LedgerDao
-import com.gymapp.data.local.dao.TransactionDao
 import com.gymapp.data.local.entity.LedgerEntryEntity
-import com.gymapp.data.local.entity.TransactionEntity
 import com.gymapp.domain.Ids
 import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.Money
@@ -13,25 +11,17 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Finans okuma/yazma.
+ * Finans okuma/yazma — tek kaynak: `ledger_entries`.
  *
- * Geçiş süresince **iki kaynak birden** okunur (dual-read): eski `transactions`
- * tablosu ve yeni `ledger_entries` defteri. Yeni yazımların tamamı deftere gider;
- * eski tablo yalnızca daha önce yazılmış kayıtlar için okunur ve kalan yazıcılar
- * da taşındıktan sonra düşürülecek.
+ * Geçiş boyunca eski `transactions` tablosu da okunuyordu (dual-read); tüm
+ * yazıcılar deftere taşındığı için o kaynak ve tablo kaldırıldı.
  */
 @Singleton
 class FinanceRepository @Inject constructor(
-    private val transactionDao: TransactionDao,
     private val ledgerDao: LedgerDao,
     private val ledgerRepository: LedgerRepository,
 ) {
-    // ─── Okuma: eski kaynak (yalnızca geçiş süresince) ──────────────────────
-
-    fun getLegacyTransactions(): Flow<List<TransactionEntity>> =
-        transactionDao.getAllTransactions()
-
-    // ─── Okuma: defter ──────────────────────────────────────────────────────
+    // ─── Okuma ──────────────────────────────────────────────────────────────
 
     fun observeLedgerBetween(
         startMs: Long,
