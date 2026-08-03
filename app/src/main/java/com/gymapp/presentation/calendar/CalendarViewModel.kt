@@ -2,10 +2,9 @@ package com.gymapp.presentation.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.gymapp.data.local.dao.AppointmentDao
 import com.gymapp.data.local.dao.MemberDao
 import com.gymapp.data.local.dao.StaffDao
-import com.gymapp.data.local.dao.TransactionDao
+import com.gymapp.data.repository.AppointmentRepository
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.StaffEntity
@@ -35,10 +34,9 @@ sealed interface CalendarEvent {
 
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
-    private val appointmentDao: AppointmentDao,
+    private val appointmentRepository: AppointmentRepository,
     private val memberDao: MemberDao,
     private val staffDao: StaffDao,
-    private val transactionDao: TransactionDao
 ) : ViewModel() {
 
     private val zone: ZoneId = ZoneId.systemDefault()
@@ -56,7 +54,7 @@ class CalendarViewModel @Inject constructor(
     val events: Flow<CalendarEvent> = _events.receiveAsFlow()
 
     val uiState: StateFlow<CalendarUiState> = combine(
-        appointmentDao.getAllAppointments(),
+        appointmentRepository.observeAll(),
         memberDao.getAllMembers(),
         staffDao.getAllStaff(),
         _selectedDate
@@ -110,12 +108,12 @@ class CalendarViewModel @Inject constructor(
                 return@launch
             }
 
-            if (appointmentDao.countOverlapping(staffId, startMs, endMs) > 0) {
+            if (appointmentRepository.hasOverlap(staffId, startMs, endMs)) {
                 _events.send(CalendarEvent.Failed("Seçilen eğitmenin bu saatte başka randevusu var."))
                 return@launch
             }
 
-            appointmentDao.insertAppointment(
+            appointmentRepository.insert(
                 AppointmentEntity(
                     memberId = memberId,
                     staffId = staffId,
@@ -130,16 +128,11 @@ class CalendarViewModel @Inject constructor(
 
     fun updateAppointmentStatus(appointmentId: Long, status: String, notes: String) {
         viewModelScope.launch {
-            runCatching {
-                appointmentDao.processAppointmentStatus(
-                    appointmentId = appointmentId,
-                    status = status,
-                    notes = notes.takeIf { it.isNotBlank() },
-                    memberDao = memberDao,
-                    transactionDao = transactionDao,
-                    staffDao = staffDao
-                )
-            }.fold(
+            appointmentRepository.processStatus(
+                appointmentId = appointmentId,
+                status = status,
+                notes = notes.takeIf { it.isNotBlank() },
+            ).fold(
                 onSuccess = { _events.send(CalendarEvent.StatusUpdated) },
                 onFailure = { _events.send(CalendarEvent.Failed(it.message ?: "Randevu güncellenemedi.")) }
             )
