@@ -25,7 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.gymapp.data.local.entity.TransactionEntity
+import com.gymapp.domain.Money
+import com.gymapp.domain.PaymentMethod
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -37,8 +38,20 @@ fun FinanceScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Kayıt sonucu her durumda kullanıcıya bildirilir.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is FinanceEvent.Saved -> snackbarHostState.showSnackbar("Kayıt eklendi.")
+                is FinanceEvent.Failed -> snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Finansal Durum", fontWeight = FontWeight.Bold) },
@@ -100,7 +113,7 @@ fun FinanceScreen(
                     label = "Net Kâr",
                     amount = uiState.totalProfit,
                     icon = Icons.Default.AccountBalanceWallet,
-                    color = if (uiState.totalProfit >= 0) Color(0xFF2196F3) else Color(0xFFFF9800),
+                    color = if (!uiState.totalProfit.isNegative) Color(0xFF2196F3) else Color(0xFFFF9800),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -148,7 +161,7 @@ fun FinanceScreen(
             Spacer(Modifier.height(8.dp))
 
             // ─── İşlem Listesi ──────────────────────────────────────────
-            if (uiState.transactions.isEmpty()) {
+            if (uiState.entries.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Bu dönemde işlem bulunamadı.", color = Color.Gray)
                 }
@@ -158,7 +171,7 @@ fun FinanceScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(uiState.transactions) { transaction ->
+                    items(uiState.entries) { transaction ->
                         TransactionListItem(transaction)
                     }
                 }
@@ -169,14 +182,14 @@ fun FinanceScreen(
     if (showAddDialog) {
         AddExpenseDialog(
             onDismiss = { showAddDialog = false },
-            onConfirm = { amount, category, desc, method, isPending, type ->
-                viewModel.addExpense(
-                    amount = amount,
-                    category = category,
+            onConfirm = { amountText, category, desc, method, isIncome ->
+                // Yeni yazımların tamamı deftere gider.
+                viewModel.addEntry(
+                    amountText = amountText,
+                    categoryName = category,
                     description = desc,
-                    paymentMethod = method,
-                    isPending = isPending,
-                    type = type
+                    paymentMethodName = method,
+                    isIncome = isIncome,
                 )
                 showAddDialog = false
             }
@@ -228,7 +241,7 @@ fun MonthYearPicker(
 }
 
 @Composable
-fun FinanceSummaryCard(label: String, amount: Double, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier) {
+fun FinanceSummaryCard(label: String, amount: Money, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier) {
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f)),
@@ -239,7 +252,7 @@ fun FinanceSummaryCard(label: String, amount: Double, icon: androidx.compose.ui.
             Spacer(Modifier.height(8.dp))
             Text(label, style = MaterialTheme.typography.labelMedium, color = color)
             Text(
-                "₺${String.format(Locale.getDefault(), "%,.2f", amount)}",
+                "₺${String.format(Locale.getDefault(), "%,.2f", amount.asDouble)}",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = color
@@ -249,7 +262,7 @@ fun FinanceSummaryCard(label: String, amount: Double, icon: androidx.compose.ui.
 }
 
 @Composable
-fun RevenueCard(label: String, amount: Double) {
+fun RevenueCard(label: String, amount: Money) {
     Card(
         modifier = Modifier.width(140.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
@@ -257,7 +270,7 @@ fun RevenueCard(label: String, amount: Double) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(label, style = MaterialTheme.typography.labelSmall)
             Text(
-                "₺${String.format(Locale.getDefault(), "%,.0f", amount)}",
+                "₺${String.format(Locale.getDefault(), "%,.0f", amount.asDouble)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -266,9 +279,9 @@ fun RevenueCard(label: String, amount: Double) {
 }
 
 @Composable
-fun TransactionListItem(transaction: TransactionEntity) {
+fun TransactionListItem(transaction: FinanceEntry) {
     val sdf = remember { SimpleDateFormat("dd MMM, HH:mm", Locale("tr")) }
-    val isIncome = transaction.type == "INCOME"
+    val isIncome = transaction.isIncome
     
     val containerColor = if (transaction.isPending) {
         Color(0xFFFF9800).copy(alpha = 0.05f)
@@ -322,22 +335,22 @@ fun TransactionListItem(transaction: TransactionEntity) {
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
                     Text(
-                        text = transaction.category,
+                        text = transaction.categoryLabel,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(end = 8.dp)
                     )
                     Text(
-                        text = when(transaction.paymentMethod) {
-                            "CARD" -> "💳 Kart"
-                            "MULTISPORT" -> "🏢 Multi"
-                            else -> "💵 Nakit"
+                        text = when (transaction.paymentMethod) {
+                            PaymentMethod.CARD -> "💳 Kart"
+                            PaymentMethod.MULTISPORT -> "🏢 Multi"
+                            PaymentMethod.CASH -> "💵 Nakit"
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.Gray,
                         modifier = Modifier.padding(end = 8.dp)
                     )
-                    Text(sdf.format(Date(transaction.date)), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Text(sdf.format(Date(transaction.occurredAtMs)), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 }
                 transaction.note?.let {
                     if (it.isNotBlank()) {
@@ -352,7 +365,7 @@ fun TransactionListItem(transaction: TransactionEntity) {
             }
             
             Text(
-                "${if (isIncome) "+" else "-"}₺${String.format(Locale.getDefault(), "%,.2f", transaction.amount)}",
+                "${if (isIncome) "+" else "-"}₺${String.format(Locale.getDefault(), "%,.2f", transaction.amount.asDouble)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = if (isIncome) Color(0xFF4CAF50) else Color(0xFFF44336)
@@ -365,17 +378,26 @@ fun TransactionListItem(transaction: TransactionEntity) {
 @Composable
 fun AddExpenseDialog(
     onDismiss: () -> Unit,
-    onConfirm: (Double, String, String, String, Boolean, String) -> Unit
+    /** (tutar metni, kategori, açıklama, ödeme yöntemi, gelir mi?) */
+    onConfirm: (String, String, String, String, Boolean) -> Unit
 ) {
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("Gider") }
+    var selectedCategory by remember { mutableStateOf("OTHER") }
     var selectedMethod by remember { mutableStateOf("CASH") }
-    var isPending by remember { mutableStateOf(false) }
     var isIncome by remember { mutableStateOf(false) }
 
-    val categories = listOf("Maaş", "Kira", "Fatura", "Alışveriş", "Bakım", "Eğitmen Hakediş", "Üyelik Geliri", "Market Satışı", "Diğer")
+    // (LedgerCategory adı, görünen etiket) — seçim enum adını taşır, ekranda Türkçesi görünür.
+    val categories = listOf(
+        "SALARY" to "Maaş",
+        "RENT" to "Kira",
+        "BILL" to "Fatura",
+        "PURCHASE" to "Alım",
+        "COMMISSION" to "Eğitmen Hakedişi",
+        "MEMBERSHIP" to "Üyelik",
+        "MARKET" to "Market",
+        "OTHER" to "Diğer",
+    )
     var expanded by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -403,7 +425,8 @@ fun AddExpenseDialog(
                     onExpandedChange = { expanded = !expanded }
                 ) {
                     OutlinedTextField(
-                        value = selectedCategory,
+                        value = categories.firstOrNull { it.first == selectedCategory }?.second
+                            ?: selectedCategory,
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Kategori") },
@@ -414,11 +437,11 @@ fun AddExpenseDialog(
                         expanded = expanded,
                         onDismissRequest = { expanded = false }
                     ) {
-                        categories.forEach { category ->
+                        categories.forEach { (categoryName, label) ->
                             DropdownMenuItem(
-                                text = { Text(category) },
+                                text = { Text(label) },
                                 onClick = {
-                                    selectedCategory = category
+                                    selectedCategory = categoryName
                                     expanded = false
                                 }
                             )
@@ -450,26 +473,17 @@ fun AddExpenseDialog(
                     label = { Text("Açıklama") },
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it },
-                    label = { Text("Not (İsteğe Bağlı)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = isPending, onCheckedChange = { isPending = it })
-                    Text("Ödeme Bekliyor (Yaklaşan)")
-                }
+                // KALDIRILDI: "Ödeme Bekliyor" kutusu ve serbest not alanı.
+                // Defter modelinde bekleyen tutar ayrı bir bayrak değil, tahakkuk
+                // (CHARGE) kaydıdır ve üyelik satışından otomatik doğar; elle
+                // girilen kayıtlarda karşılığı yoktu ve kutu hiçbir şey yapmıyordu.
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    val a = amount.toDoubleOrNull() ?: 0.0
-                    if (description.isNotBlank() && a > 0) {
-                        onConfirm(a, selectedCategory, description, selectedMethod, isPending, if (isIncome) "INCOME" else "EXPENSE")
-                    }
+                    // Doğrulama artık ViewModel'de; hata mesajı Snackbar ile gösteriliyor.
+                    onConfirm(amount, selectedCategory, description, selectedMethod, isIncome)
                 }
             ) {
                 Text("Kaydet")
