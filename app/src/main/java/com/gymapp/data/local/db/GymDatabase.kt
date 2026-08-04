@@ -23,6 +23,9 @@ import com.gymapp.data.local.entity.*
  * aynı desenle sırayla dönüşecek.
  *
  * v11: `measurements` aynı biçime geçti.
+ *
+ * v12: `appointments` aynı biçime geçti; durum ve ders türü enum oldu,
+ * hakediş matrahı randevu anında donduruluyor.
  */
 @Database(
     entities = [
@@ -37,7 +40,7 @@ import com.gymapp.data.local.entity.*
         LedgerEntryEntity::class,
         StockMovementEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

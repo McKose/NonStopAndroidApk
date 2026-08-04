@@ -1,47 +1,62 @@
 package com.gymapp.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.Update
 import com.gymapp.data.local.entity.AppointmentEntity
 import kotlinx.coroutines.flow.Flow
 
 /**
  * Randevu sorguları.
  *
- * Durum değişikliği ve finansal yan etkiler bilinçli olarak burada değil,
- * [com.gymapp.data.repository.AppointmentRepository] içinde yönetilir: defter
- * erişimi repository katmanında olduğu için orkestrasyonun DAO'da durması
- * yukarı doğru bir bağımlılık gerektiriyordu.
+ * Durum değişikliği ve finansal yan etkiler [com.gymapp.data.repository.AppointmentRepository]
+ * içinde yönetilir; defter erişimi repository katmanında olduğu için orkestrasyonun
+ * burada durması yukarı doğru bir bağımlılık gerektiriyordu.
  */
 @Dao
 interface AppointmentDao {
-    @Query("SELECT * FROM appointments ORDER BY start_time_ms ASC")
-    fun getAllAppointments(): Flow<List<AppointmentEntity>>
 
-    @Query("SELECT * FROM appointments WHERE start_time_ms >= :start AND start_time_ms < :end ORDER BY start_time_ms ASC")
-    fun getAppointmentsBetween(start: Long, end: Long): Flow<List<AppointmentEntity>>
+    @Query("""
+        SELECT * FROM appointments
+        WHERE tenantId = :tenantId AND deletedAtMs IS NULL
+        ORDER BY startTimeMs ASC
+    """)
+    fun observeAll(tenantId: String): Flow<List<AppointmentEntity>>
 
-    /** Aynı eğitmenin aynı saat aralığında başka randevusu var mı? (çakışma kontrolü) */
+    @Query("""
+        SELECT * FROM appointments
+        WHERE tenantId = :tenantId AND deletedAtMs IS NULL
+          AND startTimeMs >= :startMs AND startTimeMs < :endMs
+        ORDER BY startTimeMs ASC
+    """)
+    fun observeBetween(tenantId: String, startMs: Long, endMs: Long): Flow<List<AppointmentEntity>>
+
+    /** Aynı eğitmenin aynı saat aralığında başka randevusu var mı? (çift rezervasyon) */
     @Query("""
         SELECT COUNT(*) FROM appointments
-        WHERE staff_id = :staffId
-          AND status != 'CANCELLED'
-          AND id != :excludeAppointmentId
-          AND start_time_ms < :endTimeMs
-          AND end_time_ms > :startTimeMs
+        WHERE tenantId = :tenantId
+          AND staffId = :staffId
+          AND deletedAtMs IS NULL
+          AND state != 'CANCELLED'
+          AND id != :excludeId
+          AND startTimeMs < :endTimeMs
+          AND endTimeMs > :startTimeMs
     """)
     suspend fun countOverlapping(
+        tenantId: String,
         staffId: Long,
         startTimeMs: Long,
         endTimeMs: Long,
-        excludeAppointmentId: Long = 0L,
+        excludeId: String = "",
     ): Int
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAppointment(appointment: AppointmentEntity)
+    @Insert
+    suspend fun insert(appointment: AppointmentEntity)
 
     @Update
-    suspend fun updateAppointment(appointment: AppointmentEntity)
+    suspend fun update(appointment: AppointmentEntity)
 
     @Query("SELECT * FROM appointments WHERE id = :id")
-    suspend fun getAppointmentById(id: Long): AppointmentEntity?
+    suspend fun getById(id: String): AppointmentEntity?
 }

@@ -29,6 +29,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import com.gymapp.data.local.entity.StaffEntity
+import com.gymapp.domain.AppointmentState
+import com.gymapp.domain.TrainingType
+import com.gymapp.domain.labelTr
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -200,10 +203,11 @@ fun TimeSlotRow(
                     val memberName = members.find { it.id == appt.memberId }?.fullName ?: "Bilinmeyen Üye"
                     val staffName = staffList.find { it.id == appt.staffId }?.fullName ?: "Bilinmeyen Eğitmen"
                     
-                    val statusColor = when(appt.status) {
-                        "COMPLETED" -> Color(0xFF4CAF50)
-                        "CANCELLED" -> Color(0xFFF44336)
-                        "POSTPONED" -> Color(0xFFFF9800)
+                    val statusColor = when (appt.state) {
+                        AppointmentState.COMPLETED -> Color(0xFF4CAF50)
+                        AppointmentState.CANCELLED -> Color(0xFFF44336)
+                        AppointmentState.POSTPONED -> Color(0xFFFF9800)
+                        AppointmentState.NO_SHOW -> Color(0xFF9E9E9E)
                         else -> MaterialTheme.colorScheme.primary
                     }
 
@@ -220,15 +224,16 @@ fun TimeSlotRow(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(memberName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                Text("${appt.trainingType} - $staffName", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                Text("${appt.trainingType.labelTr()} - $staffName", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                             }
                             
-                            if (appt.status != "SCHEDULED") {
+                            if (appt.state != AppointmentState.SCHEDULED) {
                                 Text(
-                                    text = when(appt.status) {
-                                        "COMPLETED" -> "Tamamlandı"
-                                        "CANCELLED" -> "İptal"
-                                        "POSTPONED" -> "Ertelendi"
+                                    text = when (appt.state) {
+                                        AppointmentState.COMPLETED -> "Tamamlandı"
+                                        AppointmentState.CANCELLED -> "İptal"
+                                        AppointmentState.POSTPONED -> "Ertelendi"
+                                        AppointmentState.NO_SHOW -> "Gelmedi"
                                         else -> ""
                                     },
                                     style = MaterialTheme.typography.labelSmall,
@@ -249,7 +254,7 @@ fun AppointmentStatusDialog(
     appointment: AppointmentEntity,
     member: MemberEntity?,
     onDismiss: () -> Unit,
-    onConfirm: (String, String) -> Unit
+    onConfirm: (AppointmentState, String) -> Unit
 ) {
     var notes by remember { mutableStateOf(appointment.notes ?: "") }
     
@@ -270,14 +275,14 @@ fun AppointmentStatusDialog(
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
-                        onClick = { onConfirm("COMPLETED", notes) },
+                        onClick = { onConfirm(AppointmentState.COMPLETED, notes) },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Tamamlandı", style = MaterialTheme.typography.labelSmall)
                     }
                     Button(
-                        onClick = { onConfirm("POSTPONED", notes) },
+                        onClick = { onConfirm(AppointmentState.POSTPONED, notes) },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
                         modifier = Modifier.weight(1f)
                     ) {
@@ -285,7 +290,7 @@ fun AppointmentStatusDialog(
                     }
                 }
                 Button(
-                    onClick = { onConfirm("CANCELLED", notes) },
+                    onClick = { onConfirm(AppointmentState.CANCELLED, notes) },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -306,14 +311,14 @@ fun AddAppointmentSheet(
     members: List<MemberEntity>,
     staffList: List<StaffEntity>,
     onDismiss: () -> Unit,
-    onConfirm: (Long, Long, Int, String) -> Unit,
+    onConfirm: (Long, Long, Int, TrainingType) -> Unit,
     sheetState: SheetState
 ) {
     var selectedMemberId by remember { mutableStateOf<Long?>(null) }
     var selectedStaffId by remember { mutableStateOf<Long?>(null) }
     var selectedHour by remember { mutableIntStateOf(9) }
-    var selectedType by remember { mutableStateOf("FITNESS") }
-    val trainingTypes = listOf("FITNESS", "FONKSİYONEL", "REFORMER")
+    var selectedType by remember { mutableStateOf(TrainingType.FITNESS) }
+    val trainingTypes = TrainingType.entries
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -329,7 +334,7 @@ fun AddAppointmentSheet(
                     FilterChip(
                         selected = selectedType == type,
                         onClick = { selectedType = type },
-                        label = { Text(type) }
+                        label = { Text(type.labelTr()) }
                     )
                 }
             }

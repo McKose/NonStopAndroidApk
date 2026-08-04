@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.gymapp.domain.labelTr
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.StaffEntity
@@ -206,7 +207,7 @@ fun AppointmentDashboardItem(
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(member?.fullName ?: "Bilinmeyen Üye", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                Text("${appt.trainingType} - ${staff?.fullName ?: "Eğitmen atanmadı"}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Text("${appt.trainingType.labelTr()} - ${staff?.fullName ?: "Eğitmen atanmadı"}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             }
         }
     }

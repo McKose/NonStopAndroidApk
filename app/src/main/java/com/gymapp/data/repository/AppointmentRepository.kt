@@ -7,11 +7,12 @@ import com.gymapp.data.local.dao.StaffDao
 import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
-import com.gymapp.data.local.entity.StaffEntity
-import com.gymapp.domain.AppointmentStatus
+import com.gymapp.domain.AppointmentState
+import com.gymapp.domain.Ids
 import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.Money
 import com.gymapp.domain.Rate
+import com.gymapp.domain.TrainingType
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,9 +21,8 @@ import kotlin.math.roundToInt
 /**
  * Randevu akışı ve finansal yan etkileri.
  *
- * Bu mantık daha önce `AppointmentDao` içinde, DAO'ları parametre olarak alan bir
- * `@Transaction` metodundaydı. Defter erişimi repository katmanında olduğu için
- * orkestrasyon buraya taşındı; DAO artık yalnızca sorgu içeriyor.
+ * Orkestrasyon bilinçli olarak DAO'da değil burada: defter erişimi repository
+ * katmanında olduğu için DAO'da durması yukarı doğru bağımlılık gerektiriyordu.
  */
 @Singleton
 class AppointmentRepository @Inject constructor(
@@ -32,45 +32,79 @@ class AppointmentRepository @Inject constructor(
     private val staffDao: StaffDao,
     private val ledgerRepository: LedgerRepository,
 ) {
-    fun observeAll(): Flow<List<AppointmentEntity>> = appointmentDao.getAllAppointments()
+    private val tenantId = Ids.DEFAULT_TENANT
 
-    suspend fun getById(id: Long): AppointmentEntity? = appointmentDao.getAppointmentById(id)
+    fun observeAll(): Flow<List<AppointmentEntity>> = appointmentDao.observeAll(tenantId)
+
+    suspend fun getById(id: String): AppointmentEntity? = appointmentDao.getById(id)
 
     /** Aynı eğitmenin o saat aralığında başka randevusu var mı? */
     suspend fun hasOverlap(staffId: Long, startTimeMs: Long, endTimeMs: Long): Boolean =
-        appointmentDao.countOverlapping(staffId, startTimeMs, endTimeMs) > 0
+        appointmentDao.countOverlapping(tenantId, staffId, startTimeMs, endTimeMs) > 0
 
-    suspend fun insert(appointment: AppointmentEntity) =
-        appointmentDao.insertAppointment(appointment)
+    /**
+     * Randevu oluşturur ve hakediş matrahını **o anda dondurur**.
+     *
+     * Matrah önceden tamamlama anında üyenin güncel paketinden hesaplanıyordu;
+     * üye arada paketini yenilerse aynı ders için farklı hakediş çıkıyordu.
+     */
+    suspend fun create(
+        memberId: Long,
+        staffId: Long,
+        trainingType: TrainingType,
+        startTimeMs: Long,
+        endTimeMs: Long,
+    ): Result<String> = runCatching {
+        val member = memberDao.getMemberById(memberId)
+            ?: throw IllegalArgumentException("Üye bulunamadı.")
+
+        val nowMs = System.currentTimeMillis()
+        val appointmentId = Ids.new()
+
+        appointmentDao.insert(
+            AppointmentEntity(
+                id = appointmentId,
+                tenantId = tenantId,
+                memberId = memberId,
+                staffId = staffId,
+                trainingType = trainingType,
+                startTimeMs = startTimeMs,
+                endTimeMs = endTimeMs,
+                sessionValueMinor = sessionValue(member).minor,
+                createdAtMs = nowMs,
+                updatedAtMs = nowMs,
+            )
+        )
+        appointmentId
+    }
 
     /**
      * Randevu durumunu değiştirir ve finansal yan etkileri **idempotent** yönetir.
      *
-     * `isProcessed` bayrağı "durum kilitlendi" değil, **"finansal etki uygulandı"**
-     * anlamına gelir:
+     * [AppointmentEntity.settledAtMs] "durum kilitlendi" değil, **"finansal etki
+     * uygulandı"** anlamına gelir:
      *  - `COMPLETED` → seans düşülür + personel hakedişi defterde gider olarak yazılır
      *  - `COMPLETED` sonrası başka duruma dönülürse → seans iade edilir ve hakediş
      *    **ters kayıtla** iptal edilir
      *  - Diğer geçişler finansal etki doğurmaz
      *
-     * Ters kayıt, defterdeki **gerçek kayıtları** iptal ettiği için tutar birebir
-     * doğru olur; üye paketini arada değiştirmiş olsa bile geri alma sapmaz.
-     *
-     * Tümü tek transaction içinde; hata durumunda kısmi yazma kalmaz.
+     * Ters kayıt defterdeki **gerçek kayıtları** iptal ettiği için tutar birebir
+     * doğrudur; üye paketini arada değiştirmiş olsa bile geri alma sapmaz.
      */
     suspend fun processStatus(
-        appointmentId: Long,
-        status: String,
+        appointmentId: String,
+        state: AppointmentState,
         notes: String?,
     ): Result<Unit> = runCatching {
         database.withTransaction {
-            val appointment = appointmentDao.getAppointmentById(appointmentId)
+            val appointment = appointmentDao.getById(appointmentId)
                 ?: throw IllegalArgumentException("Randevu bulunamadı.")
 
-            val shouldSettle = AppointmentStatus.hasFinancialEffect(status)
+            val shouldSettle = state == AppointmentState.COMPLETED
+            val isSettled = appointment.settledAtMs != null
             val nowMs = System.currentTimeMillis()
 
-            if (shouldSettle && !appointment.isProcessed) {
+            if (shouldSettle && !isSettled) {
                 val member = memberDao.getMemberById(appointment.memberId)
                     ?: throw IllegalStateException("Randevuya bağlı üye bulunamadı.")
                 val staff = staffDao.getStaffById(appointment.staffId)
@@ -78,48 +112,48 @@ class AppointmentRepository @Inject constructor(
 
                 memberDao.decrementSession(appointment.memberId, nowMs)
 
-                val commission = sessionCommission(member, staff)
+                // Matrah randevu anında donduruldu; boşsa üyeden hesaplanır (eski kayıtlar).
+                val basis = Money(appointment.sessionValueMinor)
+                    .takeIf { it.isPositive } ?: sessionValue(member)
+                val commission = basis.applyRate(commissionRate(staff.commissionRate))
+
                 if (commission.isPositive) {
                     ledgerRepository.recordExpense(
                         amount = commission,
                         category = LedgerCategory.COMMISSION,
                         description = "${staff.fullName} — ${member.fullName} hakediş",
                         staffId = staff.id.toString(),
-                        appointmentId = appointmentId.toString(),
+                        appointmentId = appointmentId,
                         occurredAtMs = nowMs,
                     ).getOrThrow()
                 }
-            } else if (!shouldSettle && appointment.isProcessed) {
-                // Tamamlanmış randevu geri alınıyor: yan etkileri geri sar.
+            } else if (!shouldSettle && isSettled) {
                 memberDao.incrementSession(appointment.memberId, nowMs)
-
                 ledgerRepository.reverseForAppointment(
-                    appointmentId = appointmentId.toString(),
+                    appointmentId = appointmentId,
                     reason = "Randevu geri alındı",
                     occurredAtMs = nowMs,
                 ).getOrThrow()
             }
 
-            appointmentDao.updateAppointment(
-                appointment.copy(status = status, notes = notes, isProcessed = shouldSettle)
+            appointmentDao.update(
+                appointment.copy(
+                    state = state,
+                    notes = notes,
+                    settledAtMs = if (shouldSettle) (appointment.settledAtMs ?: nowMs) else null,
+                    updatedAtMs = nowMs,
+                )
             )
         }
     }
 }
 
-/**
- * Bir seansın personele düşen hakedişi: `(paket ücreti / toplam seans) * hakediş oranı`.
- *
- * Hesap `Money` üzerinden yapılır; tek yuvarlama noktasından geçtiği için
- * kuruş sapması oluşmaz.
- *
- * NOT (entity geçişi): matrah randevu anında `AppointmentEntity`'ye snapshot'lanmalı.
- * Şu anki kurguda üye paketini yenilerse **yeni** randevuların matrahı değişir;
- * geçmiş kayıtlar defterde durduğu için geriye dönük bozulma yaşanmaz.
- */
-private fun sessionCommission(member: MemberEntity, staff: StaffEntity): Money {
+/** Bir seansın parasal değeri: paket ücreti / toplam seans. */
+private fun sessionValue(member: MemberEntity): Money {
     if (member.totalSessions <= 0) return Money.ZERO
-    val sessionValue = Money.ofMajor(member.packagePrice) / member.totalSessions
-    val rate = Rate((staff.commissionRate.coerceIn(0.0, 1.0) * Rate.SCALE).roundToInt())
-    return sessionValue.applyRate(rate)
+    return Money.ofMajor(member.packagePrice) / member.totalSessions
 }
+
+/** Personelin kesir cinsinden oranını baz puana çevirir. */
+private fun commissionRate(fraction: Double): Rate =
+    Rate((fraction.coerceIn(0.0, 1.0) * Rate.SCALE).roundToInt())

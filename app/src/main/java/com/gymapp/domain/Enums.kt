@@ -83,3 +83,26 @@ object SessionQuota {
         else -> remaining + 1
     }
 }
+
+// ─── Görünen etiketler ──────────────────────────────────────────────────────
+// Enum değerleri veritabanında; Türkçe karşılıkları yalnızca ekranda kullanılır.
+
+fun TrainingType.labelTr(): String = when (this) {
+    TrainingType.FITNESS -> "Fitness"
+    TrainingType.FUNCTIONAL -> "Fonksiyonel"
+    TrainingType.REFORMER -> "Reformer"
+}
+
+fun PackageCategory.labelTr(): String = when (this) {
+    PackageCategory.INDIVIDUAL -> "Bireysel"
+    PackageCategory.DUET -> "Düet"
+    PackageCategory.GROUP -> "Grup"
+}
+
+fun AppointmentState.labelTr(): String = when (this) {
+    AppointmentState.SCHEDULED -> "Planlandı"
+    AppointmentState.COMPLETED -> "Tamamlandı"
+    AppointmentState.CANCELLED -> "İptal"
+    AppointmentState.POSTPONED -> "Ertelendi"
+    AppointmentState.NO_SHOW -> "Gelmedi"
+}
