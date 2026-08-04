@@ -21,6 +21,8 @@ import com.gymapp.data.local.entity.*
  * v10: entity cutover başladı — `orders` hedef biçime geçti (UUID anahtar,
  * `tenantId`, zaman damgaları, kuruş tutarlar, enum kolonlar). Kalan tablolar
  * aynı desenle sırayla dönüşecek.
+ *
+ * v11: `measurements` aynı biçime geçti.
  */
 @Database(
     entities = [
@@ -35,7 +37,7 @@ import com.gymapp.data.local.entity.*
         LedgerEntryEntity::class,
         StockMovementEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
