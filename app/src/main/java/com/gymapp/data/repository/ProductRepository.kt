@@ -12,6 +12,7 @@ import com.gymapp.domain.Ids
 import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.DeliveryStatus
 import com.gymapp.domain.StockMovementReason
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -101,7 +102,7 @@ class ProductRepository @Inject constructor(
         deliveryStatus: String,
         discount: Double = 0.0,
         notes: String? = null
-    ): Result<Long> = runCatching {
+    ): Result<String> = runCatching {
         require(cartItems.isNotEmpty()) { "Sepet boş." }
 
         database.withTransaction {
@@ -126,21 +127,29 @@ class ProductRepository @Inject constructor(
             val finalPrice = total - safeDiscount
 
             // 2) Sipariş
-            val orderId = orderDao.insertOrder(
+            val nowMs = System.currentTimeMillis()
+            val orderId = Ids.new()
+            orderDao.insert(
                 OrderEntity(
+                    id = orderId,
+                    tenantId = tenantId,
                     memberId = memberId,
-                    totalPrice = total.asDouble,
-                    discount = safeDiscount.asDouble,
-                    finalPrice = finalPrice.asDouble,
-                    paymentType = paymentType,
+                    totalPriceMinor = total.minor,
+                    discountMinor = safeDiscount.minor,
+                    finalPriceMinor = finalPrice.minor,
+                    paymentMethod = runCatching { PaymentMethod.valueOf(paymentType) }
+                        .getOrDefault(PaymentMethod.CASH),
                     paymentStatus = paymentStatus,
-                    deliveryStatus = deliveryStatus,
-                    notes = notes
+                    deliveryStatus = runCatching { DeliveryStatus.valueOf(deliveryStatus) }
+                        .getOrDefault(DeliveryStatus.POST_DELIVERY),
+                    dateMs = nowMs,
+                    notes = notes,
+                    createdAtMs = nowMs,
+                    updatedAtMs = nowMs,
                 )
             )
 
             // 3) Stok çıkışları — siparişe bağlı, geri alınabilir olması için ayrı kayıt.
-            val nowMs = System.currentTimeMillis()
             stockMovementDao.insertAll(
                 cartItems.map { (productId, quantity) ->
                     StockMovementEntity(
@@ -149,7 +158,7 @@ class ProductRepository @Inject constructor(
                         productId = productId.toString(),
                         quantityDelta = -quantity,
                         reason = StockMovementReason.SALE,
-                        orderId = orderId.toString(),
+                        orderId = orderId,
                         occurredAtMs = nowMs,
                         createdAtMs = nowMs,
                     )
@@ -163,12 +172,12 @@ class ProductRepository @Inject constructor(
                     method = runCatching { PaymentMethod.valueOf(paymentType) }
                         .getOrDefault(PaymentMethod.CASH),
                     description = buildString {
-                        append("Market satışı - Sipariş #").append(orderId)
+                        append("Market satışı - Sipariş #").append(orderId.take(8))
                         if (memberId == null) append(" (Misafir)")
                     },
                     category = LedgerCategory.MARKET,
                     memberId = memberId?.toString(),
-                    orderId = orderId.toString(),
+                    orderId = orderId,
                     occurredAtMs = nowMs,
                 ).getOrThrow()
             }

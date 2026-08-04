@@ -17,6 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gymapp.data.local.entity.OrderEntity
+import com.gymapp.domain.Money
+import com.gymapp.domain.PaymentMethod
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -80,12 +82,12 @@ fun OrderItem(order: OrderEntity) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Sipariş #${order.id}",
+                    text = "Sipariş #${order.id.take(8)}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "₺${String.format(Locale.getDefault(), "%,.2f", order.finalPrice)}",
+                    text = "₺${String.format(Locale.getDefault(), "%,.2f", Money(order.finalPriceMinor).asDouble)}",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.ExtraBold
@@ -122,10 +124,10 @@ fun OrderItem(order: OrderEntity) {
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = when(order.paymentType) {
-                            "CASH" -> "Nakit"
-                            "CARD" -> "Kart"
-                            else -> order.paymentType
+                        text = when (order.paymentMethod) {
+                            PaymentMethod.CASH -> "Nakit"
+                            PaymentMethod.CARD -> "Kart"
+                            PaymentMethod.MULTISPORT -> "MultiSpor"
                         },
                         style = MaterialTheme.typography.labelSmall
                     )
