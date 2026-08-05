@@ -22,7 +22,7 @@ class PhoneNumberTest {
             "0555 111 22 33",
             "(0555) 111-22-33",
         ).forEach { input ->
-            assertEquals("Girdi: $input", expected, PhoneNumber.normalizeTr(input))
+            assertEquals(expected, PhoneNumber.normalizeTr(input), "Girdi: $input")
         }
     }
 
@@ -36,7 +36,7 @@ class PhoneNumberTest {
             "55511122334",     // fazla hane
             "abcdefghij",
         ).forEach { input ->
-            assertNull("Girdi: $input", PhoneNumber.normalizeTr(input))
+            assertNull(PhoneNumber.normalizeTr(input), "Girdi: $input")
         }
     }
 
