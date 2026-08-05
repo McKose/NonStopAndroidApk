@@ -44,6 +44,9 @@ android {
 }
 
 dependencies {
+    // Platformdan bağımsız iş kuralları — iOS uygulaması da aynı modülü kullanacak.
+    implementation(project(":shared"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

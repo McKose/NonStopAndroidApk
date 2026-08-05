@@ -1,20 +1,25 @@
 package com.gymapp.domain
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
-import org.junit.Test
-import java.time.LocalDate
-import java.time.ZoneId
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class PeriodsTest {
 
-    private val istanbul: ZoneId = ZoneId.of("Europe/Istanbul")
+    private val istanbul: TimeZone = TimeZone.of("Europe/Istanbul")
+    private val dayMs = 24L * 60 * 60 * 1000
+
+    private fun startOf(year: Int, month: Int, day: Int): Long =
+        LocalDate(year, month, day).atStartOfDayIn(istanbul).toEpochMilliseconds()
 
     @Test
     fun `gun araligi 24 saattir`() {
-        val day = Periods.day(LocalDate.of(2026, 3, 15), istanbul)
-        assertEquals(24 * 60 * 60 * 1000L, day.endExclusive - day.startInclusive)
+        val day = Periods.day(LocalDate(2026, 3, 15), istanbul)
+        assertEquals(dayMs, day.endExclusive - day.startInclusive)
     }
 
     /**
@@ -23,41 +28,47 @@ class PeriodsTest {
      */
     @Test
     fun `gunun son milisaniyesi araliga dahildir`() {
-        val date = LocalDate.of(2026, 3, 15)
-        val day = Periods.day(date, istanbul)
-        val lastMillisOfDay = day.endExclusive - 1
-
-        assertTrue(lastMillisOfDay in day)
+        val day = Periods.day(LocalDate(2026, 3, 15), istanbul)
+        assertTrue(day.endExclusive - 1 in day)
         // Ertesi günün ilk milisaniyesi dahil DEĞİL (çift sayım olmaz).
         assertFalse(day.endExclusive in day)
     }
 
     @Test
     fun `gun basi araliga dahildir`() {
-        val day = Periods.day(LocalDate.of(2026, 3, 15), istanbul)
+        val day = Periods.day(LocalDate(2026, 3, 15), istanbul)
         assertTrue(day.startInclusive in day)
         assertFalse(day.startInclusive - 1 in day)
     }
 
     @Test
     fun `ardisik gunler ne bosluk ne cakisma birakir`() {
-        val first = Periods.day(LocalDate.of(2026, 3, 15), istanbul)
-        val second = Periods.day(LocalDate.of(2026, 3, 16), istanbul)
+        val first = Periods.day(LocalDate(2026, 3, 15), istanbul)
+        val second = Periods.day(LocalDate(2026, 3, 16), istanbul)
         assertEquals(first.endExclusive, second.startInclusive)
+    }
+
+    /** `dayOf` ile `day` aynı günü vermeli: biri andan, diğeri tarihten türetiyor. */
+    @Test
+    fun `dayOf gun icindeki herhangi bir ani ayni araliga esler`() {
+        val date = LocalDate(2026, 3, 15)
+        val expected = Periods.day(date, istanbul)
+        val middayMs = expected.startInclusive + dayMs / 2
+
+        assertEquals(expected, Periods.dayOf(middayMs, istanbul))
     }
 
     @Test
     fun `ay araligi ayin tamamini kapsar`() {
-        // monthIndex0 = 1 -> Şubat (Calendar.MONTH ile uyumlu)
+        // monthIndex0 = 1 -> Şubat
         val february = Periods.month(2026, 1, istanbul)
-        val expectedDays = 28L // 2026 artık yıl değil
-        assertEquals(expectedDays * 24 * 60 * 60 * 1000L, february.endExclusive - february.startInclusive)
+        assertEquals(28L * dayMs, february.endExclusive - february.startInclusive)
     }
 
     @Test
     fun `artik yil subat 29 gun surer`() {
         val february = Periods.month(2028, 1, istanbul)
-        assertEquals(29L * 24 * 60 * 60 * 1000L, february.endExclusive - february.startInclusive)
+        assertEquals(29L * dayMs, february.endExclusive - february.startInclusive)
     }
 
     @Test
@@ -70,21 +81,19 @@ class PeriodsTest {
     /** Regresyon: ciro penceresinin üst sınırı yoktu; ileri tarihli kayıtlar sayılıyordu. */
     @Test
     fun `ciro penceresi ileri tarihli kayitlari icermez`() {
-        val now = LocalDate.of(2026, 6, 15).atStartOfDay(istanbul).toInstant().toEpochMilli()
+        val now = startOf(2026, 6, 15)
         val window = Periods.lastMonths(1, now, istanbul)
 
-        val future = now + 1
-        assertFalse(future in window)
+        assertFalse(now + 1 in window)
         assertTrue(now - 1 in window)
     }
 
     @Test
     fun `ciro penceresi tam olarak N ay geriye gider`() {
-        val now = LocalDate.of(2026, 6, 15).atStartOfDay(istanbul).toInstant().toEpochMilli()
+        val now = startOf(2026, 6, 15)
         val window = Periods.lastMonths(3, now, istanbul)
 
-        val threeMonthsAgo = LocalDate.of(2026, 3, 15).atStartOfDay(istanbul).toInstant().toEpochMilli()
-        assertEquals(threeMonthsAgo, window.startInclusive)
+        assertEquals(startOf(2026, 3, 15), window.startInclusive)
         assertEquals(now, window.endExclusive)
     }
 }
