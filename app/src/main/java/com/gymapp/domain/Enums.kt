@@ -99,6 +99,22 @@ fun PackageCategory.labelTr(): String = when (this) {
     PackageCategory.GROUP -> "Grup"
 }
 
+fun StaffRole.labelTr(): String = when (this) {
+    StaffRole.ADMIN -> "Admin"
+    StaffRole.MANAGER -> "Yönetici"
+    StaffRole.TRAINER -> "Antrenör"
+}
+
+// NOT: [MemberManualStatus] için etiket yok — ekranda **türetilen** durum
+// gösterilir ([MembershipState.labelTr]); kayıtlı manuel durum tek başına
+// kullanıcıya yanlış bilgi verir (süresi dolmuş üye "Aktif" görünürdü).
+
+fun PaymentMethod.labelTr(): String = when (this) {
+    PaymentMethod.CASH -> "Nakit"
+    PaymentMethod.CARD -> "Kart"
+    PaymentMethod.MULTISPORT -> "MultiSpor"
+}
+
 fun AppointmentState.labelTr(): String = when (this) {
     AppointmentState.SCHEDULED -> "Planlandı"
     AppointmentState.COMPLETED -> "Tamamlandı"

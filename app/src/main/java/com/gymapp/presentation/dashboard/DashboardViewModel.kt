@@ -5,11 +5,16 @@ import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.StaffEntity
-import com.gymapp.data.repository.MemberRepository
 import com.gymapp.data.local.preferences.AppPreferences
+import com.gymapp.data.repository.AppointmentRepository
+import com.gymapp.data.repository.MemberRepository
+import com.gymapp.data.repository.ProductRepository
+import com.gymapp.data.repository.StaffRepository
 import com.gymapp.domain.Membership
 import com.gymapp.domain.MembershipState
+import com.gymapp.domain.Money
 import com.gymapp.domain.Periods
+import com.gymapp.domain.StaffRole
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import java.time.Instant
@@ -22,7 +27,7 @@ import javax.inject.Inject
 private const val LOW_STOCK_THRESHOLD = 5
 
 data class DashboardUiState(
-    val userRole: String = "antrenör",
+    val userRole: StaffRole = StaffRole.TRAINER,
     val totalMembers: Int = 0,
     val activeMembers: Int = 0,
     val dailyAppointments: List<AppointmentEntity> = emptyList(),
@@ -30,21 +35,24 @@ data class DashboardUiState(
     val staffList: List<StaffEntity> = emptyList(),
     val criticalAlerts: List<String> = emptyList(),
     val isLoading: Boolean = false
-)
+) {
+    /** Eğitmen yalnızca kendi randevularını ve üyelerini görür. */
+    val isTrainer: Boolean get() = userRole == StaffRole.TRAINER
+}
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val memberRepository: MemberRepository,
-    private val appointmentRepository: com.gymapp.data.repository.AppointmentRepository,
-    private val staffDao: com.gymapp.data.local.dao.StaffDao,
-    private val productRepository: com.gymapp.data.repository.ProductRepository,
+    private val appointmentRepository: AppointmentRepository,
+    private val staffRepository: StaffRepository,
+    private val productRepository: ProductRepository,
     private val prefs: AppPreferences
 ) : ViewModel() {
 
     val uiState: StateFlow<DashboardUiState> = combine(
         memberRepository.getAllMembers(),
         appointmentRepository.observeAll(),
-        staffDao.getAllStaff(),
+        staffRepository.getAllStaff(),
         productRepository.getAllProducts(),
         productRepository.observeStockByProduct(),
     ) { members, appointments, staff, products, stockByProduct ->
@@ -53,15 +61,18 @@ class DashboardViewModel @Inject constructor(
 
         val userRole = prefs.currentUserRole
         val currentUserId = prefs.currentUserId
+        val isTrainer = userRole == StaffRole.TRAINER
 
-        val filteredAppointments = if (userRole == "antrenör") {
+        val filteredAppointments = if (isTrainer) {
             appointments.filter { it.staffId == currentUserId && it.startTimeMs in today }
         } else {
             appointments.filter { it.startTimeMs in today }
         }
 
-        val filteredMembers = if (userRole == "antrenör") {
-            val memberIds = appointments.filter { it.staffId == currentUserId }.map { it.memberId }.toSet()
+        val filteredMembers = if (isTrainer) {
+            val memberIds = appointments.filter { it.staffId == currentUserId }
+                .map { it.memberId }
+                .toSet()
             members.filter { it.id in memberIds }
         } else {
             members
@@ -69,8 +80,8 @@ class DashboardViewModel @Inject constructor(
 
         val alerts = mutableListOf<String>()
 
-        // Stock Alerts (Admin/Manager only)
-        if (userRole != "antrenör") {
+        // Kritik stok — yalnızca yönetim görür.
+        if (!isTrainer) {
             products.forEach { product ->
                 val onHand = stockByProduct[product.id] ?: 0
                 if (onHand < LOW_STOCK_THRESHOLD) {
@@ -79,7 +90,7 @@ class DashboardViewModel @Inject constructor(
             }
         }
 
-        // Expiring Memberships (Next 3 days)
+        // Yaklaşan üyelik bitişleri (3 gün)
         val expiryFormatter = DateTimeFormatter.ofPattern("dd/MM", Locale.getDefault())
         val threeDaysLater = now + TimeUnit.DAYS.toMillis(3)
         members.forEach { member ->
@@ -93,18 +104,18 @@ class DashboardViewModel @Inject constructor(
             }
         }
 
-        // Pending Payments — arşivlenmiş üyeler için uyarı üretme
+        // Bekleyen ödemeler — arşivlenmiş üyeler için uyarı üretme.
         members.filter {
             it.paymentStatus == "PENDING" &&
                 Membership.stateOf(it.status, it.endDateMs, now) != MembershipState.PASSIVE
         }.forEach {
-            alerts.add("Ödeme Bekliyor: ${it.fullName} (₺${it.pricePaid})")
+            alerts.add("Ödeme Bekliyor: ${it.fullName} (₺${Money(it.pricePaidMinor)})")
         }
 
         DashboardUiState(
             userRole = userRole,
             totalMembers = filteredMembers.size,
-            // Üyelik durumu artık bitiş tarihinden türetiliyor; süresi dolmuş üye
+            // Üyelik durumu bitiş tarihinden türetiliyor; süresi dolmuş üye
             // arka plan işi çalışmasa bile "aktif" sayılmıyor.
             activeMembers = filteredMembers.count {
                 Membership.stateOf(it.status, it.endDateMs, now) == MembershipState.ACTIVE

@@ -19,7 +19,7 @@ data class MarketUiState(
     val products: List<ProductEntity> = emptyList(),
     val members: List<MemberEntity> = emptyList(),
     val cart: Map<String, Int> = emptyMap(), // ProductId -> Quantity
-    val selectedMemberId: Long? = null,
+    val selectedMemberId: String? = null,
     val paymentType: String = "CASH",
     val paymentStatus: String = "PAID",
     val deliveryStatus: String = "POST_DELIVERY",
@@ -42,7 +42,7 @@ sealed interface MarketEvent {
 /** Kullanıcının form üzerinde değiştirdiği alanlar tek bir state'te toplanır. */
 private data class MarketForm(
     val cart: Map<String, Int> = emptyMap(),
-    val selectedMemberId: Long? = null,
+    val selectedMemberId: String? = null,
     val paymentType: String = "CASH",
     val paymentStatus: String = "PAID",
     val deliveryStatus: String = "POST_DELIVERY",
@@ -110,7 +110,7 @@ class MarketViewModel @Inject constructor(
         }
     }
 
-    fun selectMember(memberId: Long?) = _form.update { it.copy(selectedMemberId = memberId) }
+    fun selectMember(memberId: String?) = _form.update { it.copy(selectedMemberId = memberId) }
     fun setPaymentType(type: String) = _form.update { it.copy(paymentType = type) }
     fun setPaymentStatus(status: String) = _form.update { it.copy(paymentStatus = status) }
     fun setDeliveryStatus(status: String) = _form.update { it.copy(deliveryStatus = status) }

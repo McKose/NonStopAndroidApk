@@ -40,7 +40,7 @@ fun DashboardScreen(
             TopAppBar(
                 title = { Text("Non Stop", fontWeight = FontWeight.Bold) },
                 actions = {
-                    if (uiState.userRole != "antrenör") {
+                    if (!uiState.isTrainer) {
                         IconButton(onClick = onNavigateToSettings) {
                             Icon(Icons.Default.Settings, contentDescription = "Ayarlar")
                         }
@@ -96,7 +96,7 @@ fun DashboardScreen(
                     QuickActionCard("Takvim", Icons.Default.CalendarMonth, Modifier.weight(1f), onNavigateToCalendar)
                     QuickActionCard("Üyeler", Icons.Default.Groups, Modifier.weight(1f), onNavigateToMembers)
                 }
-                if (uiState.userRole != "antrenör") {
+                if (!uiState.isTrainer) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),

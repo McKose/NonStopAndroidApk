@@ -1,62 +1,89 @@
 package com.gymapp.data.local.entity
 
-import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.gymapp.domain.MemberManualStatus
+import com.gymapp.domain.PaymentMethod
 
+/**
+ * Salon üyesi.
+ *
+ * Hedef biçime ek olarak üç düzeltme:
+ *  - **Ölçüm alanları düştü** (`weight`, `height`, `shoulder`, `chest`, `waist`,
+ *    `hips`, `leg`, `arm`, `bodyFatPercentage`). Aynı veriler [MeasurementEntity]
+ *    içinde tarihli olarak tutuluyordu; üye satırındaki kopya hiçbir zaman
+ *    yazılmıyor ama ekranlarda okunabiliyordu — iki kaynak, biri her zaman boş.
+ *  - **Kullanılmayan sağlık bayrakları düştü** (`hasChronicDisease`, `hasAllergy`,
+ *    `isHealthProfileCompleted`); hiçbir yerde set edilmiyordu.
+ *  - **`totalSessions` / `remainingSessions` nullable** — `-1` sentinel'i yerine
+ *    `null` = sınırsız (abonman).
+ *
+ * Silme artık `status = PASSIVE` ile değil **tombstone** (`deletedAtMs`) ile yapılır;
+ * [MemberManualStatus.ARCHIVED] ise "silinmedi ama listelenmesin" anlamındaki
+ * manuel durumdur.
+ */
 @Entity(
     tableName = "gym_members",
     indices = [
-        Index(value = ["phone"], unique = true),
-        Index(value = ["endDateMs"]),
-        Index(value = ["status"])
+        Index(value = ["tenantId", "phone"], unique = true),
+        Index(value = ["tenantId", "endDateMs"]),
+        Index(value = ["tenantId", "status"]),
+        Index(value = ["updatedAtMs"]),
     ]
 )
 data class MemberEntity(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
+    @PrimaryKey
+    val id: String,
+
+    val tenantId: String,
+
     val fullName: String,
+
+    /** E.164 biçiminde normalize edilmiş numara (+90XXXXXXXXXX). */
     val phone: String,
+
     val email: String? = null,
     val birthDateMs: Long? = null,
-    val activePackageId: Long? = null,
-    val totalSessions: Int = -1,
-    val remainingSessions: Int = -1,
+
+    val activePackageId: String? = null,
+
+    /** Paketin seans kotası; `null` ise sınırsız. */
+    val totalSessions: Int? = null,
+
+    /** Kalan seans; `null` ise sınırsız. */
+    val remainingSessions: Int? = null,
+
     val startDateMs: Long? = null,
     val endDateMs: Long? = null,
-    val status: String = MemberStatus.ACTIVE.name,
-    val paymentType: String = PaymentType.CASH.name, // CASH, CARD, MULTISPORT
+
+    val status: MemberManualStatus = MemberManualStatus.ACTIVE,
+
+    val paymentType: PaymentMethod = PaymentMethod.CASH,
     val installmentCount: Int = 1,
-    val packagePrice: Double = 0.0,
-    val discount: Double = 0.0,
-    val pricePaid: Double = 0.0, // (packagePrice - discount) + commission
-    val paymentStatus: String = "PENDING", // PENDING, PAID
+
+    /** Paket liste fiyatı (kuruş). */
+    val packagePriceMinor: Long = 0,
+
+    /** Uygulanan iskonto (kuruş). */
+    val discountMinor: Long = 0,
+
+    /** Vade farkı dahil ödenecek nihai tutar (kuruş). */
+    val pricePaidMinor: Long = 0,
+
+    /** "PAID" | "PENDING" — gerçek bakiye defterden türetilir, bu kolon gösterim içindir. */
+    val paymentStatus: String = "PENDING",
+
     val paymentDateMs: Long? = null,
+
     val notes: String? = null,
 
-    // Sağlık Bilgileri
+    // ─── Sağlık bilgileri (KVKK: özel nitelikli kişisel veri) ────────────────
     val healthRisks: String? = null,
     val riskLevel: String = "LOW",
-    val hasChronicDisease: Boolean = false,
-    val hasAllergy: Boolean = false,
     val healthNotes: String? = null,
-    val isHealthProfileCompleted: Boolean = false,
 
-    // Fiziksel Ölçümler
-    val weight: Double? = null,
-    val height: Double? = null,
-    val bodyFatPercentage: Double? = null,
-    val shoulder: Double? = null,
-    val chest: Double? = null,
-    val waist: Double? = null,
-    val hips: Double? = null,
-    val leg: Double? = null,
-    val arm: Double? = null,
-
-    val createdAtMs: Long = System.currentTimeMillis(),
-    val updatedAtMs: Long = System.currentTimeMillis()
+    val createdAtMs: Long,
+    val updatedAtMs: Long,
+    val deletedAtMs: Long? = null,
 )
-
-enum class MemberStatus { ACTIVE, PASSIVE, FROZEN }
-enum class PaymentType  { CASH, CARD, MULTISPORT }

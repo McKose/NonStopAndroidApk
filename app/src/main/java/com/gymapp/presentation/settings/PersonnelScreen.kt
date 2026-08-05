@@ -3,13 +3,14 @@ package com.gymapp.presentation.settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.*
@@ -23,8 +24,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gymapp.data.local.entity.StaffEntity
-import com.gymapp.domain.CommissionRate
-import java.util.*
+import com.gymapp.domain.Money
+import com.gymapp.domain.Rate
+import com.gymapp.domain.StaffRole
+import com.gymapp.domain.labelTr
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,17 +36,23 @@ fun PersonnelScreen(
     viewModel: PersonnelViewModel = hiltViewModel()
 ) {
     val staffList by viewModel.staffList.collectAsState(initial = emptyList())
-    val error by viewModel.error.collectAsState()
-    var showAddDialog by remember { mutableStateOf(false) }
-    var selectedStaff by remember { mutableStateOf<StaffEntity?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(error) {
-        if (error == null && !showAddDialog && selectedStaff == null) {
-            // Success case logic if needed
+    /** `null` = diyalog kapalı; `StaffEntity?` içeren değer = düzenleme (veya yeni kayıt). */
+    var editing by remember { mutableStateOf<StaffFormTarget?>(null) }
+    var pendingDelete by remember { mutableStateOf<StaffEntity?>(null) }
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is PersonnelEvent.Saved -> editing = null
+                is PersonnelEvent.Failed -> snackbarHostState.showSnackbar(event.message)
+            }
         }
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Personel Yönetimi", fontWeight = FontWeight.Bold) },
@@ -55,7 +64,7 @@ fun PersonnelScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
+            FloatingActionButton(onClick = { editing = StaffFormTarget(null) }) {
                 Icon(Icons.Default.Add, contentDescription = "Personel Ekle")
             }
         }
@@ -65,48 +74,73 @@ fun PersonnelScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(staffList) { staff ->
-                PersonnelItem(staff, onClick = { selectedStaff = staff })
+            items(staffList, key = { it.id }) { staff ->
+                PersonnelItem(
+                    staff = staff,
+                    onClick = { editing = StaffFormTarget(staff) },
+                    onDelete = { pendingDelete = staff },
+                )
             }
         }
     }
 
-    if (showAddDialog) {
-        AddStaffDialog(
-            error = error,
-            onDismiss = { 
-                showAddDialog = false
-                viewModel.clearError()
-            },
-            onConfirm = { name, title, branch, commissionFraction, salary, phone, nickname, role ->
-                viewModel.addStaff(name, title, branch, commissionFraction, salary, phone, nickname, role)
+    editing?.let { target ->
+        StaffDialog(
+            staff = target.staff,
+            onDismiss = { editing = null },
+            onConfirm = { form ->
+                viewModel.saveStaff(
+                    staffId = target.staff?.id,
+                    name = form.name,
+                    title = form.title,
+                    branch = form.branch,
+                    commissionPercent = form.commissionPercent,
+                    salary = form.salary,
+                    phone = form.phone,
+                    nickname = form.nickname,
+                    role = form.role,
+                    password = form.password,
+                )
             }
         )
     }
 
-    if (selectedStaff != null) {
-        EditStaffDialog(
-            staff = selectedStaff!!,
-            error = error,
-            onDismiss = {
-                selectedStaff = null
-                viewModel.clearError()
+    pendingDelete?.let { staff ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Personeli sil") },
+            text = { Text("${staff.fullName} listeden kaldırılacak. Geçmiş randevu ve hakediş kayıtları korunur.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteStaff(staff.id)
+                    pendingDelete = null
+                }) { Text("Sil", color = Color.Red) }
             },
-            onConfirm = { updatedStaff ->
-                viewModel.updateStaff(updatedStaff)
-                selectedStaff = null
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("Vazgeç") }
             }
         )
-    }
-
-    // Auto-close add dialog on success
-    LaunchedEffect(staffList.size) {
-        if (showAddDialog) showAddDialog = false
     }
 }
 
+/** Diyaloğun hedefi: `staff == null` ise yeni kayıt. */
+private data class StaffFormTarget(val staff: StaffEntity?)
+
+/** Diyalogdan dönen form değerleri. */
+private data class StaffForm(
+    val name: String,
+    val title: String,
+    val branch: String,
+    val commissionPercent: Double,
+    val salary: Double,
+    val phone: String,
+    val nickname: String,
+    val role: StaffRole,
+    val password: String?,
+)
+
 @Composable
-fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit) {
+private fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit, onDelete: () -> Unit) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -125,79 +159,123 @@ fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit) {
                     Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
             }
-            
+
             Spacer(Modifier.width(16.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(staff.fullName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text("${staff.title} | ${staff.branch}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Text(
+                    "${staff.role.labelTr()} | ${staff.branch.ifBlank { "-" }}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color.Gray)
                     Spacer(Modifier.width(4.dp))
                     Text(staff.phone, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 }
             }
-            
+
             Column(horizontalAlignment = Alignment.End) {
-                Text("₺${staff.monthlySalary}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                 Text(
-                    "Hakediş: %${CommissionRate.toPercentDisplay(staff.commissionRate)}",
+                    "₺${Money(staff.monthlySalaryMinor)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Hakediş: %${Rate(staff.commissionBasisPoints).asPercent}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.secondary
                 )
+            }
+
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, contentDescription = "Sil", tint = Color.Red)
             }
         }
     }
 }
 
+/**
+ * Ekleme ve düzenleme için **tek** diyalog.
+ *
+ * Önceden neredeyse birebir aynı iki diyalog vardı; alan eklendiğinde biri
+ * güncellenip diğeri unutuluyordu.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditStaffDialog(
-    staff: StaffEntity,
-    error: String? = null,
+private fun StaffDialog(
+    staff: StaffEntity?,
     onDismiss: () -> Unit,
-    onConfirm: (StaffEntity) -> Unit
+    onConfirm: (StaffForm) -> Unit
 ) {
-    var name by remember { mutableStateOf(staff.fullName) }
-    var title by remember { mutableStateOf(staff.title) }
-    var branch by remember { mutableStateOf(staff.branch) }
-    var rate by remember { mutableStateOf(CommissionRate.toPercentDisplay(staff.commissionRate).toString()) }
-    var salary by remember { mutableStateOf(staff.monthlySalary.toString()) }
-    var phone by remember { mutableStateOf(staff.phone) }
-    var nickname by remember { mutableStateOf(staff.nickname) }
-    var password by remember { mutableStateOf(staff.password) }
-    var role by remember { mutableStateOf(staff.role) }
+    var name by remember { mutableStateOf(staff?.fullName ?: "") }
+    var title by remember { mutableStateOf(staff?.title ?: "") }
+    var branch by remember { mutableStateOf(staff?.branch ?: "") }
+    var rate by remember {
+        mutableStateOf(staff?.let { Rate(it.commissionBasisPoints).asPercent.toString() } ?: "")
+    }
+    var salary by remember {
+        mutableStateOf(staff?.let { Money(it.monthlySalaryMinor).asDouble.toString() } ?: "")
+    }
+    var phone by remember { mutableStateOf(staff?.phone ?: "") }
+    var nickname by remember { mutableStateOf(staff?.nickname ?: "") }
+    var password by remember { mutableStateOf("") }
+    var role by remember { mutableStateOf(staff?.role ?: StaffRole.TRAINER) }
     var roleExpanded by remember { mutableStateOf(false) }
+
+    val canSave = name.isNotBlank() && nickname.isNotBlank() && phone.isNotBlank()
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Personel Düzenle") },
+        title = { Text(if (staff == null) "Yeni Personel" else "Personel Düzenle") },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (error != null) {
-                    Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                }
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Ad Soyad *") }, modifier = Modifier.fillMaxWidth())
-                
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Ad Soyad *") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = nickname, onValueChange = { nickname = it }, label = { Text("Kullanıcı Adı *") }, modifier = Modifier.weight(1f))
-                    
+                    OutlinedTextField(
+                        value = nickname,
+                        onValueChange = { nickname = it },
+                        label = { Text("Kullanıcı Adı *") },
+                        modifier = Modifier.weight(1f)
+                    )
+
                     ExposedDropdownMenuBox(
                         expanded = roleExpanded,
                         onExpandedChange = { roleExpanded = it },
                         modifier = Modifier.weight(1f)
                     ) {
                         OutlinedTextField(
-                            value = role,
+                            value = role.labelTr(),
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Rol") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(roleExpanded) },
-                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                         )
-                        ExposedDropdownMenu(expanded = roleExpanded, onDismissRequest = { roleExpanded = false }) {
-                            listOf("antrenör", "yönetici", "admin").forEach { r ->
-                                DropdownMenuItem(text = { Text(r) }, onClick = { role = r; roleExpanded = false })
+                        ExposedDropdownMenu(
+                            expanded = roleExpanded,
+                            onDismissRequest = { roleExpanded = false }
+                        ) {
+                            // Seçenekler enum'dan üretiliyor; ekranda Türkçe etiket,
+                            // veritabanında enum adı. Serbest metin rolü kalmadı.
+                            StaffRole.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option.labelTr()) },
+                                    onClick = {
+                                        role = option
+                                        roleExpanded = false
+                                    }
+                                )
                             }
                         }
                     }
@@ -206,119 +284,70 @@ fun EditStaffDialog(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Şifre") },
+                    label = { Text(if (staff == null) "Şifre (boşsa varsayılan)" else "Yeni Şifre (boşsa değişmez)") },
                     modifier = Modifier.fillMaxWidth(),
                     // Şifre omuz üstünden okunabiliyordu.
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
                 )
 
-                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Ünvan") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = branch, onValueChange = { branch = it }, label = { Text("Branş") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Telefon *") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth())
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = salary, onValueChange = { salary = it }, label = { Text("Maaş") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = rate, onValueChange = { rate = it }, label = { Text("Hakediş %") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                onConfirm(staff.copy(
-                    fullName = name.trim(),
-                    title = title.trim(),
-                    branch = branch.trim(),
-                    // DÜZELTME: "Hakediş %" alanı daha önce hourlyRate'e yazıyordu; hakediş
-                    // hesabı commissionRate'i okuduğu için oran her zaman 0 kalıyordu.
-                    commissionRate = CommissionRate.fromPercentInput(rate.toDoubleOrNull()),
-                    monthlySalary = salary.toDoubleOrNull() ?: 0.0,
-                    phone = phone.trim(),
-                    nickname = nickname.trim(),
-                    password = password,
-                    role = role
-                ))
-            }) { Text("Güncelle") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("İptal") }
-        }
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddStaffDialog(
-    error: String? = null,
-    onDismiss: () -> Unit,
-    onConfirm: (String, String, String, Double, Double, String, String, String) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var title by remember { mutableStateOf("") }
-    var branch by remember { mutableStateOf("") }
-    var rate by remember { mutableStateOf("") }
-    var salary by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var nickname by remember { mutableStateOf("") }
-    var role by remember { mutableStateOf("antrenör") }
-    var roleExpanded by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Yeni Personel") },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (error != null) {
-                    Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                }
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Ad Soyad *") }, modifier = Modifier.fillMaxWidth())
-                
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = nickname, onValueChange = { nickname = it }, label = { Text("Kullanıcı Adı *") }, modifier = Modifier.weight(1f))
-                    
-                    ExposedDropdownMenuBox(
-                        expanded = roleExpanded,
-                        onExpandedChange = { roleExpanded = it },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        OutlinedTextField(
-                            value = role,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Rol") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(roleExpanded) },
-                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                        )
-                        ExposedDropdownMenu(expanded = roleExpanded, onDismissRequest = { roleExpanded = false }) {
-                            listOf("antrenör", "yönetici").forEach { r ->
-                                DropdownMenuItem(text = { Text(r) }, onClick = { role = r; roleExpanded = false })
-                            }
-                        }
-                    }
-                }
-
-                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Ünvan (Eğitmen, Resepsiyon vb.)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = branch, onValueChange = { branch = it }, label = { Text("Branş (Fitness, Reformer vb.)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Telefon *") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth())
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = salary, onValueChange = { salary = it }, label = { Text("Maaş") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = rate, onValueChange = { rate = it }, label = { Text("Hakediş %") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                onConfirm(
-                    name.trim(),
-                    title.trim(),
-                    branch.trim(),
-                    // Yüzde girdisi kesre çevrilerek commissionRate'e yazılır.
-                    CommissionRate.fromPercentInput(rate.toDoubleOrNull()),
-                    salary.toDoubleOrNull() ?: 0.0,
-                    phone.trim(),
-                    nickname.trim(),
-                    role
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Ünvan (Eğitmen, Resepsiyon vb.)") },
+                    modifier = Modifier.fillMaxWidth()
                 )
-            }) { Text("Ekle") }
+                OutlinedTextField(
+                    value = branch,
+                    onValueChange = { branch = it },
+                    label = { Text("Branş (Fitness, Reformer vb.)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("Telefon *") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = salary,
+                        onValueChange = { salary = it },
+                        label = { Text("Maaş") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = rate,
+                        onValueChange = { rate = it },
+                        label = { Text("Hakediş %") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = canSave,
+                onClick = {
+                    onConfirm(
+                        StaffForm(
+                            name = name.trim(),
+                            title = title.trim(),
+                            branch = branch.trim(),
+                            // Alan **yüzde** alır; baz puana çevrim tek noktada.
+                            commissionPercent = rate.toDoubleOrNull() ?: 0.0,
+                            salary = salary.toDoubleOrNull() ?: 0.0,
+                            phone = phone.trim(),
+                            nickname = nickname.trim(),
+                            role = role,
+                            password = password.takeIf { it.isNotBlank() },
+                        )
+                    )
+                }
+            ) { Text(if (staff == null) "Ekle" else "Güncelle") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("İptal") }

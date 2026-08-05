@@ -3,13 +3,17 @@ package com.gymapp
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
-import com.gymapp.worker.MemberExpirationWorker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
 /**
- * Hilt için @HiltAndroidApp zorunlu.
- * WorkManager'ı Hilt ile manuel başlatıyoruz (auto-init devre dışı).
+ * Hilt için `@HiltAndroidApp` zorunlu.
+ * WorkManager Hilt ile manuel başlatılıyor (auto-init manifest'te devre dışı).
+ *
+ * KALDIRILDI: `MemberExpirationWorker`. Üyelik durumu artık okuma anında bitiş
+ * tarihinden **türetiliyor** ([com.gymapp.domain.Membership.stateOf]); gecelik iş
+ * hem gereksizdi hem de süresi dolan üyeyi kalıcı olarak arşivliyordu. Fabrika
+ * yerinde kalıyor: Faz 4'teki senkronizasyon kuyruğu (outbox) bir işçi kullanacak.
  */
 @HiltAndroidApp
 class GymApplication : Application(), Configuration.Provider {
@@ -21,10 +25,4 @@ class GymApplication : Application(), Configuration.Provider {
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
             .build()
-
-    override fun onCreate() {
-        super.onCreate()
-        // Üye bitiş tarihi kontrolünü günde 1 kez çalıştır
-        MemberExpirationWorker.schedule(this)
-    }
 }

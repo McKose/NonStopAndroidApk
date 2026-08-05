@@ -18,6 +18,14 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
+    /**
+     * KALDIRILDI: `fallbackToDestructiveMigration()`.
+     *
+     * Şema geçişi sırasında geçici olarak açıktı; cutover bittiği ve şema v1'e
+     * sıfırlandığı için artık kapalı. Yıkıcı geçiş açık kalsaydı ileride yazılmayı
+     * unutulan bir migration **sessizce tüm veriyi silerdi** — hata vermek yerine.
+     * Bundan sonra her şema değişikliği elle yazılmış bir migration ister.
+     */
     @Provides
     @Singleton
     fun provideGymDatabase(@ApplicationContext context: Context): GymDatabase =
@@ -25,9 +33,7 @@ object DatabaseModule {
             context,
             GymDatabase::class.java,
             "gym_database"
-        )
-            .fallbackToDestructiveMigration()
-            .build()
+        ).build()
 
     @Provides
     @Singleton

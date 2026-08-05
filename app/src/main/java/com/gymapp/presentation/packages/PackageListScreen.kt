@@ -14,12 +14,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gymapp.data.local.entity.PackageEntity
-import com.gymapp.domain.Membership
+import com.gymapp.domain.Money
+import com.gymapp.domain.labelTr
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PackageListScreen(
-    onNavigateToAdd: (Long?) -> Unit,
+    onNavigateToAdd: (String?) -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: PackageViewModel = hiltViewModel()
 ) {
@@ -55,7 +56,7 @@ fun PackageListScreen(
                 items(packages) { pkg ->
                     PackageItem(
                         pkg = pkg, 
-                        onDelete = { viewModel.deletePackage(pkg) },
+                        onDelete = { viewModel.deletePackage(pkg.id) },
                         onClick = { onNavigateToAdd(pkg.id) }
                     )
                 }
@@ -78,13 +79,17 @@ fun PackageItem(pkg: PackageEntity, onDelete: () -> Unit, onClick: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = pkg.name, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = "${pkg.basePrice} TL • ${pkg.validityDays} Gün",
+                    text = "₺${Money(pkg.basePriceMinor)} • ${pkg.validityDays} Gün",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
-                    // Sınırsızlık paket türünden değil, seans sayısından (-1) anlaşılır.
-                    text = if (Membership.isUnlimited(pkg.sessionCount)) "Sınırsız Seans"
-                    else "${pkg.sessionCount} Seans",
+                    // Sınırsızlık `null` seans kotasından anlaşılır; `-1` sentinel'i kalktı.
+                    text = pkg.sessionCount?.let { "$it Seans" } ?: "Sınırsız Seans",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+                Text(
+                    text = "${pkg.type.labelTr()} • ${pkg.category.labelTr()}",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray
                 )

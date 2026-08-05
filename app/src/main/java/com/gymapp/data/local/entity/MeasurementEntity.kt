@@ -12,8 +12,6 @@ import androidx.room.PrimaryKey
  *
  * Ölçüler (cm/kg) parasal olmadığı için `Double` kalıyor — kuruş dönüşümü
  * yalnızca para alanları için geçerli.
- *
- * `memberId` hâlâ `Long`: üye tablosu henüz dönüşmedi.
  */
 @Entity(
     tableName = "measurements",
@@ -28,7 +26,7 @@ data class MeasurementEntity(
 
     val tenantId: String,
 
-    val memberId: Long,
+    val memberId: String,
 
     val dateMs: Long,
 

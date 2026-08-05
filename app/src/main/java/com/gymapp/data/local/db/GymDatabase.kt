@@ -7,27 +7,28 @@ import com.gymapp.data.local.dao.*
 import com.gymapp.data.local.entity.*
 
 /**
- * Şema geçişi **expand/contract** (paralel değişim) yöntemiyle yapılıyor:
- * yeni tablolar mevcut olanların yanına eklenir, kullanım kademe kademe taşınır,
- * en sonda eskiler düşürülür. Böylece her adımda derlenebilir ve test edilebilir
- * bir durum korunur.
+ * Uygulama veritabanı.
  *
- * v8: [LedgerEntryEntity] (append-only finans defteri) ve [StockMovementEntity]
- * (toplanabilir stok hareketleri) eklendi.
+ * **Şema sıfırlandı (v1).** Entity cutover'ı expand/contract yöntemiyle adım adım
+ * yapıldı (v8–v14) ve her ara sürüm `fallbackToDestructiveMigration()` ile
+ * geçiliyordu; uygulama henüz kullanımda olmadığı için bu güvenliydi. Cutover
+ * tamamlandığına göre o ara sürümlerin bir değeri kalmadı: sürüm 1'e alındı,
+ * eski şema anlık görüntüleri silindi ve yıkıcı geçiş kapatıldı.
  *
- * v9: contract adımı — tüm yazıcılar deftere taşındığı için eski `transactions`
- * tablosu düşürüldü.
+ * **Buradan sonrası katı migration disiplini**: her şema değişikliği bir sürüm
+ * artışı ve elle yazılmış bir [androidx.room.migration.Migration] gerektirir.
+ * `exportSchema = true` olduğu için her sürümün anlık görüntüsü `app/schemas`
+ * altında depoya işlenir ve geçişler test edilebilir.
  *
- * v10: entity cutover başladı — `orders` hedef biçime geçti (UUID anahtar,
- * `tenantId`, zaman damgaları, kuruş tutarlar, enum kolonlar). Kalan tablolar
- * aynı desenle sırayla dönüşecek.
- *
- * v11: `measurements` aynı biçime geçti.
- *
- * v12: `appointments` aynı biçime geçti; durum ve ders türü enum oldu,
- * hakediş matrahı randevu anında donduruluyor.
- *
- * v13: `products` aynı biçime geçti; stockCount kolonu düştü.
+ * Tüm tablolar ortak biçimde:
+ *  - **UUID birincil anahtar** — `autoGenerate` `Long` anahtarlar çok cihazlı
+ *    senkronizasyonda çakışır (iki cihaz çevrimdışıyken aynı `id`'yi üretir).
+ *  - **`tenantId`** — hesap/salon izolasyonu; web admin tarafındaki satır bazlı
+ *    güvenlik politikası bunun üzerine kurulacak.
+ *  - **`createdAtMs` / `updatedAtMs` / `deletedAtMs`** — delta senkronizasyon ve
+ *    tombstone silme.
+ *  - **Para kuruş cinsinden `Long`** — `Double` toplamlarda sapma yaratıyordu.
+ *  - **Enum kolonlar** — serbest metin yerine tip güvenli değerler.
  */
 @Database(
     entities = [
@@ -38,11 +39,11 @@ import com.gymapp.data.local.entity.*
         StaffEntity::class,
         OrderEntity::class,
         MeasurementEntity::class,
-        // v8 — yeni append-only tablolar
+        // Append-only tablolar: düzeltme silme/güncelleme ile değil ters kayıtla yapılır.
         LedgerEntryEntity::class,
         StockMovementEntity::class,
     ],
-    version = 13,
+    version = 1,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

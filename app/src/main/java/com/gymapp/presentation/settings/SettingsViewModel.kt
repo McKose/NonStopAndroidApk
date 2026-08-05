@@ -39,8 +39,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun logout(onLogout: () -> Unit) {
-        prefs.currentUserRole = ""
-        prefs.currentUserId = -1L
+        prefs.clearSession()
         onLogout()
     }
 }

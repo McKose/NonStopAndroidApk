@@ -20,8 +20,6 @@ import com.gymapp.domain.TrainingType
  * [sessionValueMinor] hakediş matrahını **randevu oluşturulurken** dondurur.
  * Önceden matrah tamamlama anında üyenin güncel paketinden hesaplanıyordu; üye
  * arada paketini yenilerse aynı ders için farklı hakediş çıkıyordu.
- *
- * `memberId` / `staffId` hâlâ `Long`: o tablolar henüz dönüşmedi.
  */
 @Entity(
     tableName = "appointments",
@@ -38,8 +36,8 @@ data class AppointmentEntity(
 
     val tenantId: String,
 
-    val memberId: Long,
-    val staffId: Long,
+    val memberId: String,
+    val staffId: String,
 
     val trainingType: TrainingType = TrainingType.FITNESS,
 

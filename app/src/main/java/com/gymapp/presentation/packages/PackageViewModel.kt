@@ -4,12 +4,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.entity.PackageEntity
 import com.gymapp.data.repository.PackageRepository
+import com.gymapp.domain.Money
+import com.gymapp.domain.PackageCategory
+import com.gymapp.domain.TrainingType
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+/** Bir kez tüketilen kullanıcı bildirimleri. */
+sealed interface PackageEvent {
+    data object Saved : PackageEvent
+    data class Failed(val message: String) : PackageEvent
+}
 
 @HiltViewModel
 class PackageViewModel @Inject constructor(
@@ -23,35 +35,47 @@ class PackageViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
-    fun addPackage(
-        id: Long = 0,
+    private val _events = Channel<PackageEvent>(Channel.BUFFERED)
+    val events: Flow<PackageEvent> = _events.receiveAsFlow()
+
+    /**
+     * Paketi kaydeder.
+     *
+     * Kimlik ve zaman damgaları repository'de üretilir; ekran entity kurmaz.
+     * Sonuç **her zaman** bildirilir — önceden hata sessizce yutuluyordu.
+     *
+     * @param sessionCount `null` ise sınırsız (abonman) paket.
+     */
+    fun savePackage(
+        packageId: String? = null,
         name: String,
-        type: String,
-        category: String,
+        type: TrainingType,
+        category: PackageCategory,
         basePrice: Double,
         validityDays: Int,
-        sessionCount: Int
+        sessionCount: Int?,
     ) {
         viewModelScope.launch {
-            val pkg = PackageEntity(
-                id = id,
+            repository.savePackage(
+                packageId = packageId,
                 name = name,
                 type = type,
                 category = category,
-                basePrice = basePrice,
+                basePrice = Money.ofMajor(basePrice),
                 validityDays = validityDays,
                 sessionCount = sessionCount,
-                serviceId = 1L // Varsayılan değer
+            ).fold(
+                onSuccess = { _events.send(PackageEvent.Saved) },
+                onFailure = { _events.send(PackageEvent.Failed(it.message ?: "Paket kaydedilemedi.")) },
             )
-            repository.insertPackage(pkg)
         }
     }
 
-    fun deletePackage(pkg: PackageEntity) {
+    fun deletePackage(packageId: String) {
         viewModelScope.launch {
-            repository.deletePackage(pkg)
+            repository.deletePackage(packageId)
         }
     }
 
-    suspend fun getPackageById(id: Long) = repository.getPackageById(id)
+    suspend fun getPackageById(id: String): PackageEntity? = repository.getPackageById(id)
 }

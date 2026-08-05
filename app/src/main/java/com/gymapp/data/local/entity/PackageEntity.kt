@@ -1,43 +1,54 @@
 package com.gymapp.data.local.entity
 
-import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.gymapp.domain.PackageCategory
+import com.gymapp.domain.TrainingType
 
 /**
- * Üyelik paketleri (Fitness, Fonksiyonel, Reformer)
+ * Üyelik paketi.
+ *
+ * `orders` / `measurements` / `appointments` / `products` ile aynı hedef biçim:
+ * UUID anahtar, `tenantId`, zaman damgaları, tombstone silme, kuruş tutar, enum kolon.
+ *
+ * İki ek düzeltme:
+ *  - **`sessionCount` artık nullable**: `-1` sihirli sayısı kalktı, `null` = sınırsız
+ *    (abonman). Sentinel değer ekranda "-1 Seans" olarak sızabiliyordu ve her
+ *    karşılaştırmada ayrıca kontrol edilmesi gerekiyordu.
+ *  - **`serviceId` düştü**: hiçbir yerde okunmuyordu, yalnızca sabit `1L` yazılıyordu.
  */
-@Entity(tableName = "gym_packages")
+@Entity(
+    tableName = "gym_packages",
+    indices = [
+        Index(value = ["tenantId", "name"]),
+        Index(value = ["updatedAtMs"]),
+    ]
+)
 data class PackageEntity(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
+    @PrimaryKey
+    val id: String,
 
-    @ColumnInfo(name = "name")
+    val tenantId: String,
+
     val name: String,
 
-    /** "FITNESS" | "FONKSİYONEL" | "REFORMER" */
-    @ColumnInfo(name = "type")
-    val type: String,
+    val type: TrainingType = TrainingType.FITNESS,
 
-    /** "BİREYSEL" | "DÜET" | "GRUP" */
-    @ColumnInfo(name = "category")
-    val category: String = "BİREYSEL",
+    val category: PackageCategory = PackageCategory.INDIVIDUAL,
 
-    /** Geçerlilik süresi (gün) */
-    @ColumnInfo(name = "validity_days")
+    /** Geçerlilik süresi (gün). */
     val validityDays: Int,
 
-    /** Seans sayısı (-1 ise sınırsız) */
-    @ColumnInfo(name = "session_count")
-    val sessionCount: Int = -1,
+    /** Seans kotası; `null` ise sınırsız (abonman). */
+    val sessionCount: Int? = null,
 
-    /** Paket Fiyatı */
-    @ColumnInfo(name = "base_price")
-    val basePrice: Double,
+    /** Paket fiyatı (kuruş). */
+    val basePriceMinor: Long,
 
-    @ColumnInfo(name = "service_id")
-    val serviceId: Long = 0,
+    val isActive: Boolean = true,
 
-    @ColumnInfo(name = "is_active")
-    val isActive: Boolean = true
+    val createdAtMs: Long,
+    val updatedAtMs: Long,
+    val deletedAtMs: Long? = null,
 )

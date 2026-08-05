@@ -10,13 +10,13 @@ import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.AppointmentState
 import com.gymapp.domain.Ids
 import com.gymapp.domain.LedgerCategory
+import com.gymapp.domain.Membership
 import com.gymapp.domain.Money
 import com.gymapp.domain.Rate
 import com.gymapp.domain.TrainingType
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.roundToInt
 
 /**
  * Randevu akışı ve finansal yan etkileri.
@@ -38,44 +38,70 @@ class AppointmentRepository @Inject constructor(
 
     suspend fun getById(id: String): AppointmentEntity? = appointmentDao.getById(id)
 
-    /** Aynı eğitmenin o saat aralığında başka randevusu var mı? */
-    suspend fun hasOverlap(staffId: Long, startTimeMs: Long, endTimeMs: Long): Boolean =
-        appointmentDao.countOverlapping(tenantId, staffId, startTimeMs, endTimeMs) > 0
-
     /**
      * Randevu oluşturur ve hakediş matrahını **o anda dondurur**.
      *
      * Matrah önceden tamamlama anında üyenin güncel paketinden hesaplanıyordu;
      * üye arada paketini yenilerse aynı ders için farklı hakediş çıkıyordu.
+     *
+     * Uygunluk kuralları (üyelik geçerli mi, seans hakkı var mı, eğitmen o saatte
+     * boş mu) bilinçli olarak burada: ekranda yapılan kontrol ile yazma arasında
+     * yarış vardı ve kontrol yalnızca tek bir çağrı yerini koruyordu. Kontrol ve
+     * kayıt aynı transaction içinde olduğundan iki eşzamanlı rezervasyon aynı
+     * saati alamaz.
      */
     suspend fun create(
-        memberId: Long,
-        staffId: Long,
+        memberId: String,
+        staffId: String,
         trainingType: TrainingType,
         startTimeMs: Long,
         endTimeMs: Long,
     ): Result<String> = runCatching {
-        val member = memberDao.getMemberById(memberId)
-            ?: throw IllegalArgumentException("Üye bulunamadı.")
+        require(endTimeMs > startTimeMs) { "Randevu bitişi başlangıcından sonra olmalıdır." }
 
-        val nowMs = System.currentTimeMillis()
-        val appointmentId = Ids.new()
+        database.withTransaction {
+            val nowMs = System.currentTimeMillis()
 
-        appointmentDao.insert(
-            AppointmentEntity(
-                id = appointmentId,
-                tenantId = tenantId,
-                memberId = memberId,
-                staffId = staffId,
-                trainingType = trainingType,
-                startTimeMs = startTimeMs,
-                endTimeMs = endTimeMs,
-                sessionValueMinor = sessionValue(member).minor,
-                createdAtMs = nowMs,
-                updatedAtMs = nowMs,
+            val member = memberDao.getMemberById(memberId)
+                ?: throw IllegalArgumentException("Üye bulunamadı.")
+
+            if (staffDao.getStaffById(staffId) == null) {
+                throw IllegalArgumentException("Eğitmen bulunamadı.")
+            }
+
+            if (!Membership.canBookSession(
+                    storedStatus = member.status,
+                    endDateMs = member.endDateMs,
+                    remainingSessions = member.remainingSessions,
+                    nowMs = nowMs,
+                )
+            ) {
+                throw IllegalStateException(
+                    "${member.fullName}: üyelik aktif değil ya da seans hakkı kalmadı."
+                )
+            }
+
+            if (appointmentDao.countOverlapping(tenantId, staffId, startTimeMs, endTimeMs) > 0) {
+                throw IllegalStateException("Seçilen eğitmenin bu saatte başka randevusu var.")
+            }
+
+            val appointmentId = Ids.new()
+            appointmentDao.insert(
+                AppointmentEntity(
+                    id = appointmentId,
+                    tenantId = tenantId,
+                    memberId = memberId,
+                    staffId = staffId,
+                    trainingType = trainingType,
+                    startTimeMs = startTimeMs,
+                    endTimeMs = endTimeMs,
+                    sessionValueMinor = sessionValue(member).minor,
+                    createdAtMs = nowMs,
+                    updatedAtMs = nowMs,
+                )
             )
-        )
-        appointmentId
+            appointmentId
+        }
     }
 
     /**
@@ -115,14 +141,14 @@ class AppointmentRepository @Inject constructor(
                 // Matrah randevu anında donduruldu; boşsa üyeden hesaplanır (eski kayıtlar).
                 val basis = Money(appointment.sessionValueMinor)
                     .takeIf { it.isPositive } ?: sessionValue(member)
-                val commission = basis.applyRate(commissionRate(staff.commissionRate))
+                val commission = basis.applyRate(Rate(staff.commissionBasisPoints))
 
                 if (commission.isPositive) {
                     ledgerRepository.recordExpense(
                         amount = commission,
                         category = LedgerCategory.COMMISSION,
                         description = "${staff.fullName} — ${member.fullName} hakediş",
-                        staffId = staff.id.toString(),
+                        staffId = staff.id,
                         appointmentId = appointmentId,
                         occurredAtMs = nowMs,
                     ).getOrThrow()
@@ -148,12 +174,13 @@ class AppointmentRepository @Inject constructor(
     }
 }
 
-/** Bir seansın parasal değeri: paket ücreti / toplam seans. */
+/**
+ * Bir seansın parasal değeri: paket ücreti / toplam seans.
+ *
+ * Sınırsız (abonman) pakette seans başına değer tanımsızdır; hakediş matrahı sıfırdır.
+ */
 private fun sessionValue(member: MemberEntity): Money {
-    if (member.totalSessions <= 0) return Money.ZERO
-    return Money.ofMajor(member.packagePrice) / member.totalSessions
+    val total = member.totalSessions ?: return Money.ZERO
+    if (total <= 0) return Money.ZERO
+    return Money(member.packagePriceMinor) / total
 }
-
-/** Personelin kesir cinsinden oranını baz puana çevirir. */
-private fun commissionRate(fraction: Double): Rate =
-    Rate((fraction.coerceIn(0.0, 1.0) * Rate.SCALE).roundToInt())

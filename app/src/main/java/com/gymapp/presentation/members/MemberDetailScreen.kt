@@ -21,13 +21,15 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Membership
+import com.gymapp.domain.SessionQuota
+import com.gymapp.domain.labelTr
 import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MemberDetailScreen(
-    memberId: Long,
+    memberId: String,
     onNavigateBack: () -> Unit,
     viewModel: MemberViewModel = hiltViewModel()
 ) {
@@ -41,7 +43,7 @@ fun MemberDetailScreen(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Üyeyi sil") },
             text = {
-                Text("${member?.fullName ?: "Bu üye"} pasife alınacak. Devam edilsin mi?")
+                Text("${member?.fullName ?: "Bu üye"} listeden kaldırılacak. Devam edilsin mi?")
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -112,7 +114,14 @@ fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewMo
             Column(modifier = Modifier.padding(16.dp)) {
                 DetailRow(label = "Telefon", value = member.phone)
                 member.email?.let { DetailRow(label = "E-posta", value = it) }
-                DetailRow(label = "Durum", value = member.status)
+                DetailRow(
+                    label = "Durum",
+                    value = Membership.stateOf(
+                        member.status,
+                        member.endDateMs,
+                        System.currentTimeMillis()
+                    ).labelTr()
+                )
                 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 
@@ -136,7 +145,7 @@ fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewMo
             Column(modifier = Modifier.padding(16.dp)) {
                 DetailRow(label = "Başlangıç", value = member.startDateMs?.let { dateFormat.format(Date(it)) } ?: "-")
                 DetailRow(label = "Bitiş", value = member.endDateMs?.let { dateFormat.format(Date(it)) } ?: "-")
-                DetailRow(label = "Kalan Seans", value = if (member.remainingSessions == -1) "Sınırsız" else member.remainingSessions.toString())
+                DetailRow(label = "Kalan Seans", value = member.remainingSessions?.toString() ?: "Sınırsız")
             }
         }
     }
@@ -420,15 +429,14 @@ fun PackagesTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewModel
                         Text(activePackage.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     }
                     Spacer(Modifier.height(12.dp))
-                    // DÜZELTME: "ABONMAN" hiçbir yerde yazılmayan bir değerdi; sınırsızlık
-                    // paketin seans sayısından (-1) anlaşılır. Önceden sınırsız paketler
-                    // ekranda "-1 Seans" olarak görünüyordu.
-                    val unlimited = Membership.isUnlimited(activePackage.sessionCount)
+                    // Sınırsızlık artık `null` seans kotasından anlaşılıyor; önceden
+                    // `-1` sentinel'i ekranda "-1 Seans" olarak sızabiliyordu.
+                    val unlimited = SessionQuota.isUnlimited(activePackage.sessionCount)
                     DetailRow(label = "Paket Türü", value = if (unlimited) "Abonman" else "Ders Paketi")
                     DetailRow(label = "Bitiş Tarihi", value = member.endDateMs?.let { dateFormat.format(Date(it)) } ?: "-")
                     DetailRow(
                         label = "Kalan Hak",
-                        value = if (unlimited) "Sınırsız" else "${member.remainingSessions} Seans"
+                        value = member.remainingSessions?.let { "$it Seans" } ?: "Sınırsız"
                     )
                 }
             }
