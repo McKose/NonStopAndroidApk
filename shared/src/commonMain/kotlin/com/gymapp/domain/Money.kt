@@ -1,5 +1,9 @@
 package com.gymapp.domain
 
+// `kotlin.jvm.*` yalnızca JVM hedeflerinde varsayılan import; ortak kodda
+// açıkça alınması gerekiyor. Android tarafında sessizce çalışıyordu, hatayı
+// Kotlin/Native derlemesi yakaladı.
+import kotlin.jvm.JvmInline
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
