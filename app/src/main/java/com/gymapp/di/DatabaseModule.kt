@@ -1,9 +1,9 @@
 package com.gymapp.di
 
 import android.content.Context
-import androidx.room.Room
 import com.gymapp.data.local.dao.*
 import com.gymapp.data.local.db.GymDatabase
+import com.gymapp.data.local.db.createGymDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -12,28 +12,20 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Hilt DI modülü — Room Database ve DAO'ları sağlar.
+ * Hilt DI modülü — veritabanı ve DAO'ları sağlar.
+ *
+ * Veritabanının **kurulumu** artık burada değil, `:shared` modülünde: şema,
+ * sorgular ve sürücü ayarları iki platformda ortak. Burada kalan yalnızca
+ * Android tarafındaki yaşam döngüsü bağlaması (tekil örnek, uygulama context'i).
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
-    /**
-     * KALDIRILDI: `fallbackToDestructiveMigration()`.
-     *
-     * Şema geçişi sırasında geçici olarak açıktı; cutover bittiği ve şema v1'e
-     * sıfırlandığı için artık kapalı. Yıkıcı geçiş açık kalsaydı ileride yazılmayı
-     * unutulan bir migration **sessizce tüm veriyi silerdi** — hata vermek yerine.
-     * Bundan sonra her şema değişikliği elle yazılmış bir migration ister.
-     */
     @Provides
     @Singleton
     fun provideGymDatabase(@ApplicationContext context: Context): GymDatabase =
-        Room.databaseBuilder(
-            context,
-            GymDatabase::class.java,
-            "gym_database"
-        ).build()
+        createGymDatabase(context)
 
     @Provides
     @Singleton

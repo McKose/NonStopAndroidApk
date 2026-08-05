@@ -335,5 +335,5 @@ class MemberRepository @Inject constructor(
 
     /** Fiziksel silmez; tombstone işaretler ki silme de senkronize olabilsin. */
     suspend fun deleteMeasurement(measurementId: String) =
-        measurementDao.softDelete(measurementId)
+        measurementDao.softDelete(measurementId, System.currentTimeMillis())
 }

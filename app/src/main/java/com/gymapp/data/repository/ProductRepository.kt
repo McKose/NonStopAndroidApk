@@ -109,7 +109,8 @@ class ProductRepository @Inject constructor(
     }
 
     /** Ürünü tombstone ile siler; geçmiş hareketler ve satışlar öksüz kalmaz. */
-    suspend fun deleteProduct(productId: String) = productDao.softDelete(productId)
+    suspend fun deleteProduct(productId: String) =
+        productDao.softDelete(productId, System.currentTimeMillis())
 
     /**
      * Siparişi tek transaction içinde işler.

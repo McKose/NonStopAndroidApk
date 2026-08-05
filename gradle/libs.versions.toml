@@ -22,6 +22,10 @@ hiltNavCompose  = "1.2.0"
 
 # Kotlin Multiplatform
 kotlinxDatetime = "0.6.1"
+kotlinxCoroutines = "1.9.0"
+
+# Room'un KMP tarafında kullandığı SQLite sürücüsü (Room 2.7.x ile eşleşir)
+androidxSqlite  = "2.5.1"
 
 [libraries]
 # AndroidX Core
@@ -47,6 +51,9 @@ androidx-compose-material-icons = { group = "androidx.compose.material", name = 
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx     = { group = "androidx.room", name = "room-ktx",     version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+# iOS'ta sistem SQLite'ı yerine gömülü sürücü kullanılır; sürüm farklılıklarından
+# doğan davranış farkları böylece ortadan kalkar.
+androidx-sqlite-bundled = { group = "androidx.sqlite", name = "sqlite-bundled", version.ref = "androidxSqlite" }
 
 # Hilt
 hilt-android          = { group = "com.google.dagger", name = "hilt-android",          version.ref = "hilt" }
@@ -55,6 +62,7 @@ hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-com
 
 # Kotlin Multiplatform — ortak (commonMain) bağımlılıklar
 kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinxDatetime" }
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 
 # Test
 junit                    = { group = "junit",               name = "junit",          version.ref = "junit" }
@@ -69,3 +77,4 @@ kotlin-android      = { id = "org.jetbrains.kotlin.android",       version.ref =
 kotlin-compose      = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 hilt-android        = { id = "com.google.dagger.hilt.android",     version.ref = "hilt" }
 ksp                 = { id = "com.google.devtools.ksp",            version.ref = "ksp" }
+room                = { id = "androidx.room",                      version.ref = "room" }
