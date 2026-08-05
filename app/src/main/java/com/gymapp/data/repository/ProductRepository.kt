@@ -122,7 +122,7 @@ class ProductRepository @Inject constructor(
      * stoğu satamaz.
      */
     suspend fun processOrder(
-        memberId: Long?,
+        memberId: String?,
         cartItems: Map<String, Int>,
         paymentMethod: PaymentMethod,
         paymentStatus: String,
@@ -200,7 +200,7 @@ class ProductRepository @Inject constructor(
                         if (memberId == null) append(" (Misafir)")
                     },
                     category = LedgerCategory.MARKET,
-                    memberId = memberId?.toString(),
+                    memberId = memberId,
                     orderId = orderId,
                     occurredAtMs = nowMs,
                 ).getOrThrow()

@@ -6,47 +6,68 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.gymapp.domain.Money
+import com.gymapp.domain.PackageCategory
+import com.gymapp.domain.TrainingType
+import com.gymapp.domain.labelTr
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPackageScreen(
-    packageId: Long? = null,
+    packageId: String? = null,
     onNavigateBack: () -> Unit,
     viewModel: PackageViewModel = hiltViewModel()
 ) {
+    // Sınırsız (abonman) paket seans sayısı taşımaz; `-1` sentinel'i yerine
+    // ayrı bir anahtar kullanılıyor, böylece geçersiz değer girilemiyor.
+    var unlimited by remember { mutableStateOf(false) }
     var sessionCount by remember { mutableStateOf("10") }
-    var type by remember { mutableStateOf("Fitness") } // Fitness, Fonksiyonel, Reformer
-    var category by remember { mutableStateOf("BİREYSEL") } // BİREYSEL, DÜET, GRUP
+    var type by remember { mutableStateOf(TrainingType.FITNESS) }
+    var category by remember { mutableStateOf(PackageCategory.INDIVIDUAL) }
     var price by remember { mutableStateOf("") }
     var days by remember { mutableStateOf("30") }
     var isLoading by remember { mutableStateOf(packageId != null) }
 
-    val types = listOf("Fitness", "Fonksiyonel", "Reformer")
-    val categories = listOf("BİREYSEL", "DÜET", "GRUP")
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(packageId) {
         if (packageId != null) {
             viewModel.getPackageById(packageId)?.let { pkg ->
-                sessionCount = pkg.sessionCount.toString()
+                unlimited = pkg.sessionCount == null
+                sessionCount = pkg.sessionCount?.toString() ?: "10"
                 type = pkg.type
                 category = pkg.category
-                price = pkg.basePrice.toString()
+                price = Money(pkg.basePriceMinor).asDouble.toString()
                 days = pkg.validityDays.toString()
             }
             isLoading = false
         }
     }
 
-    // Generated Name: [Session Count] - [Type] - [Category]
-    val generatedName = remember(sessionCount, type, category) {
-        "$sessionCount - $type - $category"
+    // Kaydetme sonucu **her zaman** bildirilir; önceden hata sessizce yutuluyor
+    // ve ekran başarılıymış gibi kapanıyordu.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is PackageEvent.Saved -> onNavigateBack()
+                is PackageEvent.Failed -> snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
+
+    val sessionLabel = if (unlimited) "Sınırsız" else sessionCount.ifBlank { "0" }
+    val generatedName = remember(sessionLabel, type, category) {
+        "$sessionLabel - ${type.labelTr()} - ${category.labelTr()}"
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(if (packageId == null) "Yeni Paket Ekle" else "Paketi Düzenle") },
@@ -59,7 +80,7 @@ fun AddPackageScreen(
         }
     ) { padding ->
         if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else {
@@ -71,30 +92,47 @@ fun AddPackageScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Paket Adı (Otomatik)", style = MaterialTheme.typography.labelSmall)
-                        Text(generatedName, style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text(
+                            generatedName,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
 
-                OutlinedTextField(
-                    value = sessionCount,
-                    onValueChange = { sessionCount = it },
-                    label = { Text("Seans Sayısı") },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Sınırsız (Abonman)", modifier = Modifier.weight(1f))
+                    Switch(checked = unlimited, onCheckedChange = { unlimited = it })
+                }
+
+                if (!unlimited) {
+                    OutlinedTextField(
+                        value = sessionCount,
+                        onValueChange = { sessionCount = it },
+                        label = { Text("Seans Sayısı") },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
 
                 Text("Paket Türü")
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    types.forEach { t ->
+                    TrainingType.entries.forEach { t ->
                         FilterChip(
                             selected = type == t,
                             onClick = { type = t },
-                            label = { Text(t) },
+                            label = { Text(t.labelTr()) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -102,11 +140,11 @@ fun AddPackageScreen(
 
                 Text("Kategori")
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    categories.forEach { cat ->
+                    PackageCategory.entries.forEach { cat ->
                         FilterChip(
                             selected = category == cat,
                             onClick = { category = cat },
-                            label = { Text(cat) },
+                            label = { Text(cat.labelTr()) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -128,23 +166,24 @@ fun AddPackageScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
 
+                val canSave = price.toDoubleOrNull() != null &&
+                    (days.toIntOrNull() ?: 0) > 0 &&
+                    (unlimited || (sessionCount.toIntOrNull() ?: 0) > 0)
+
                 Button(
                     onClick = {
-                        if (price.isNotBlank()) {
-                            viewModel.addPackage(
-                                id = packageId ?: 0L,
-                                name = generatedName,
-                                type = type,
-                                category = category,
-                                basePrice = price.toDoubleOrNull() ?: 0.0,
-                                validityDays = days.toIntOrNull() ?: 30,
-                                sessionCount = sessionCount.toIntOrNull() ?: 0
-                            )
-                            onNavigateBack()
-                        }
+                        viewModel.savePackage(
+                            packageId = packageId,
+                            name = generatedName,
+                            type = type,
+                            category = category,
+                            basePrice = price.toDoubleOrNull() ?: 0.0,
+                            validityDays = days.toIntOrNull() ?: 30,
+                            sessionCount = if (unlimited) null else sessionCount.toIntOrNull(),
+                        )
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = price.isNotBlank()
+                    enabled = canSave
                 ) {
                     Text(if (packageId == null) "Kaydet" else "Güncelle")
                 }

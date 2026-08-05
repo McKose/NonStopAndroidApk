@@ -45,7 +45,7 @@ interface AppointmentDao {
     """)
     suspend fun countOverlapping(
         tenantId: String,
-        staffId: Long,
+        staffId: String,
         startTimeMs: Long,
         endTimeMs: Long,
         excludeId: String = "",

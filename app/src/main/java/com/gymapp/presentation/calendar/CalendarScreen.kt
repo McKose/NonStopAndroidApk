@@ -311,11 +311,11 @@ fun AddAppointmentSheet(
     members: List<MemberEntity>,
     staffList: List<StaffEntity>,
     onDismiss: () -> Unit,
-    onConfirm: (Long, Long, Int, TrainingType) -> Unit,
+    onConfirm: (String, String, Int, TrainingType) -> Unit,
     sheetState: SheetState
 ) {
-    var selectedMemberId by remember { mutableStateOf<Long?>(null) }
-    var selectedStaffId by remember { mutableStateOf<Long?>(null) }
+    var selectedMemberId by remember { mutableStateOf<String?>(null) }
+    var selectedStaffId by remember { mutableStateOf<String?>(null) }
     var selectedHour by remember { mutableIntStateOf(9) }
     var selectedType by remember { mutableStateOf(TrainingType.FITNESS) }
     val trainingTypes = TrainingType.entries

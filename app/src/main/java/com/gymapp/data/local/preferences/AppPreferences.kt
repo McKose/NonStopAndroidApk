@@ -2,6 +2,7 @@ package com.gymapp.data.local.preferences
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.gymapp.domain.StaffRole
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,11 +29,34 @@ class AppPreferences @Inject constructor(
         get() = prefs.getString("salon_password", "1234") ?: "1234"
         set(value) = prefs.edit().putString("salon_password", value).apply()
 
-    var currentUserRole: String
-        get() = prefs.getString("current_user_role", "") ?: ""
-        set(value) = prefs.edit().putString("current_user_role", value).apply()
+    /**
+     * Oturumdaki kullanıcının yetki seviyesi.
+     *
+     * Önceden serbest metin (`"antrenör"`) tutuluyordu ve yetki kontrolleri bu
+     * metnin birebir eşleşmesine bağlıydı; tek harflik bir fark sessizce yetki
+     * veriyor ya da alıyordu. Tanınmayan değerde **en dar** yetkiye düşülür.
+     */
+    var currentUserRole: StaffRole
+        get() = runCatching {
+            StaffRole.valueOf(prefs.getString("current_user_role_v2", null) ?: "")
+        }.getOrDefault(StaffRole.TRAINER)
+        set(value) = prefs.edit().putString("current_user_role_v2", value.name).apply()
 
-    var currentUserId: Long
-        get() = prefs.getLong("current_user_id", -1L)
-        set(value) = prefs.edit().putLong("current_user_id", value).apply()
+    /**
+     * Oturumdaki kullanıcının kimliği; oturum yoksa boş.
+     *
+     * Anahtar bilinçli olarak yeni (`_v2`): kimlikler `Long`'dan `String`'e geçtiği için
+     * eski anahtar `getString` ile okunduğunda `ClassCastException` fırlatırdı.
+     */
+    var currentUserId: String
+        get() = prefs.getString("current_user_id_v2", "") ?: ""
+        set(value) = prefs.edit().putString("current_user_id_v2", value).apply()
+
+    /** Oturum kapatma — rol ve kimlik birlikte temizlenir. */
+    fun clearSession() {
+        prefs.edit()
+            .remove("current_user_role_v2")
+            .remove("current_user_id_v2")
+            .apply()
+    }
 }

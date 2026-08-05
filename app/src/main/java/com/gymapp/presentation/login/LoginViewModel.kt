@@ -2,8 +2,9 @@ package com.gymapp.presentation.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.gymapp.data.local.dao.StaffDao
 import com.gymapp.data.local.preferences.AppPreferences
+import com.gymapp.data.repository.StaffRepository
+import com.gymapp.domain.StaffRole
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,7 +13,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val staffDao: StaffDao,
+    private val staffRepository: StaffRepository,
     private val prefs: AppPreferences
 ) : ViewModel() {
 
@@ -33,15 +34,15 @@ class LoginViewModel @Inject constructor(
                 val user = nickname.trim()
 
                 if (user.equals(ADMIN_USER, ignoreCase = true) && password == prefs.salonPassword) {
-                    prefs.currentUserRole = "admin"
+                    prefs.currentUserRole = StaffRole.ADMIN
                     prefs.currentUserId = ADMIN_USER_ID
                     onLoginSuccess()
                     return@launch
                 }
 
-                val staff = staffDao.getStaffByNickname(user)
-                // NOT (Faz 1): şifreler hash'lenerek saklanmalı ve karşılaştırma
-                // sabit zamanlı olmalı; kimlik doğrulama sunucuya taşınacak.
+                val staff = staffRepository.getByNickname(user)
+                // NOT (Faz 4): şifreler hash'lenerek saklanmalı ve karşılaştırma sabit
+                // zamanlı olmalı; kimlik doğrulama Supabase Auth'a taşınacak.
                 if (staff != null && staff.isActive && staff.password == password) {
                     prefs.currentUserRole = staff.role
                     prefs.currentUserId = staff.id
@@ -57,6 +58,11 @@ class LoginViewModel @Inject constructor(
 
     private companion object {
         const val ADMIN_USER = "admin"
-        const val ADMIN_USER_ID = -1L
+
+        /**
+         * Salon sahibinin kimliği personel tablosunda karşılığı olmayan sabit bir değer;
+         * randevu/hakediş kayıtları bu kimliğe bağlanmaz.
+         */
+        const val ADMIN_USER_ID = "admin"
     }
 }

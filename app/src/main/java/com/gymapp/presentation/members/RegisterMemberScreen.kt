@@ -14,21 +14,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.gymapp.data.local.entity.PaymentType
+import com.gymapp.domain.Money
+import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.labelTr
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterMemberScreen(
     onNavigateBack: () -> Unit,
     isRenewal: Boolean = false,
-    memberId: Long = 0L,
+    memberId: String = "",
     viewModel: MemberViewModel = hiltViewModel()
 ) {
     val formState by viewModel.formState.collectAsState()
     val packages by viewModel.packages.collectAsState()
 
     LaunchedEffect(isRenewal, memberId) {
-        if (isRenewal && memberId != 0L) {
+        if (isRenewal && memberId.isNotBlank()) {
             viewModel.loadMemberForRenewal(memberId)
         } else if (!isRenewal) {
             viewModel.resetForm()
@@ -133,7 +135,7 @@ fun RegisterMemberScreen(
                             text = {
                                 Column {
                                     Text(pkg.name, fontWeight = FontWeight.Bold)
-                                    Text("${pkg.type} - ₺${pkg.basePrice}", style = MaterialTheme.typography.bodySmall)
+                                    Text("${pkg.type.labelTr()} - ₺${Money(pkg.basePriceMinor)}", style = MaterialTheme.typography.bodySmall)
                                 }
                             },
                             onClick = {
@@ -160,19 +162,11 @@ fun RegisterMemberScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                PaymentType.entries.forEach { type ->
+                PaymentMethod.entries.forEach { type ->
                     FilterChip(
                         selected = formState.paymentType == type,
                         onClick = { viewModel.onPaymentTypeChange(type) },
-                        label = { 
-                            Text(
-                                when(type) {
-                                    PaymentType.CASH -> "Nakit"
-                                    PaymentType.CARD -> "Kart"
-                                    PaymentType.MULTISPORT -> "MultiSpor"
-                                }
-                            ) 
-                        },
+                        label = { Text(type.labelTr()) },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -191,7 +185,7 @@ fun RegisterMemberScreen(
                 )
             }
 
-            if (formState.paymentType == PaymentType.CARD) {
+            if (formState.paymentType == PaymentMethod.CARD) {
                 var expanded by remember { mutableStateOf(false) }
                 val installmentOptions = viewModel.installmentOptions
 
@@ -238,7 +232,7 @@ fun RegisterMemberScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("Paket Fiyatı")
-                            Text("₺${formState.selectedPackage?.basePrice ?: 0.0}")
+                            Text("₺${Money(formState.selectedPackage?.basePriceMinor ?: 0L)}")
                         }
                         if ((formState.discount.toDoubleOrNull() ?: 0.0) > 0.0) {
                             Row(

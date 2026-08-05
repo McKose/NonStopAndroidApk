@@ -2,80 +2,83 @@ package com.gymapp.presentation.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.gymapp.data.local.dao.StaffDao
 import com.gymapp.data.local.entity.StaffEntity
+import com.gymapp.data.repository.StaffRepository
+import com.gymapp.domain.Money
+import com.gymapp.domain.Rate
+import com.gymapp.domain.StaffRole
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** Bir kez tüketilen kullanıcı bildirimleri. */
+sealed interface PersonnelEvent {
+    data object Saved : PersonnelEvent
+    data class Failed(val message: String) : PersonnelEvent
+}
+
 @HiltViewModel
 class PersonnelViewModel @Inject constructor(
-    private val staffDao: StaffDao
+    private val repository: StaffRepository
 ) : ViewModel() {
 
-    private val _error = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
-    val error = _error.asStateFlow()
+    val staffList: Flow<List<StaffEntity>> = repository.getAllStaff()
 
-    val staffList: Flow<List<StaffEntity>> = staffDao.getAllStaff()
+    private val _events = Channel<PersonnelEvent>(Channel.BUFFERED)
+    val events: Flow<PersonnelEvent> = _events.receiveAsFlow()
 
-    /** @param commissionFraction hakediş **kesri** (0.40 = %40) — ekran yüzdeyi burada çevirir. */
-    fun addStaff(name: String, title: String, branch: String, commissionFraction: Double, salary: Double, phone: String, nickname: String, role: String) {
-        if (name.isBlank() || nickname.isBlank() || phone.isBlank()) {
-            _error.value = "Lütfen zorunlu alanları (Ad, Kullanıcı Adı, Telefon) doldurun."
-            return
-        }
-
+    /**
+     * Personel ekler veya günceller.
+     *
+     * Sonuç **her zaman** bildirilir; önceki sürümde diyalog listenin uzunluğu
+     * değişince kapanıyordu, dolayısıyla güncelleme başarılı olsa da kapanmıyor,
+     * başarısız ekleme ise fark edilmiyordu.
+     *
+     * @param staffId `null` ise yeni personel.
+     * @param commissionPercent hakediş **yüzdesi** (40 = %40); baz puana dönüşüm
+     *        [Rate] içinde tek noktada yapılır.
+     */
+    fun saveStaff(
+        staffId: String? = null,
+        name: String,
+        title: String,
+        branch: String,
+        commissionPercent: Double,
+        salary: Double,
+        phone: String,
+        nickname: String,
+        role: StaffRole,
+        password: String? = null,
+        isActive: Boolean = true,
+    ) {
         viewModelScope.launch {
-            try {
-                val existing = staffDao.getStaffByNickname(nickname)
-                if (existing != null) {
-                    _error.value = "Bu kullanıcı adı zaten alınmış."
-                    return@launch
-                }
-
-                staffDao.insertStaff(
-                    StaffEntity(
-                        fullName = name,
-                        title = title,
-                        branch = branch,
-                        // DÜZELTME: hakediş oranı daha önce hourlyRate'e yazılıyor, hesapta ise
-                        // commissionRate okunuyordu; bu yüzden hakediş her zaman 0 çıkıyordu.
-                        commissionRate = commissionFraction,
-                        monthlySalary = salary,
-                        phone = phone,
-                        nickname = nickname,
-                        role = role,
-                        // NOT (Faz 1): şifreler hash'lenmeli ve ilk girişte değiştirme zorunlu olmalı.
-                        password = DEFAULT_STAFF_PASSWORD
-                    )
-                )
-                _error.value = null
-            } catch (e: Exception) {
-                _error.value = "Personel eklenirken bir hata oluştu."
-            }
+            repository.saveStaff(
+                staffId = staffId,
+                fullName = name,
+                title = title,
+                role = role,
+                branch = branch,
+                commissionBasisPoints = Rate.ofPercent(commissionPercent).basisPoints,
+                monthlySalary = Money.ofMajor(salary),
+                phone = phone,
+                nickname = nickname,
+                password = password?.takeIf { it.isNotBlank() },
+                isActive = isActive,
+            ).fold(
+                onSuccess = { _events.send(PersonnelEvent.Saved) },
+                onFailure = {
+                    _events.send(PersonnelEvent.Failed(it.message ?: "Personel kaydedilemedi."))
+                },
+            )
         }
     }
 
-    fun clearError() {
-        _error.value = null
-    }
-
-    fun updateStaff(staff: StaffEntity) {
+    fun deleteStaff(staffId: String) {
         viewModelScope.launch {
-            // Kullanıcı adı başka bir personele aitse güncellemeyi reddet.
-            val clash = staffDao.getStaffByNickname(staff.nickname)
-            if (clash != null && clash.id != staff.id) {
-                _error.value = "Bu kullanıcı adı zaten alınmış."
-                return@launch
-            }
-            staffDao.updateStaff(staff)
-            _error.value = null
+            repository.deleteStaff(staffId)
         }
-    }
-
-    private companion object {
-        const val DEFAULT_STAFF_PASSWORD = "123"
     }
 }

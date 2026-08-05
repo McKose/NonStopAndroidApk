@@ -23,8 +23,6 @@ import com.gymapp.domain.PaymentMethod
  * `orders` bilinçli olarak ilk seçildi: kimliğine yalnızca `stock_movements` ve
  * `ledger_entries` referans veriyor ve ikisi de zaten metin kimlik kullanıyor,
  * dolayısıyla bu dönüşüm başka hiçbir tabloyu değiştirmeye zorlamıyor.
- *
- * `memberId` hâlâ `Long`: üye tablosu henüz dönüşmedi, o dilimde `String` olacak.
  */
 @Entity(
     tableName = "orders",
@@ -41,7 +39,7 @@ data class OrderEntity(
     val tenantId: String,
 
     /** Misafir satışında `null`. */
-    val memberId: Long? = null,
+    val memberId: String? = null,
 
     val totalPriceMinor: Long,
     val discountMinor: Long = 0,

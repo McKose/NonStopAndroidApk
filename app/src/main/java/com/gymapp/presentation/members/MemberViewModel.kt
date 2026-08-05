@@ -4,8 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.PackageEntity
-import com.gymapp.data.local.entity.PaymentType
 import com.gymapp.data.repository.MemberRepository
+import com.gymapp.domain.Money
+import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Pricing
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,7 +27,7 @@ data class RegisterFormState(
     val fullName: String = "",
     val phone: String = "",
     val email: String = "",
-    val paymentType: PaymentType = PaymentType.CASH,
+    val paymentType: PaymentMethod = PaymentMethod.CASH,
     val installmentCount: Int = 1,
     val selectedPackage: PackageEntity? = null,
     val discount: String = "0",
@@ -42,7 +43,7 @@ data class RegisterFormState(
     val submitSuccess: Boolean = false,
     val submitError: String? = null,
     val isRenewal: Boolean = false,
-    val memberId: Long? = null,
+    val memberId: String? = null,
     // Calculated price
     val previewPrice: Double = 0.0
 )
@@ -108,7 +109,7 @@ class MemberViewModel @Inject constructor(
             it.copy(
                 discount = value,
                 previewPrice = repository.calculateFinalPrice(
-                    it.selectedPackage?.basePrice ?: 0.0,
+                    it.selectedPackage.basePriceMajor(),
                     disc,
                     it.paymentType,
                     it.installmentCount
@@ -129,14 +130,15 @@ class MemberViewModel @Inject constructor(
         _formState.update { it.copy(healthNotes = value) }
     }
 
-    fun onPaymentTypeChange(type: PaymentType) {
+    fun onPaymentTypeChange(type: PaymentMethod) {
         _formState.update {
-            val newInstallment = if (type == PaymentType.CASH || type == PaymentType.MULTISPORT) 1 else it.installmentCount
+            // Taksit yalnızca kartlı ödemede anlamlı; kural [Pricing] içinde tek noktada.
+            val newInstallment = Pricing.normalizeInstallment(type, it.installmentCount)
             it.copy(
                 paymentType = type,
                 installmentCount = newInstallment,
                 previewPrice = repository.calculateFinalPrice(
-                    it.selectedPackage?.basePrice ?: 0.0,
+                    it.selectedPackage.basePriceMajor(),
                     it.discount.toDoubleOrNull() ?: 0.0,
                     type,
                     newInstallment
@@ -150,7 +152,7 @@ class MemberViewModel @Inject constructor(
             it.copy(
                 installmentCount = count,
                 previewPrice = repository.calculateFinalPrice(
-                    it.selectedPackage?.basePrice ?: 0.0,
+                    it.selectedPackage.basePriceMajor(),
                     it.discount.toDoubleOrNull() ?: 0.0,
                     it.paymentType,
                     count
@@ -164,7 +166,7 @@ class MemberViewModel @Inject constructor(
             it.copy(
                 selectedPackage = pkg,
                 previewPrice = repository.calculateFinalPrice(
-                    pkg?.basePrice ?: 0.0,
+                    pkg.basePriceMajor(),
                     it.discount.toDoubleOrNull() ?: 0.0,
                     it.paymentType,
                     it.installmentCount
@@ -245,7 +247,7 @@ class MemberViewModel @Inject constructor(
         }
     }
 
-    fun loadMemberForRenewal(memberId: Long) {
+    fun loadMemberForRenewal(memberId: String) {
         viewModelScope.launch {
             repository.getMemberById(memberId).firstOrNull()?.let { member ->
                 _formState.update {
@@ -261,15 +263,15 @@ class MemberViewModel @Inject constructor(
         }
     }
 
-    fun getMemberById(id: Long): Flow<MemberEntity?> {
+    fun getMemberById(id: String): Flow<MemberEntity?> {
         return repository.getMemberById(id)
     }
 
-    fun getMeasurements(memberId: Long): Flow<List<com.gymapp.data.local.entity.MeasurementEntity>> =
+    fun getMeasurements(memberId: String): Flow<List<com.gymapp.data.local.entity.MeasurementEntity>> =
         repository.getMeasurementsForMember(memberId)
 
     fun addMeasurement(
-        memberId: Long,
+        memberId: String,
         height: Double,
         weight: Double,
         shoulder: Double,
@@ -302,7 +304,7 @@ class MemberViewModel @Inject constructor(
         }
     }
 
-    fun deleteMember(memberId: Long) {
+    fun deleteMember(memberId: String) {
         viewModelScope.launch {
             repository.deleteMember(memberId)
         }
@@ -316,9 +318,17 @@ class MemberViewModel @Inject constructor(
         _formState.update { it.copy(submitError = null) }
     }
 
-    fun markAsPaid(memberId: Long) {
+    fun markAsPaid(memberId: String) {
         viewModelScope.launch {
             repository.updatePaymentStatus(memberId, true)
         }
     }
 }
+
+/**
+ * Paket fiyatının TL karşılığı — **yalnızca ekran önizlemesi** için.
+ *
+ * Kaydedilen tutar kuruş üzerinden [com.gymapp.domain.Pricing.finalPrice] ile hesaplanır;
+ * bu dönüşüm hesaba girmez.
+ */
+private fun PackageEntity?.basePriceMajor(): Double = Money(this?.basePriceMinor ?: 0L).asDouble

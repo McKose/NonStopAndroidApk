@@ -20,17 +20,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gymapp.data.local.entity.MemberEntity
+import com.gymapp.domain.Membership
+import com.gymapp.domain.MembershipState
+import com.gymapp.domain.labelTr
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MemberListScreen(
     onNavigateToRegister: () -> Unit,
-    onNavigateToDetail: (Long) -> Unit,
+    onNavigateToDetail: (String) -> Unit,
     onNavigateToPackages: () -> Unit,
     onNavigateToFinance: () -> Unit,
     onNavigateToMarket: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToRenew: (Long) -> Unit,
+    onNavigateToRenew: (String) -> Unit,
     viewModel: MemberViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.listUiState.collectAsState()
@@ -184,10 +187,18 @@ fun MemberItem(
                     }
                 }
                 Text(text = member.phone, style = MaterialTheme.typography.bodyMedium)
+                // Durum kayıtlı kolondan değil bitiş tarihinden türetiliyor; süresi
+                // dolmuş üye artık "Aktif" görünmüyor. Paket kimliği (UUID) kullanıcıya
+                // hiçbir şey ifade etmediği için gösterilmiyor.
+                val state = Membership.stateOf(member.status, member.endDateMs, System.currentTimeMillis())
                 Text(
-                    text = "Durum: ${member.status} | Paket: ${member.activePackageId ?: "Yok"}",
+                    text = "Durum: ${state.labelTr()}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (member.status == "ACTIVE") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    color = if (state == MembershipState.ACTIVE) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    }
                 )
             }
             

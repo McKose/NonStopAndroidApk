@@ -187,7 +187,7 @@ fun MarketScreen(
 @Composable
 fun CheckoutContent(
     uiState: MarketUiState,
-    onMemberSelect: (Long?) -> Unit,
+    onMemberSelect: (String?) -> Unit,
     onPaymentTypeSelect: (String) -> Unit,
     onPaymentStatusSelect: (String) -> Unit,
     onDeliveryStatusSelect: (String) -> Unit,

@@ -1,10 +1,14 @@
 package com.gymapp.data.repository
 
+import com.gymapp.data.local.dao.MeasurementDao
 import com.gymapp.data.local.dao.MemberDao
-import com.gymapp.data.local.entity.*
+import com.gymapp.data.local.entity.MeasurementEntity
+import com.gymapp.data.local.entity.MemberEntity
+import com.gymapp.data.local.entity.PackageEntity
+import com.gymapp.domain.Ids
+import com.gymapp.domain.MemberManualStatus
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
-import com.gymapp.domain.Ids
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Pricing
 import kotlinx.coroutines.flow.Flow
@@ -16,40 +20,38 @@ import javax.inject.Singleton
 class MemberRepository @Inject constructor(
     private val memberDao: MemberDao,
     private val ledgerRepository: LedgerRepository,
-    private val measurementDao: com.gymapp.data.local.dao.MeasurementDao
+    private val measurementDao: MeasurementDao,
 ) {
-    /**
-     * Üye kimliği defterde metin olarak tutulur; tablolar UUID biçimine geçene
-     * kadar `Long` kimlik burada köprüleniyor.
-     */
-    private fun ledgerMemberId(memberId: Long): String = memberId.toString()
+    private val tenantId = Ids.DEFAULT_TENANT
 
-    private fun paymentMethodOf(paymentType: PaymentType): PaymentMethod =
-        runCatching { PaymentMethod.valueOf(paymentType.name) }
-            .getOrDefault(PaymentMethod.CASH)
-    /** Fiyat mantığı [Pricing] içinde; burası yalnızca yönlendirir. */
+    /**
+     * Ekranda gösterilen fiyat önizlemesi.
+     *
+     * Kaydedilen tutar [Pricing.finalPrice] ile **kuruş** üzerinden hesaplanır;
+     * bu metot yalnızca aynı kuralın TL karşılığını gösterir.
+     */
     fun calculateFinalPrice(
         packagePrice: Double,
         discount: Double,
-        paymentType: PaymentType,
-        installmentCount: Int
-    ): Double = Pricing.finalPrice(packagePrice, discount, paymentType, installmentCount)
+        paymentType: PaymentMethod,
+        installmentCount: Int,
+    ): Double = Pricing.previewPrice(packagePrice, discount, paymentType, installmentCount)
 
     suspend fun registerMember(
         fullName: String,
         phone: String,
         email: String?,
         selectedPackage: PackageEntity?,
-        paymentType: PaymentType,
+        paymentType: PaymentMethod,
         installmentCount: Int,
         discount: Double,
         paymentStatus: String,
         paymentDateMs: Long?,
         healthRisks: String?,
         healthNotes: String?,
-        notes: String?
-    ): Result<Long> = runCatching {
-        // Paket zorunlu: pakedsiz üyenin bitiş tarihi olmaz ve üyelik hiçbir zaman sona ermez.
+        notes: String?,
+    ): Result<String> = runCatching {
+        // Paket zorunlu: paketsiz üyenin bitiş tarihi olmaz ve üyelik hiçbir zaman sona ermez.
         val pkg = selectedPackage
             ?: throw IllegalArgumentException("Üyelik paketi seçilmelidir.")
 
@@ -57,170 +59,190 @@ class MemberRepository @Inject constructor(
         val normalizedPhone = PhoneNumber.normalizeTr(phone)
             ?: throw IllegalArgumentException("Geçerli bir cep telefonu numarası giriniz.")
 
-        val existing = memberDao.getMemberByPhone(normalizedPhone)
-        if (existing != null) {
+        if (memberDao.getMemberByPhone(tenantId, normalizedPhone) != null) {
             throw IllegalArgumentException("Bu telefon numarası zaten kayıtlı.")
         }
 
         val nowMs = System.currentTimeMillis()
         val endDateMs = nowMs + TimeUnit.DAYS.toMillis(pkg.validityDays.toLong())
 
-        val finalPrice = calculateFinalPrice(pkg.basePrice, discount, paymentType, installmentCount)
+        val basePrice = Money(pkg.basePriceMinor)
+        val safeInstallment = Pricing.normalizeInstallment(paymentType, installmentCount)
+        val safeDiscount = Money.ofMajor(discount).coerceNonNegative().coerceAtMost(basePrice)
+        val finalPrice = Pricing.finalPrice(basePrice, safeDiscount, paymentType, safeInstallment)
 
+        val memberId = Ids.new()
         val member = MemberEntity(
+            id = memberId,
+            tenantId = tenantId,
             fullName = fullName.trim(),
             phone = normalizedPhone,
             email = email?.trim()?.takeIf { it.isNotEmpty() },
             activePackageId = pkg.id,
-            // DÜZELTME: totalSessions daha önce hiç yazılmıyordu; -1 kalınca personel
-            // hakedişi hesaplayan koşul (`totalSessions > 0`) hiçbir zaman sağlanmıyordu.
+            // DÜZELTME: totalSessions daha önce hiç yazılmıyordu; sentinel kalınca personel
+            // hakedişi hesaplayan koşul hiçbir zaman sağlanmıyordu.
             totalSessions = pkg.sessionCount,
             remainingSessions = pkg.sessionCount,
             startDateMs = nowMs,
             endDateMs = endDateMs,
-            status = MemberStatus.ACTIVE.name,
-            paymentType = paymentType.name,
-            installmentCount = installmentCount,
-            packagePrice = pkg.basePrice,
-            discount = discount.coerceIn(0.0, pkg.basePrice),
-            pricePaid = finalPrice,
+            status = MemberManualStatus.ACTIVE,
+            paymentType = paymentType,
+            installmentCount = safeInstallment,
+            packagePriceMinor = basePrice.minor,
+            discountMinor = safeDiscount.minor,
+            pricePaidMinor = finalPrice.minor,
             paymentStatus = paymentStatus,
             paymentDateMs = paymentDateMs ?: nowMs,
-            healthRisks = healthRisks,
-            healthNotes = healthNotes,
-            notes = notes,
+            healthRisks = healthRisks?.takeIf { it.isNotBlank() },
+            healthNotes = healthNotes?.takeIf { it.isNotBlank() },
+            notes = notes?.takeIf { it.isNotBlank() },
             createdAtMs = nowMs,
-            updatedAtMs = nowMs
+            updatedAtMs = nowMs,
         )
 
         // Kontrol ile insert arasındaki yarışta UNIQUE index devreye girer;
         // ham SQLite hatası yerine anlaşılır mesaj döndür.
-        val memberId = try {
+        try {
             memberDao.insertMember(member)
         } catch (e: android.database.sqlite.SQLiteConstraintException) {
             throw IllegalArgumentException("Bu telefon numarası zaten kayıtlı.", e)
         }
 
-        // Satış her hâlükârda borç doğurur; tahsilat ayrı bir kayıttır.
-        // Böylece ödenmemiş bakiye defterden türetilebiliyor.
-        val amount = Money.ofMajor(finalPrice)
-        val ledgerId = ledgerMemberId(memberId)
-        val occurredAt = paymentDateMs ?: nowMs
+        recordSale(
+            memberId = memberId,
+            memberName = member.fullName,
+            packageName = pkg.name,
+            amount = finalPrice,
+            paymentType = paymentType,
+            paymentStatus = paymentStatus,
+            occurredAtMs = paymentDateMs ?: nowMs,
+            suffix = null,
+        )
 
-        if (amount.isPositive) {
-            ledgerRepository.recordCharge(
-                memberId = ledgerId,
-                amount = amount,
-                description = "${member.fullName} - ${pkg.name}",
-                occurredAtMs = occurredAt,
-            ).getOrThrow()
-
-            if (paymentStatus == "PAID") {
-                ledgerRepository.recordPayment(
-                    amount = amount,
-                    method = paymentMethodOf(paymentType),
-                    description = "${member.fullName} - ${pkg.name} tahsilat",
-                    memberId = ledgerId,
-                    occurredAtMs = occurredAt,
-                ).getOrThrow()
-            }
-        }
         memberId
     }
 
     suspend fun renewPackage(
-        memberId: Long,
+        memberId: String,
         selectedPackage: PackageEntity,
-        paymentType: PaymentType,
+        paymentType: PaymentMethod,
         installmentCount: Int,
         discount: Double,
         paymentStatus: String,
-        paymentDateMs: Long?
+        paymentDateMs: Long?,
     ): Result<Unit> = runCatching {
-        val member = memberDao.getMemberById(memberId) ?: throw Exception("Üye bulunamadı")
+        val member = memberDao.getMemberById(memberId)
+            ?: throw IllegalArgumentException("Üye bulunamadı.")
+
         val nowMs = System.currentTimeMillis()
-        
-        // Mevcut bitiş tarihinden mi başlasın yoksa bugünden mi?
+
+        // Üyelik henüz bitmediyse yeni süre mevcut bitiş tarihinden başlar; aksi hâlde bugünden.
         val currentEndDate = member.endDateMs ?: nowMs
         val baseDate = if (currentEndDate > nowMs) currentEndDate else nowMs
         val endDateMs = baseDate + TimeUnit.DAYS.toMillis(selectedPackage.validityDays.toLong())
-        
-        val finalPrice = calculateFinalPrice(selectedPackage.basePrice, discount, paymentType, installmentCount)
 
-        // Üye satırındaki `pricePaid` yeni paketle değişiyor, ancak önceki paketin
-        // ödenmemiş bakiyesi artık kaybolmuyor: defterdeki eski tahakkuk yerinde
-        // duruyor ve yeni tahakkuk üzerine ekleniyor, dolayısıyla toplam borç doğru.
-        val updatedMember = member.copy(
-            activePackageId = selectedPackage.id,
-            totalSessions = selectedPackage.sessionCount,
-            remainingSessions = selectedPackage.sessionCount,
-            startDateMs = baseDate,
-            endDateMs = endDateMs,
-            status = MemberStatus.ACTIVE.name,
-            paymentType = paymentType.name,
-            installmentCount = installmentCount,
-            packagePrice = selectedPackage.basePrice,
-            discount = discount.coerceIn(0.0, selectedPackage.basePrice),
-            pricePaid = finalPrice,
-            paymentStatus = paymentStatus,
-            paymentDateMs = paymentDateMs ?: nowMs,
-            updatedAtMs = nowMs
+        val basePrice = Money(selectedPackage.basePriceMinor)
+        val safeInstallment = Pricing.normalizeInstallment(paymentType, installmentCount)
+        val safeDiscount = Money.ofMajor(discount).coerceNonNegative().coerceAtMost(basePrice)
+        val finalPrice = Pricing.finalPrice(basePrice, safeDiscount, paymentType, safeInstallment)
+
+        // Üye satırındaki tutarlar yeni paketle değişiyor, ancak önceki paketin ödenmemiş
+        // bakiyesi kaybolmuyor: defterdeki eski tahakkuk yerinde duruyor ve yeni tahakkuk
+        // üzerine ekleniyor, dolayısıyla toplam borç doğru.
+        memberDao.updateMember(
+            member.copy(
+                activePackageId = selectedPackage.id,
+                totalSessions = selectedPackage.sessionCount,
+                remainingSessions = selectedPackage.sessionCount,
+                startDateMs = baseDate,
+                endDateMs = endDateMs,
+                status = MemberManualStatus.ACTIVE,
+                paymentType = paymentType,
+                installmentCount = safeInstallment,
+                packagePriceMinor = basePrice.minor,
+                discountMinor = safeDiscount.minor,
+                pricePaidMinor = finalPrice.minor,
+                paymentStatus = paymentStatus,
+                paymentDateMs = paymentDateMs ?: nowMs,
+                updatedAtMs = nowMs,
+            )
         )
-        
-        memberDao.updateMember(updatedMember)
 
-        val amount = Money.ofMajor(finalPrice)
-        val ledgerId = ledgerMemberId(memberId)
-        val occurredAt = paymentDateMs ?: nowMs
+        recordSale(
+            memberId = memberId,
+            memberName = member.fullName,
+            packageName = selectedPackage.name,
+            amount = finalPrice,
+            paymentType = paymentType,
+            paymentStatus = paymentStatus,
+            occurredAtMs = paymentDateMs ?: nowMs,
+            suffix = "Yenileme",
+        )
+    }
 
-        if (amount.isPositive) {
-            ledgerRepository.recordCharge(
-                memberId = ledgerId,
+    /**
+     * Satışın defter kayıtları.
+     *
+     * Satış her hâlükârda **borç doğurur** (CHARGE); tahsilat ayrı bir kayıttır (PAYMENT).
+     * Böylece ödenmemiş bakiye defterden türetilebiliyor ve kısmi ödeme kaybolmuyor.
+     */
+    private suspend fun recordSale(
+        memberId: String,
+        memberName: String,
+        packageName: String,
+        amount: Money,
+        paymentType: PaymentMethod,
+        paymentStatus: String,
+        occurredAtMs: Long,
+        suffix: String?,
+    ) {
+        if (!amount.isPositive) return
+
+        val label = if (suffix == null) "$memberName - $packageName" else "$memberName - $packageName ($suffix)"
+
+        ledgerRepository.recordCharge(
+            memberId = memberId,
+            amount = amount,
+            description = label,
+            occurredAtMs = occurredAtMs,
+        ).getOrThrow()
+
+        if (paymentStatus == "PAID") {
+            ledgerRepository.recordPayment(
                 amount = amount,
-                description = "${member.fullName} - ${selectedPackage.name} (Yenileme)",
-                occurredAtMs = occurredAt,
+                method = paymentType,
+                description = "$label tahsilat",
+                memberId = memberId,
+                occurredAtMs = occurredAtMs,
             ).getOrThrow()
-
-            if (paymentStatus == "PAID") {
-                ledgerRepository.recordPayment(
-                    amount = amount,
-                    method = paymentMethodOf(paymentType),
-                    description = "${member.fullName} - ${selectedPackage.name} (Yenileme) tahsilat",
-                    memberId = ledgerId,
-                    occurredAtMs = occurredAt,
-                ).getOrThrow()
-            }
         }
     }
 
     /**
      * Ödeme durumunu değiştirir.
      *
-     * Artık **her iki yön de** çalışıyor: `isPaid = false` çağrısı önceden hiçbir şey
-     * yapmıyordu, çünkü tahsilatı geri almanın bir yolu yoktu. Defter append-only
-     * olduğu için geri alma, kaydı silerek değil ters kayıt ekleyerek yapılıyor.
+     * **Her iki yön de** çalışır: `isPaid = false` çağrısı önceden hiçbir şey yapmıyordu,
+     * çünkü tahsilatı geri almanın bir yolu yoktu. Defter append-only olduğu için geri
+     * alma, kaydı silerek değil ters kayıt ekleyerek yapılıyor.
      *
-     * İşlem idempotenttir: zaten ödenmiş bir üye tekrar tahsil edilmez, zaten
-     * borçlu bir üyenin geri alınacak tahsilatı yoktur.
+     * İşlem idempotenttir: zaten ödenmiş bir üye tekrar tahsil edilmez, zaten borçlu bir
+     * üyenin geri alınacak tahsilatı yoktur.
      */
-    suspend fun updatePaymentStatus(memberId: Long, isPaid: Boolean): Result<Unit> = runCatching {
-        val member = memberDao.getMemberById(memberId) ?: throw Exception("Üye bulunamadı")
-        val ledgerId = ledgerMemberId(memberId)
+    suspend fun updatePaymentStatus(memberId: String, isPaid: Boolean): Result<Unit> = runCatching {
+        val member = memberDao.getMemberById(memberId)
+            ?: throw IllegalArgumentException("Üye bulunamadı.")
         val nowMs = System.currentTimeMillis()
 
         if (isPaid) {
             // Kalan borç kadar tahsilat yaz; borç yoksa yapılacak bir şey yok.
-            val outstanding = ledgerRepository.outstandingBalance(ledgerId)
+            val outstanding = ledgerRepository.outstandingBalance(memberId)
             if (!outstanding.isPositive) return@runCatching
 
             ledgerRepository.recordPayment(
                 amount = outstanding,
-                method = paymentMethodOf(
-                    runCatching { PaymentType.valueOf(member.paymentType) }
-                        .getOrDefault(PaymentType.CASH)
-                ),
+                method = member.paymentType,
                 description = "${member.fullName} - Paket ödemesi alındı",
-                memberId = ledgerId,
+                memberId = memberId,
                 occurredAtMs = nowMs,
             ).getOrThrow()
 
@@ -229,7 +251,7 @@ class MemberRepository @Inject constructor(
             )
         } else {
             val reversed = ledgerRepository.reversePaymentsForMember(
-                memberId = ledgerId,
+                memberId = memberId,
                 reason = "${member.fullName} - ödeme geri alındı",
                 occurredAtMs = nowMs,
             ).getOrThrow()
@@ -241,34 +263,34 @@ class MemberRepository @Inject constructor(
         }
     }
 
-    /**
-     * Üyenin kalan borcu. Ödeme durumu geçiş sonrasında bu değerden türetilecek;
-     * şimdilik `paymentStatus` kolonu UI uyumluluğu için güncel tutuluyor.
-     */
-    suspend fun outstandingBalance(memberId: Long) =
-        ledgerRepository.outstandingBalance(ledgerMemberId(memberId))
+    /** Üyenin kalan borcu — defterden türetilir, üye satırındaki kolondan değil. */
+    suspend fun outstandingBalance(memberId: String): Money =
+        ledgerRepository.outstandingBalance(memberId)
 
     // ─── Sorgu metodları ──────────────────────────────────────────────────────
 
-    fun getAllMembers(): Flow<List<MemberEntity>> = memberDao.getAllMembers()
-    fun getActiveMembers(): Flow<List<MemberEntity>> = memberDao.getActiveMembers()
-    fun searchMembers(query: String): Flow<List<MemberEntity>> = memberDao.searchMembers(query)
+    fun getAllMembers(): Flow<List<MemberEntity>> = memberDao.getAllMembers(tenantId)
+    fun getActiveMembers(): Flow<List<MemberEntity>> = memberDao.getActiveMembers(tenantId)
+    fun searchMembers(query: String): Flow<List<MemberEntity>> =
+        memberDao.searchMembers(tenantId, query)
 
-    fun getMemberById(id: Long): Flow<MemberEntity?> = memberDao.getMemberByIdFlow(id)
+    fun getMemberById(id: String): Flow<MemberEntity?> = memberDao.getMemberByIdFlow(id)
 
-    suspend fun deleteMember(id: Long) = memberDao.softDeleteMember(id)
+    /** Tombstone siler; üyeye bağlı randevu, ölçüm ve defter kayıtları öksüz kalmaz. */
+    suspend fun deleteMember(id: String) =
+        memberDao.softDeleteMember(id, System.currentTimeMillis())
 
-    /** DÜZELTME #3 — WorkManager bu metodu çağırır */
-    suspend fun expireOverdueMembers(): Int = memberDao.expireOverdueMembers()
+    suspend fun updateMemberInfo(member: MemberEntity) =
+        memberDao.updateMember(member.copy(updatedAtMs = System.currentTimeMillis()))
 
-    // ─── Ölçümler (Measurements) ──────────────────────────────────────────────
+    // ─── Ölçümler ─────────────────────────────────────────────────────────────
 
-    fun getMeasurementsForMember(memberId: Long): Flow<List<MeasurementEntity>> =
-        measurementDao.observeForMember(Ids.DEFAULT_TENANT, memberId)
+    fun getMeasurementsForMember(memberId: String): Flow<List<MeasurementEntity>> =
+        measurementDao.observeForMember(tenantId, memberId)
 
     /** Kimlik ve zaman damgaları burada üretilir; çağıran katmanın bilmesi gerekmez. */
     suspend fun addMeasurement(
-        memberId: Long,
+        memberId: String,
         height: Double,
         weight: Double,
         shoulder: Double,
@@ -283,7 +305,7 @@ class MemberRepository @Inject constructor(
         measurementDao.insert(
             MeasurementEntity(
                 id = Ids.new(),
-                tenantId = Ids.DEFAULT_TENANT,
+                tenantId = tenantId,
                 memberId = memberId,
                 dateMs = nowMs,
                 height = height,
@@ -304,7 +326,4 @@ class MemberRepository @Inject constructor(
     /** Fiziksel silmez; tombstone işaretler ki silme de senkronize olabilsin. */
     suspend fun deleteMeasurement(measurementId: String) =
         measurementDao.softDelete(measurementId)
-
-    suspend fun updateMemberInfo(member: MemberEntity) =
-        memberDao.updateMember(member)
 }

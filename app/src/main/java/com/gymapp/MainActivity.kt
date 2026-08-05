@@ -144,9 +144,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(
                             route = "renew_package/{memberId}",
-                            arguments = listOf(navArgument("memberId") { type = NavType.LongType })
+                            arguments = listOf(navArgument("memberId") { type = NavType.StringType })
                         ) { backStackEntry ->
-                            val memberId = backStackEntry.arguments?.getLong("memberId") ?: 0L
+                            val memberId = backStackEntry.arguments?.getString("memberId").orEmpty()
                             RegisterMemberScreen(
                                 isRenewal = true,
                                 memberId = memberId,
@@ -155,9 +155,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(
                             route = "member_detail/{memberId}",
-                            arguments = listOf(navArgument("memberId") { type = NavType.LongType })
+                            arguments = listOf(navArgument("memberId") { type = NavType.StringType })
                         ) { backStackEntry ->
-                            val memberId = backStackEntry.arguments?.getLong("memberId") ?: 0L
+                            val memberId = backStackEntry.arguments?.getString("memberId").orEmpty()
                             MemberDetailScreen(
                                 memberId = memberId,
                                 onNavigateBack = { navController.popBackStack() }
@@ -165,12 +165,27 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("package_list") {
                             PackageListScreen(
-                                onNavigateToAdd = { navController.navigate("add_package") },
+                                onNavigateToAdd = { packageId ->
+                                    if (packageId == null) {
+                                        navController.navigate("add_package")
+                                    } else {
+                                        navController.navigate("edit_package/$packageId")
+                                    }
+                                },
                                 onNavigateBack = { navController.popBackStack() }
                             )
                         }
                         composable("add_package") {
                             AddPackageScreen(onNavigateBack = { navController.popBackStack() })
+                        }
+                        composable(
+                            route = "edit_package/{packageId}",
+                            arguments = listOf(navArgument("packageId") { type = NavType.StringType })
+                        ) { backStackEntry ->
+                            AddPackageScreen(
+                                packageId = backStackEntry.arguments?.getString("packageId"),
+                                onNavigateBack = { navController.popBackStack() }
+                            )
                         }
                     }
                 }

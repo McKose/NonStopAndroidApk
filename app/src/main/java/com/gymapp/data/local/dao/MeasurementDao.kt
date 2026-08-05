@@ -15,7 +15,7 @@ interface MeasurementDao {
         WHERE tenantId = :tenantId AND memberId = :memberId AND deletedAtMs IS NULL
         ORDER BY dateMs DESC
     """)
-    fun observeForMember(tenantId: String, memberId: Long): Flow<List<MeasurementEntity>>
+    fun observeForMember(tenantId: String, memberId: String): Flow<List<MeasurementEntity>>
 
     @Insert
     suspend fun insert(measurement: MeasurementEntity)
