@@ -6,6 +6,9 @@ import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.ProductEntity
 import com.gymapp.data.repository.MemberRepository
 import com.gymapp.data.repository.ProductRepository
+import com.gymapp.domain.DeliveryStatus
+import com.gymapp.domain.Money
+import com.gymapp.domain.PaymentMethod
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -15,7 +18,7 @@ import javax.inject.Inject
 data class MarketUiState(
     val products: List<ProductEntity> = emptyList(),
     val members: List<MemberEntity> = emptyList(),
-    val cart: Map<Long, Int> = emptyMap(), // ProductId -> Quantity
+    val cart: Map<String, Int> = emptyMap(), // ProductId -> Quantity
     val selectedMemberId: Long? = null,
     val paymentType: String = "CASH",
     val paymentStatus: String = "PAID",
@@ -23,11 +26,11 @@ data class MarketUiState(
     val discount: Double = 0.0,
     val notes: String = "",
     /** Ürün kimliği → eldeki stok (hareketlerin toplamı). */
-    val stockByProduct: Map<Long, Int> = emptyMap(),
+    val stockByProduct: Map<String, Int> = emptyMap(),
     val isLoading: Boolean = false,
     val isCheckingOut: Boolean = false,
 ) {
-    fun stockOf(productId: Long): Int = stockByProduct[productId] ?: 0
+    fun stockOf(productId: String): Int = stockByProduct[productId] ?: 0
 }
 
 /** Bir kez tüketilen kullanıcı bildirimleri (Snackbar). */
@@ -38,7 +41,7 @@ sealed interface MarketEvent {
 
 /** Kullanıcının form üzerinde değiştirdiği alanlar tek bir state'te toplanır. */
 private data class MarketForm(
-    val cart: Map<Long, Int> = emptyMap(),
+    val cart: Map<String, Int> = emptyMap(),
     val selectedMemberId: Long? = null,
     val paymentType: String = "CASH",
     val paymentStatus: String = "PAID",
@@ -99,7 +102,7 @@ class MarketViewModel @Inject constructor(
         }
     }
 
-    fun removeFromCart(productId: Long) {
+    fun removeFromCart(productId: String) {
         _form.update { form ->
             val count = form.cart[productId] ?: return@update form
             val cart = if (count > 1) form.cart + (productId to count - 1) else form.cart - productId
@@ -138,10 +141,12 @@ class MarketViewModel @Inject constructor(
             val result = repository.processOrder(
                 memberId = form.selectedMemberId,
                 cartItems = form.cart,
-                paymentType = form.paymentType,
+                paymentMethod = runCatching { PaymentMethod.valueOf(form.paymentType) }
+                    .getOrDefault(PaymentMethod.CASH),
                 paymentStatus = form.paymentStatus,
-                deliveryStatus = form.deliveryStatus,
-                discount = form.discount,
+                deliveryStatus = runCatching { DeliveryStatus.valueOf(form.deliveryStatus) }
+                    .getOrDefault(DeliveryStatus.POST_DELIVERY),
+                discount = Money.ofMajor(form.discount),
                 notes = form.notes.takeIf { it.isNotBlank() },
             )
 
@@ -159,26 +164,27 @@ class MarketViewModel @Inject constructor(
         }
     }
 
-    fun addProduct(id: Long = 0, name: String, category: String, price: Double, stock: Int) {
+    fun saveProduct(
+        productId: String? = null,
+        name: String,
+        category: String,
+        price: Double,
+        stock: Int,
+    ) {
         viewModelScope.launch {
             repository.saveProduct(
-                product = ProductEntity(
-                    id = id,
-                    name = name.trim(),
-                    category = category.trim(),
-                    price = price.coerceAtLeast(0.0),
-                    // Sayaç kolonu geçiş süresince duruyor ama artık doğruluk kaynağı değil;
-                    // eldeki stok hareket toplamından geliyor.
-                    stockCount = 0,
-                ),
-                desiredStock = stock.coerceAtLeast(0),
+                productId = productId,
+                name = name,
+                category = category,
+                price = Money.ofMajor(price),
+                desiredStock = stock,
             ).onFailure { _events.send(MarketEvent.Failed(it.message ?: "Ürün kaydedilemedi.")) }
         }
     }
 
-    fun deleteProduct(product: ProductEntity) {
+    fun deleteProduct(productId: String) {
         viewModelScope.launch {
-            repository.deleteProduct(product)
+            repository.deleteProduct(productId)
         }
     }
 }
