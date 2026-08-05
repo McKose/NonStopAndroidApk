@@ -15,7 +15,9 @@ navigationCompose = "2.9.0"
 room            = "2.7.1"
 
 # Hilt
-hilt            = "2.60.1"
+# Tavanı AGP belirliyor: Hilt 2.59.2+ AGP 9.0 istiyor, elimizde 8.13.2 var.
+# 2.58, AGP 8.4+ ile uyumlu olan en yeni sürüm.
+hilt            = "2.58"
 hiltNavCompose  = "1.2.0"
 
 # Kotlin Multiplatform
