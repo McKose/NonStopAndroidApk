@@ -28,15 +28,31 @@ interface MemberDao {
     """)
     fun getAllMembers(tenantId: String): Flow<List<MemberEntity>>
 
-    @Query("SELECT * FROM gym_members WHERE id = :id AND deletedAtMs IS NULL")
+    /**
+     * Kimliğe göre tekil okuma — tombstone **filtrelenmez**.
+     *
+     * Bu çağrı bir listeleme değil, var olan bir yabancı anahtarın çözümlenmesidir
+     * (randevuya bağlı üye gibi). Filtrelenseydi, üyesi silinmiş bir randevuyu
+     * tamamlamak "üye bulunamadı" ile başarısız olurdu.
+     */
+    @Query("SELECT * FROM gym_members WHERE id = :id")
     suspend fun getMemberById(id: String): MemberEntity?
 
+    /** Ekran akışı — silinen üyenin detay ekranı boşalsın diye tombstone filtrelenir. */
     @Query("SELECT * FROM gym_members WHERE id = :id AND deletedAtMs IS NULL")
     fun getMemberByIdFlow(id: String): Flow<MemberEntity?>
 
+    /**
+     * Telefona göre arama — silinmiş kayıtlar **dahil**.
+     *
+     * UNIQUE index tombstone satırlarını da kapsadığından, silinmiş bir üyenin
+     * numarası filtrelenseydi yeniden kayıt `INSERT` aşamasında anlaşılmaz bir
+     * kısıt hatasıyla düşerdi. Kayıt bulunduğunda üye *canlandırılır*, böylece
+     * geri dönen üyenin defter geçmişi de korunur.
+     */
     @Query("""
         SELECT * FROM gym_members
-        WHERE tenantId = :tenantId AND phone = :phone AND deletedAtMs IS NULL
+        WHERE tenantId = :tenantId AND phone = :phone
         LIMIT 1
     """)
     suspend fun getMemberByPhone(tenantId: String, phone: String): MemberEntity?

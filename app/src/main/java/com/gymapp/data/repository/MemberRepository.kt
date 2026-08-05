@@ -59,7 +59,10 @@ class MemberRepository @Inject constructor(
         val normalizedPhone = PhoneNumber.normalizeTr(phone)
             ?: throw IllegalArgumentException("Geçerli bir cep telefonu numarası giriniz.")
 
-        if (memberDao.getMemberByPhone(tenantId, normalizedPhone) != null) {
+        // Aynı numarayla kayıtlı biri var mı? Tombstone satırlar da UNIQUE index'e
+        // dahil olduğu için silinmişler de aranır.
+        val existing = memberDao.getMemberByPhone(tenantId, normalizedPhone)
+        if (existing != null && existing.deletedAtMs == null) {
             throw IllegalArgumentException("Bu telefon numarası zaten kayıtlı.")
         }
 
@@ -71,7 +74,9 @@ class MemberRepository @Inject constructor(
         val safeDiscount = Money.ofMajor(discount).coerceNonNegative().coerceAtMost(basePrice)
         val finalPrice = Pricing.finalPrice(basePrice, safeDiscount, paymentType, safeInstallment)
 
-        val memberId = Ids.new()
+        // Geri dönen üye: silinmiş kaydı *canlandır*. Yeni satır açmak numarayı
+        // UNIQUE index'e takardı ve üyenin defter geçmişi kopardı.
+        val memberId = existing?.id ?: Ids.new()
         val member = MemberEntity(
             id = memberId,
             tenantId = tenantId,
@@ -96,16 +101,21 @@ class MemberRepository @Inject constructor(
             healthRisks = healthRisks?.takeIf { it.isNotBlank() },
             healthNotes = healthNotes?.takeIf { it.isNotBlank() },
             notes = notes?.takeIf { it.isNotBlank() },
-            createdAtMs = nowMs,
+            // Canlandırmada ilk kayıt tarihi korunur; `deletedAtMs` varsayılan olarak null.
+            createdAtMs = existing?.createdAtMs ?: nowMs,
             updatedAtMs = nowMs,
         )
 
-        // Kontrol ile insert arasındaki yarışta UNIQUE index devreye girer;
-        // ham SQLite hatası yerine anlaşılır mesaj döndür.
-        try {
-            memberDao.insertMember(member)
-        } catch (e: android.database.sqlite.SQLiteConstraintException) {
-            throw IllegalArgumentException("Bu telefon numarası zaten kayıtlı.", e)
+        if (existing != null) {
+            memberDao.updateMember(member)
+        } else {
+            // Kontrol ile insert arasındaki yarışta UNIQUE index devreye girer;
+            // ham SQLite hatası yerine anlaşılır mesaj döndür.
+            try {
+                memberDao.insertMember(member)
+            } catch (e: android.database.sqlite.SQLiteConstraintException) {
+                throw IllegalArgumentException("Bu telefon numarası zaten kayıtlı.", e)
+            }
         }
 
         recordSale(

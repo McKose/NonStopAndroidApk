@@ -56,8 +56,19 @@ class StaffRepository @Inject constructor(
 
         // Kullanıcı adı tenant içinde tekil; kontrolü burada yapıyoruz ki anlaşılır
         // mesaj dönebilelim, ama son söz veritabanındaki UNIQUE index'te.
-        val clash = staffDao.getStaffByNickname(tenantId, normalizedNickname)
-        require(clash == null || clash.id == staffId) { "Bu kullanıcı adı zaten alınmış." }
+        //
+        // Silinmiş kayıtlar da aranıyor: tombstone satırları index'te durduğu için
+        // görülmezlerse kayıt anlaşılmaz bir kısıt hatasıyla düşerdi.
+        val clash = staffDao.findByNicknameIncludingDeleted(tenantId, normalizedNickname)
+        if (clash != null && clash.id != staffId) {
+            throw IllegalArgumentException(
+                if (clash.deletedAtMs == null) {
+                    "Bu kullanıcı adı zaten alınmış."
+                } else {
+                    "Bu kullanıcı adı silinmiş bir personele ait; farklı bir ad seçin."
+                }
+            )
+        }
 
         val nowMs = System.currentTimeMillis()
         val existing = staffId?.let { staffDao.getStaffById(it) }
