@@ -1,20 +1,41 @@
 package com.gymapp.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "products")
+/**
+ * Markette satılan ürün.
+ *
+ * `orders`, `measurements` ve `appointments` ile aynı hedef biçim.
+ *
+ * `stockCount` kolonu **kaldırıldı**: eldeki stok artık `stock_movements`
+ * toplamından türetiliyor. Mutlak sayaç, iki cihaz aynı anda satış yaptığında
+ * birinin diğerini ezmesine ve bir satışın sessizce kaybolmasına yol açıyordu.
+ */
+@Entity(
+    tableName = "products",
+    indices = [
+        Index(value = ["tenantId", "name"]),
+        Index(value = ["updatedAtMs"]),
+    ]
+)
 data class ProductEntity(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
+    @PrimaryKey
+    val id: String,
+
+    val tenantId: String,
+
     val name: String,
-    val category: String, // Ayarlar'dan eklenecek
-    val price: Double,
-    /**
-     * ARTIK KULLANILMIYOR — eldeki stok `stock_movements` toplamından türetiliyor.
-     * Kolon yalnızca şema geçişi tamamlanana kadar duruyor; entity cutover'da düşecek.
-     */
-    val stockCount: Int,
+    val category: String,
+
+    /** Birim fiyat, kuruş cinsinden. */
+    val priceMinor: Long,
+
     val imageUrl: String? = null,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+
+    val createdAtMs: Long,
+    val updatedAtMs: Long,
+    val deletedAtMs: Long? = null,
 )

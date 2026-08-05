@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.ProductEntity
+import com.gymapp.domain.Money
 import java.util.Locale
 
 private const val LOW_STOCK_THRESHOLD = 5
@@ -92,7 +93,7 @@ fun MarketScreen(
                         onAdd = { viewModel.addToCart(product) },
                         onRemove = { viewModel.removeFromCart(product.id) },
                         onEdit = { productToEdit = product },
-                        onDelete = { viewModel.deleteProduct(product) }
+                        onDelete = { viewModel.deleteProduct(product.id) }
                     )
                 }
             }
@@ -106,7 +107,7 @@ fun MarketScreen(
                 ) {
                     val totalItems = uiState.cart.values.sum()
                     val totalPrice = uiState.cart.map { (id, qty) -> 
-                        (uiState.products.find { it.id == id }?.price ?: 0.0) * qty 
+                        Money(uiState.products.find { it.id == id }?.priceMinor ?: 0L).asDouble * qty 
                     }.sum()
 
                     Row(
@@ -137,7 +138,7 @@ fun MarketScreen(
         AddProductDialog(
             onDismiss = { showAddDialog = false },
             onConfirm = { name, category, price, stock ->
-                viewModel.addProduct(name = name, category = category, price = price, stock = stock)
+                viewModel.saveProduct(name = name, category = category, price = price, stock = stock)
                 showAddDialog = false
             }
         )
@@ -149,8 +150,8 @@ fun MarketScreen(
             currentStock = uiState.stockOf(productToEdit!!.id),
             onDismiss = { productToEdit = null },
             onConfirm = { name, category, price, stock ->
-                viewModel.addProduct(
-                    id = productToEdit!!.id,
+                viewModel.saveProduct(
+                    productId = productToEdit!!.id,
                     name = name,
                     category = category,
                     price = price,
@@ -289,7 +290,7 @@ fun CheckoutContent(
         Spacer(Modifier.height(16.dp))
 
         val totalPrice = uiState.cart.map { (id, qty) -> 
-            (uiState.products.find { it.id == id }?.price ?: 0.0) * qty 
+            Money(uiState.products.find { it.id == id }?.priceMinor ?: 0L).asDouble * qty 
         }.sum()
         val finalPrice = totalPrice - uiState.discount
 
@@ -358,7 +359,7 @@ fun ProductGridItem(
                 Text(product.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
                 Text("Stok: $onHand", style = MaterialTheme.typography.bodySmall, color = if (isLowStock) Color.Red else Color.Gray)
                 Spacer(Modifier.weight(1f))
-                Text("₺${product.price}", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
+                Text("₺${Money(product.priceMinor)}", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
             }
             
             DropdownMenu(
@@ -424,7 +425,7 @@ fun AddProductDialog(
 ) {
     var name by remember { mutableStateOf(product?.name ?: "") }
     var category by remember { mutableStateOf(product?.category ?: "Market Ürünleri") }
-    var price by remember { mutableStateOf(product?.price?.toString() ?: "") }
+    var price by remember { mutableStateOf(product?.let { Money(it.priceMinor).asDouble.toString() } ?: "") }
     var stock by remember { mutableStateOf(if (product != null) currentStock.toString() else "") }
     var categoryExpanded by remember { mutableStateOf(false) }
     val categories = listOf("Market Ürünleri", "Supplement", "Ekipman")

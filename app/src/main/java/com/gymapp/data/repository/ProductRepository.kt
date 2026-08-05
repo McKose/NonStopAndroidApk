@@ -8,11 +8,11 @@ import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.entity.OrderEntity
 import com.gymapp.data.local.entity.ProductEntity
 import com.gymapp.data.local.entity.StockMovementEntity
+import com.gymapp.domain.DeliveryStatus
 import com.gymapp.domain.Ids
 import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
-import com.gymapp.domain.DeliveryStatus
 import com.gymapp.domain.StockMovementReason
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -29,78 +29,105 @@ class ProductRepository @Inject constructor(
 ) {
     private val tenantId = Ids.DEFAULT_TENANT
 
-    fun getAllProducts(): Flow<List<ProductEntity>> = productDao.getAllProducts()
+    fun getAllProducts(): Flow<List<ProductEntity>> = productDao.observeAll(tenantId)
 
     /**
      * Ürün kimliği → eldeki stok.
      *
-     * Stok artık ürün satırındaki mutlak sayaçta değil, hareketlerin toplamında.
-     * Hareketler toplanabilir (commutative) olduğu için iki cihaz aynı anda satış
-     * yaptığında hiçbir satış kaybolmaz — sayaç modelinde biri diğerini eziyordu.
+     * Stok ürün satırındaki sayaçta değil, hareketlerin toplamında. Hareketler
+     * toplanabilir (commutative) olduğu için iki cihaz aynı anda satış yaptığında
+     * hiçbir satış kaybolmaz — sayaç modelinde biri diğerini eziyordu.
      */
-    fun observeStockByProduct(): Flow<Map<Long, Int>> =
+    fun observeStockByProduct(): Flow<Map<String, Int>> =
         stockMovementDao.observeOnHandByProduct(tenantId).map { rows ->
-            rows.mapNotNull { row ->
-                row.productId.toLongOrNull()?.let { it to row.onHand }
-            }.toMap()
+            rows.associate { it.productId to it.onHand }
         }
 
     /**
      * Ürünü kaydeder; [desiredStock] verilmişse eldeki stoğu o değere **düzeltme
      * hareketiyle** eşitler (mutlak sayaç yazmaz).
+     *
+     * @param productId `null` ise yeni ürün oluşturulur.
      */
-    suspend fun saveProduct(product: ProductEntity, desiredStock: Int? = null): Result<Long> =
-        runCatching {
-            database.withTransaction {
-                val productId = if (product.id == 0L) {
-                    productDao.insertProduct(product)
-                } else {
-                    productDao.updateProduct(product)
-                    product.id
-                }
+    suspend fun saveProduct(
+        productId: String?,
+        name: String,
+        category: String,
+        price: Money,
+        desiredStock: Int? = null,
+    ): Result<String> = runCatching {
+        require(name.isNotBlank()) { "Ürün adı boş olamaz." }
 
-                if (desiredStock != null) {
-                    val current = stockMovementDao.onHand(tenantId, productId.toString())
-                    val delta = desiredStock.coerceAtLeast(0) - current
-                    if (delta != 0) {
-                        val nowMs = System.currentTimeMillis()
-                        stockMovementDao.insert(
-                            StockMovementEntity(
-                                id = Ids.new(),
-                                tenantId = tenantId,
-                                productId = productId.toString(),
-                                quantityDelta = delta,
-                                reason = StockMovementReason.CORRECTION,
-                                note = "Stok düzeltme",
-                                occurredAtMs = nowMs,
-                                createdAtMs = nowMs,
-                            )
-                        )
-                    }
-                }
-                productId
+        database.withTransaction {
+            val nowMs = System.currentTimeMillis()
+            val id = productId ?: Ids.new()
+
+            val existing = productId?.let { productDao.getById(it) }
+            if (existing == null) {
+                productDao.insert(
+                    ProductEntity(
+                        id = id,
+                        tenantId = tenantId,
+                        name = name.trim(),
+                        category = category.trim(),
+                        priceMinor = price.coerceNonNegative().minor,
+                        createdAtMs = nowMs,
+                        updatedAtMs = nowMs,
+                    )
+                )
+            } else {
+                productDao.update(
+                    existing.copy(
+                        name = name.trim(),
+                        category = category.trim(),
+                        priceMinor = price.coerceNonNegative().minor,
+                        updatedAtMs = nowMs,
+                    )
+                )
             }
-        }
 
-    suspend fun deleteProduct(product: ProductEntity) = productDao.deleteProduct(product)
+            if (desiredStock != null) {
+                val current = stockMovementDao.onHand(tenantId, id)
+                val delta = desiredStock.coerceAtLeast(0) - current
+                if (delta != 0) {
+                    stockMovementDao.insert(
+                        StockMovementEntity(
+                            id = Ids.new(),
+                            tenantId = tenantId,
+                            productId = id,
+                            quantityDelta = delta,
+                            reason = StockMovementReason.CORRECTION,
+                            note = "Stok düzeltme",
+                            occurredAtMs = nowMs,
+                            createdAtMs = nowMs,
+                        )
+                    )
+                }
+            }
+            id
+        }
+    }
+
+    /** Ürünü tombstone ile siler; geçmiş hareketler ve satışlar öksüz kalmaz. */
+    suspend fun deleteProduct(productId: String) = productDao.softDelete(productId)
 
     /**
      * Siparişi tek transaction içinde işler.
      *
      * Akış: (1) fiyat ve stok **veritabanından** doğrulanır, (2) sipariş yazılır,
-     * (3) stok çıkış hareketleri ve tahsilat kaydı siparişe bağlanır. Herhangi bir
-     * adımda hata olursa hiçbiri kalmaz.
+     * (3) stok çıkış hareketleri ve tahsilat siparişe bağlanır. Herhangi bir adımda
+     * hata olursa hiçbiri kalmaz.
      *
-     * Stok kontrolü ile düşüm aynı transaction içinde olduğundan, iki eşzamanlı
-     * satış aynı stoğu satamaz.
+     * Kontrol ile düşüm aynı transaction'da olduğundan iki eşzamanlı satış aynı
+     * stoğu satamaz.
      */
     suspend fun processOrder(
         memberId: Long?,
-        cartItems: Map<Long, Int>,
-        paymentType: String,
+        cartItems: Map<String, Int>,
+        paymentMethod: PaymentMethod,
         paymentStatus: String,
-        deliveryStatus: String,
-        discount: Double = 0.0,
+        deliveryStatus: DeliveryStatus,
+        discount: Money = Money.ZERO,
         notes: String? = null
     ): Result<String> = runCatching {
         require(cartItems.isNotEmpty()) { "Sepet boş." }
@@ -112,18 +139,18 @@ class ProductRepository @Inject constructor(
             cartItems.forEach { (productId, quantity) ->
                 require(quantity > 0) { "Geçersiz ürün adedi." }
 
-                val product = productDao.getProductById(productId)
-                    ?: throw IllegalStateException("Ürün bulunamadı (#$productId).")
+                val product = productDao.getById(productId)
+                    ?: throw IllegalStateException("Ürün bulunamadı.")
 
-                val onHand = stockMovementDao.onHand(tenantId, productId.toString())
+                val onHand = stockMovementDao.onHand(tenantId, productId)
                 if (onHand < quantity) {
                     throw IllegalStateException("${product.name} için yeterli stok yok (elde: $onHand).")
                 }
 
-                total += Money.ofMajor(product.price) * quantity
+                total += Money(product.priceMinor) * quantity
             }
 
-            val safeDiscount = Money.ofMajor(discount).coerceNonNegative().coerceAtMost(total)
+            val safeDiscount = discount.coerceNonNegative().coerceAtMost(total)
             val finalPrice = total - safeDiscount
 
             // 2) Sipariş
@@ -137,11 +164,9 @@ class ProductRepository @Inject constructor(
                     totalPriceMinor = total.minor,
                     discountMinor = safeDiscount.minor,
                     finalPriceMinor = finalPrice.minor,
-                    paymentMethod = runCatching { PaymentMethod.valueOf(paymentType) }
-                        .getOrDefault(PaymentMethod.CASH),
+                    paymentMethod = paymentMethod,
                     paymentStatus = paymentStatus,
-                    deliveryStatus = runCatching { DeliveryStatus.valueOf(deliveryStatus) }
-                        .getOrDefault(DeliveryStatus.POST_DELIVERY),
+                    deliveryStatus = deliveryStatus,
                     dateMs = nowMs,
                     notes = notes,
                     createdAtMs = nowMs,
@@ -155,7 +180,7 @@ class ProductRepository @Inject constructor(
                     StockMovementEntity(
                         id = Ids.new(),
                         tenantId = tenantId,
-                        productId = productId.toString(),
+                        productId = productId,
                         quantityDelta = -quantity,
                         reason = StockMovementReason.SALE,
                         orderId = orderId,
@@ -169,8 +194,7 @@ class ProductRepository @Inject constructor(
             if (paymentStatus == "PAID" && finalPrice.isPositive) {
                 ledgerRepository.recordPayment(
                     amount = finalPrice,
-                    method = runCatching { PaymentMethod.valueOf(paymentType) }
-                        .getOrDefault(PaymentMethod.CASH),
+                    method = paymentMethod,
                     description = buildString {
                         append("Market satışı - Sipariş #").append(orderId.take(8))
                         if (memberId == null) append(" (Misafir)")
