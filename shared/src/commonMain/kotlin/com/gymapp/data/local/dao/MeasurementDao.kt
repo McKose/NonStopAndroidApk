@@ -27,5 +27,5 @@ interface MeasurementDao {
      * kaydın "hiç silinmemiş" gibi geri gelmesine yol açardı.
      */
     @Query("UPDATE measurements SET deletedAtMs = :nowMs, updatedAtMs = :nowMs WHERE id = :id")
-    suspend fun softDelete(id: String, nowMs: Long = System.currentTimeMillis())
+    suspend fun softDelete(id: String, nowMs: Long)
 }

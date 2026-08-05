@@ -34,5 +34,5 @@ interface ProductDao {
      * devam ediyor — fiziksel silme o kayıtları öksüz bırakırdı.
      */
     @Query("UPDATE products SET deletedAtMs = :nowMs, updatedAtMs = :nowMs WHERE id = :id")
-    suspend fun softDelete(id: String, nowMs: Long = System.currentTimeMillis())
+    suspend fun softDelete(id: String, nowMs: Long)
 }

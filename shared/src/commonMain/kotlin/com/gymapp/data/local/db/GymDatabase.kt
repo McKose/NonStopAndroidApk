@@ -1,7 +1,9 @@
 package com.gymapp.data.local.db
 
+import androidx.room.ConstructedBy
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.RoomDatabaseConstructor
 import androidx.room.TypeConverters
 import com.gymapp.data.local.dao.*
 import com.gymapp.data.local.entity.*
@@ -47,6 +49,7 @@ import com.gymapp.data.local.entity.*
     exportSchema = true
 )
 @TypeConverters(Converters::class)
+@ConstructedBy(GymDatabaseConstructor::class)
 abstract class GymDatabase : RoomDatabase() {
 
     abstract fun memberDao(): MemberDao
@@ -60,7 +63,19 @@ abstract class GymDatabase : RoomDatabase() {
     abstract fun stockMovementDao(): StockMovementDao
 }
 
-// KALDIRILDI: `getInstance()` companion singleton'ı, Hilt'in sağladığıyla aynı isimli
+/**
+ * Room'un her platform için ürettiği örnekleme noktası.
+ *
+ * `actual` gövdeyi Room'un kod üreticisi yazar; burada yalnızca beklendiği
+ * bildiriliyor. Ortak kodda `GymDatabase::class.java` gibi JVM'e özgü bir
+ * yansıma (reflection) çağrısı yapılamayacağı için KMP'de bu yol izleniyor.
+ */
+@Suppress("NO_ACTUAL_FOR_EXPECT", "KotlinNoActualForExpect")
+expect object GymDatabaseConstructor : RoomDatabaseConstructor<GymDatabase> {
+    override fun initialize(): GymDatabase
+}
+
+// KALDIRILDI: `getInstance()` companion singleton'ı, DI'nin sağladığıyla aynı isimli
 // ("gym_database") ikinci bir Room örneği kurabiliyordu. İki örnek aynı dosyayı açtığında
 // invalidation tracker kopar (Flow'lar güncellenmez) ve yazma kilitleri çakışır.
-// Veritabanının tek kaynağı artık com.gymapp.di.DatabaseModule.
+// Veritabanının tek kaynağı platform tarafındaki tekil kurulum.
