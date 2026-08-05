@@ -35,7 +35,7 @@ data class DashboardUiState(
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val memberRepository: MemberRepository,
-    private val appointmentDao: com.gymapp.data.local.dao.AppointmentDao,
+    private val appointmentRepository: com.gymapp.data.repository.AppointmentRepository,
     private val staffDao: com.gymapp.data.local.dao.StaffDao,
     private val productRepository: com.gymapp.data.repository.ProductRepository,
     private val prefs: AppPreferences
@@ -43,7 +43,7 @@ class DashboardViewModel @Inject constructor(
 
     val uiState: StateFlow<DashboardUiState> = combine(
         memberRepository.getAllMembers(),
-        appointmentDao.getAllAppointments(),
+        appointmentRepository.observeAll(),
         staffDao.getAllStaff(),
         productRepository.getAllProducts(),
         productRepository.observeStockByProduct(),

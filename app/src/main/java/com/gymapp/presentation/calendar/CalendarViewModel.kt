@@ -8,8 +8,10 @@ import com.gymapp.data.repository.AppointmentRepository
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.StaffEntity
+import com.gymapp.domain.AppointmentState
 import com.gymapp.domain.Membership
 import com.gymapp.domain.Periods
+import com.gymapp.domain.TrainingType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -84,7 +86,7 @@ class CalendarViewModel @Inject constructor(
      *  - üyeliğin geçerli ve seans hakkının olması
      *  - seçilen eğitmenin o saatte başka randevusunun olmaması (çift rezervasyon)
      */
-    fun addAppointment(memberId: Long, staffId: Long, hour: Int, trainingType: String) {
+    fun addAppointment(memberId: Long, staffId: Long, hour: Int, trainingType: TrainingType) {
         viewModelScope.launch {
             val startDateTime = _selectedDate.value.atTime(hour, 0)
             val startMs = startDateTime.atZone(zone).toInstant().toEpochMilli()
@@ -113,24 +115,24 @@ class CalendarViewModel @Inject constructor(
                 return@launch
             }
 
-            appointmentRepository.insert(
-                AppointmentEntity(
-                    memberId = memberId,
-                    staffId = staffId,
-                    trainingType = trainingType,
-                    startTimeMs = startMs,
-                    endTimeMs = endMs
-                )
+            appointmentRepository.create(
+                memberId = memberId,
+                staffId = staffId,
+                trainingType = trainingType,
+                startTimeMs = startMs,
+                endTimeMs = endMs,
+            ).fold(
+                onSuccess = { _events.send(CalendarEvent.AppointmentSaved) },
+                onFailure = { _events.send(CalendarEvent.Failed(it.message ?: "Randevu oluşturulamadı.")) },
             )
-            _events.send(CalendarEvent.AppointmentSaved)
         }
     }
 
-    fun updateAppointmentStatus(appointmentId: Long, status: String, notes: String) {
+    fun updateAppointmentStatus(appointmentId: String, state: AppointmentState, notes: String) {
         viewModelScope.launch {
             appointmentRepository.processStatus(
                 appointmentId = appointmentId,
-                status = status,
+                state = state,
                 notes = notes.takeIf { it.isNotBlank() },
             ).fold(
                 onSuccess = { _events.send(CalendarEvent.StatusUpdated) },

@@ -274,10 +274,20 @@ fun MeasurementsTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewM
 
     if (showAddDialog) {
         AddMeasurementDialog(
-            memberId = member.id,
             onDismiss = { showAddDialog = false },
-            onConfirm = { m ->
-                viewModel.addMeasurement(m)
+            onConfirm = { height, weight, shoulder, chest, waist, hips, leg, arm, notes ->
+                viewModel.addMeasurement(
+                    memberId = member.id,
+                    height = height,
+                    weight = weight,
+                    shoulder = shoulder,
+                    chest = chest,
+                    waist = waist,
+                    hips = hips,
+                    leg = leg,
+                    arm = arm,
+                    notes = notes,
+                )
                 showAddDialog = false
             }
         )
@@ -333,9 +343,9 @@ fun MeasurementLabelValue(label: String, value: String, modifier: Modifier = Mod
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddMeasurementDialog(
-    memberId: Long,
     onDismiss: () -> Unit,
-    onConfirm: (com.gymapp.data.local.entity.MeasurementEntity) -> Unit
+    /** (boy, kilo, omuz, göğüs, karın, kalça, bacak, kol, not) */
+    onConfirm: (Double, Double, Double, Double, Double, Double, Double, Double, String) -> Unit
 ) {
     var weight by remember { mutableStateOf("") }
     var height by remember { mutableStateOf("") }
@@ -373,18 +383,17 @@ fun AddMeasurementDialog(
         },
         confirmButton = {
             Button(onClick = {
-                onConfirm(com.gymapp.data.local.entity.MeasurementEntity(
-                    memberId = memberId,
-                    weight = weight.toDoubleOrNull() ?: 0.0,
-                    height = height.toDoubleOrNull() ?: 0.0,
-                    shoulder = shoulder.toDoubleOrNull() ?: 0.0,
-                    chest = chest.toDoubleOrNull() ?: 0.0,
-                    waist = waist.toDoubleOrNull() ?: 0.0,
-                    hips = hips.toDoubleOrNull() ?: 0.0,
-                    leg = leg.toDoubleOrNull() ?: 0.0,
-                    arm = arm.toDoubleOrNull() ?: 0.0,
-                    notes = notes
-                ))
+                onConfirm(
+                    height.toDoubleOrNull() ?: 0.0,
+                    weight.toDoubleOrNull() ?: 0.0,
+                    shoulder.toDoubleOrNull() ?: 0.0,
+                    chest.toDoubleOrNull() ?: 0.0,
+                    waist.toDoubleOrNull() ?: 0.0,
+                    hips.toDoubleOrNull() ?: 0.0,
+                    leg.toDoubleOrNull() ?: 0.0,
+                    arm.toDoubleOrNull() ?: 0.0,
+                    notes,
+                )
             }) { Text("Kaydet") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("İptal") } }

@@ -268,9 +268,31 @@ class MemberViewModel @Inject constructor(
     fun getMeasurements(memberId: Long): Flow<List<com.gymapp.data.local.entity.MeasurementEntity>> =
         repository.getMeasurementsForMember(memberId)
 
-    fun addMeasurement(measurement: com.gymapp.data.local.entity.MeasurementEntity) {
+    fun addMeasurement(
+        memberId: Long,
+        height: Double,
+        weight: Double,
+        shoulder: Double,
+        chest: Double,
+        waist: Double,
+        hips: Double,
+        leg: Double,
+        arm: Double,
+        notes: String,
+    ) {
         viewModelScope.launch {
-            repository.addMeasurement(measurement)
+            repository.addMeasurement(
+                memberId = memberId,
+                height = height,
+                weight = weight,
+                shoulder = shoulder,
+                chest = chest,
+                waist = waist,
+                hips = hips,
+                leg = leg,
+                arm = arm,
+                notes = notes,
+            )
         }
     }
 

@@ -1,36 +1,62 @@
 package com.gymapp.data.local.entity
 
-import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.gymapp.domain.AppointmentState
+import com.gymapp.domain.TrainingType
 
-@Entity(tableName = "appointments")
+/**
+ * Antrenman randevusu.
+ *
+ * `orders` ve `measurements` ile aynı hedef biçim.
+ *
+ * İki ek iyileştirme:
+ *  - `status`/`trainingType` serbest metin yerine **enum** oldu; ekranda gösterilen
+ *    Türkçe etiketler artık veritabanına sızmıyor.
+ *  - `isProcessed` bayrağı [settledAtMs] ile değiştirildi: "işlendi mi" sorusunun
+ *    yanıtı **ne zaman işlendiği** bilgisini de taşıyor ve niyeti daha açık.
+ *
+ * [sessionValueMinor] hakediş matrahını **randevu oluşturulurken** dondurur.
+ * Önceden matrah tamamlama anında üyenin güncel paketinden hesaplanıyordu; üye
+ * arada paketini yenilerse aynı ders için farklı hakediş çıkıyordu.
+ *
+ * `memberId` / `staffId` hâlâ `Long`: o tablolar henüz dönüşmedi.
+ */
+@Entity(
+    tableName = "appointments",
+    indices = [
+        Index(value = ["tenantId", "startTimeMs"]),
+        Index(value = ["tenantId", "staffId", "startTimeMs"]),
+        Index(value = ["tenantId", "memberId"]),
+        Index(value = ["updatedAtMs"]),
+    ]
+)
 data class AppointmentEntity(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
-    
-    @ColumnInfo(name = "member_id")
+    @PrimaryKey
+    val id: String,
+
+    val tenantId: String,
+
     val memberId: Long,
-    
-    @ColumnInfo(name = "staff_id")
-    val staffId: Long, // Hangi personel ile antrenman yapılacak
-    
-    /** "FITNESS" | "FONKSİYONEL" | "REFORMER" */
-    @ColumnInfo(name = "training_type")
-    val trainingType: String = "FITNESS",
-    
-    @ColumnInfo(name = "start_time_ms")
+    val staffId: Long,
+
+    val trainingType: TrainingType = TrainingType.FITNESS,
+
     val startTimeMs: Long,
-    
-    @ColumnInfo(name = "end_time_ms")
     val endTimeMs: Long,
-    
-    @ColumnInfo(name = "status")
-    val status: String = "SCHEDULED", // SCHEDULED, COMPLETED, CANCELLED, POSTPONED
-    
-    @ColumnInfo(name = "is_processed")
-    val isProcessed: Boolean = false, // Finansal hakediş ve ders düşümü yapıldı mı?
-    
-    @ColumnInfo(name = "notes")
-    val notes: String? = null
+
+    val state: AppointmentState = AppointmentState.SCHEDULED,
+
+    /** Hakediş matrahı, randevu anında dondurulur (kuruş). */
+    val sessionValueMinor: Long = 0,
+
+    /** Finansal etki uygulandığı an; `null` ise uygulanmamıştır. */
+    val settledAtMs: Long? = null,
+
+    val notes: String? = null,
+
+    val createdAtMs: Long,
+    val updatedAtMs: Long,
+    val deletedAtMs: Long? = null,
 )

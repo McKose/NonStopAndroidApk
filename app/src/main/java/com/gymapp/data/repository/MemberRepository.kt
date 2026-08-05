@@ -4,6 +4,7 @@ import com.gymapp.data.local.dao.MemberDao
 import com.gymapp.data.local.entity.*
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.Ids
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Pricing
 import kotlinx.coroutines.flow.Flow
@@ -263,13 +264,46 @@ class MemberRepository @Inject constructor(
     // ─── Ölçümler (Measurements) ──────────────────────────────────────────────
 
     fun getMeasurementsForMember(memberId: Long): Flow<List<MeasurementEntity>> =
-        measurementDao.getMeasurementsForMember(memberId)
+        measurementDao.observeForMember(Ids.DEFAULT_TENANT, memberId)
 
-    suspend fun addMeasurement(measurement: MeasurementEntity) =
-        measurementDao.insertMeasurement(measurement)
+    /** Kimlik ve zaman damgaları burada üretilir; çağıran katmanın bilmesi gerekmez. */
+    suspend fun addMeasurement(
+        memberId: Long,
+        height: Double,
+        weight: Double,
+        shoulder: Double,
+        chest: Double,
+        waist: Double,
+        hips: Double,
+        leg: Double,
+        arm: Double,
+        notes: String,
+    ): Result<Unit> = runCatching {
+        val nowMs = System.currentTimeMillis()
+        measurementDao.insert(
+            MeasurementEntity(
+                id = Ids.new(),
+                tenantId = Ids.DEFAULT_TENANT,
+                memberId = memberId,
+                dateMs = nowMs,
+                height = height,
+                weight = weight,
+                shoulder = shoulder,
+                chest = chest,
+                waist = waist,
+                hips = hips,
+                leg = leg,
+                arm = arm,
+                notes = notes.trim(),
+                createdAtMs = nowMs,
+                updatedAtMs = nowMs,
+            )
+        )
+    }
 
-    suspend fun deleteMeasurement(measurement: MeasurementEntity) =
-        measurementDao.deleteMeasurement(measurement)
+    /** Fiziksel silmez; tombstone işaretler ki silme de senkronize olabilsin. */
+    suspend fun deleteMeasurement(measurementId: String) =
+        measurementDao.softDelete(measurementId)
 
     suspend fun updateMemberInfo(member: MemberEntity) =
         memberDao.updateMember(member)
