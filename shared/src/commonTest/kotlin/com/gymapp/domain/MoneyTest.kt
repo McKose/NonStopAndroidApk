@@ -1,8 +1,8 @@
 package com.gymapp.domain
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.test.Test
 
 class MoneyTest {
 
@@ -74,6 +74,23 @@ class MoneyTest {
     @Test
     fun `sifir oran sifir hakedis uretir`() {
         assertEquals(Money.ZERO, Money.ofMajor(250.0).applyRate(Rate.ZERO))
+    }
+
+    @Test
+    fun `sifir matrah hakedis uretmez`() {
+        assertEquals(Money.ZERO, Money.ZERO.applyRate(Rate.ofPercent(40.0)))
+    }
+
+    /**
+     * Regresyon bağlamı: oran bir dönem `Double` kesir (0.40) olarak saklanıyor,
+     * personel ekranı ise **yüzde** (40) alıyordu. İki birimin karışması hakedişi
+     * 100 kat yanlış hesaplıyordu. Birim artık [Rate]'in kendisinde kodlu ve tam
+     * bölünmeyen oranlarda da tek bir yuvarlama noktasından geçiyor.
+     */
+    @Test
+    fun `kusuratli oran kurusa yuvarlanir`() {
+        // 100,00 * %33,33 = 33,33 TL
+        assertEquals(Money(3_333), Money.ofMajor(100.0).applyRate(Rate.ofPercent(33.33)))
     }
 
     // ─── Rate birimi ────────────────────────────────────────────────────────

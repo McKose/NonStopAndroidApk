@@ -1,16 +1,16 @@
 package com.gymapp.domain
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
-import org.junit.Test
-import java.util.concurrent.TimeUnit
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.test.Test
 
 class MembershipTest {
 
     private val now = 1_700_000_000_000L
-    private val tomorrow = now + TimeUnit.DAYS.toMillis(1)
-    private val yesterday = now - TimeUnit.DAYS.toMillis(1)
+    private val oneDayMs = 24L * 60 * 60 * 1000
+    private val tomorrow = now + oneDayMs
+    private val yesterday = now - oneDayMs
 
     @Test
     fun `bitis tarihi gelecekte olan uye aktiftir`() {

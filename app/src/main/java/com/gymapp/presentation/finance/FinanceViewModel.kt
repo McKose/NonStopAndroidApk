@@ -72,7 +72,7 @@ class FinanceViewModel @Inject constructor(
         val nowMs = System.currentTimeMillis()
 
         /** Son [monthsBack] aylık tahsilat. Üst sınır `nowMs`: ileri tarihli kayıt ciroyu şişiremez. */
-        fun revenue(monthsBack: Long): Money {
+        fun revenue(monthsBack: Int): Money {
             val window = Periods.lastMonths(monthsBack, nowMs)
             return entries
                 .filter { it.isIncome && !it.isPending && !it.isVoided && it.occurredAtMs in window }
@@ -105,10 +105,10 @@ class FinanceViewModel @Inject constructor(
             totalIncome = income,
             totalExpense = expense,
             totalProfit = income - expense,
-            monthlyRevenue = revenue(1L),
-            quarterlyRevenue = revenue(3L),
-            halfYearlyRevenue = revenue(6L),
-            yearlyRevenue = revenue(12L),
+            monthlyRevenue = revenue(1),
+            quarterlyRevenue = revenue(3),
+            halfYearlyRevenue = revenue(6),
+            yearlyRevenue = revenue(12),
             selectedMonth = month,
             selectedYear = year,
             selectedFilter = filter,

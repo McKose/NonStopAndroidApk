@@ -1,7 +1,7 @@
 [versions]
 agp             = "8.13.2"
-kotlin          = "2.0.21"
-ksp             = "2.0.21-1.0.28"
+kotlin          = "2.2.21"
+ksp             = "2.2.21-2.0.5"
 coreKtx         = "1.16.0"
 junit           = "4.13.2"
 junitVersion    = "1.2.1"
@@ -15,12 +15,13 @@ navigationCompose = "2.9.0"
 room            = "2.7.1"
 
 # Hilt
-hilt            = "2.51.1"
-hiltWork        = "1.2.0"
+# Tavanı AGP belirliyor: Hilt 2.59.2+ AGP 9.0 istiyor, elimizde 8.13.2 var.
+# 2.58, AGP 8.4+ ile uyumlu olan en yeni sürüm.
+hilt            = "2.58"
 hiltNavCompose  = "1.2.0"
 
-# WorkManager
-workManager     = "2.10.1"
+# Kotlin Multiplatform
+kotlinxDatetime = "0.6.1"
 
 [libraries]
 # AndroidX Core
@@ -51,11 +52,9 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 hilt-android          = { group = "com.google.dagger", name = "hilt-android",          version.ref = "hilt" }
 hilt-android-compiler = { group = "com.google.dagger", name = "hilt-android-compiler",  version.ref = "hilt" }
 hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavCompose" }
-hilt-work             = { group = "androidx.hilt",      name = "hilt-work",             version.ref = "hiltWork" }
-hilt-compiler         = { group = "androidx.hilt",      name = "hilt-compiler",         version.ref = "hiltWork" }
 
-# WorkManager
-androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
+# Kotlin Multiplatform — ortak (commonMain) bağımlılıklar
+kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinxDatetime" }
 
 # Test
 junit                    = { group = "junit",               name = "junit",          version.ref = "junit" }
@@ -64,6 +63,8 @@ androidx-espresso-core   = { group = "androidx.test.espresso", name = "espresso-
 
 [plugins]
 android-application = { id = "com.android.application",            version.ref = "agp" }
+android-library     = { id = "com.android.library",                version.ref = "agp" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-android      = { id = "org.jetbrains.kotlin.android",       version.ref = "kotlin" }
 kotlin-compose      = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 hilt-android        = { id = "com.google.dagger.hilt.android",     version.ref = "hilt" }

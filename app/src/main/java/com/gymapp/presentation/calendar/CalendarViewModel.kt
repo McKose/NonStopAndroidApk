@@ -61,7 +61,10 @@ class CalendarViewModel @Inject constructor(
         _selectedDate
     ) { appointments, members, staffList, date ->
         // Yarı açık gün aralığı: gün sınırındaki randevular artık kaybolmuyor.
-        val day = Periods.day(date, zone)
+        //
+        // Domain katmanı ortak koda (KMP) taşındığı için tarihleri **epoch millis**
+        // olarak konuşuyor; `java.time` bu ekranın kendi sınırında kalıyor.
+        val day = Periods.dayOf(date.atStartOfDay(zone).toInstant().toEpochMilli())
         CalendarUiState(
             appointments = appointments.filter { it.startTimeMs in day },
             members = members,

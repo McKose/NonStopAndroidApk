@@ -31,7 +31,12 @@ jobs:
       - name: Gradle kur (cache dahil)
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Birim testleri
+      # Ortak modülün testleri iş kurallarının tamamını kapsıyor; Android'e özgü
+      # kod barındırmadığı için buradaki sonuç iOS için de geçerli.
+      - name: Ortak modül testleri
+        run: ./gradlew --no-daemon :shared:testDebugUnitTest
+
+      - name: Uygulama birim testleri
         run: ./gradlew --no-daemon :app:testDebugUnitTest
 
       - name: Debug APK derle
@@ -44,7 +49,40 @@ jobs:
         with:
           name: test-reports
           path: |
+            shared/build/reports/tests/
+            shared/build/test-results/
             app/build/reports/tests/
             app/build/test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  ios:
+    name: iOS framework derle (Kotlin/Native)
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17 kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle kur (cache dahil)
+        uses: gradle/actions/setup-gradle@v4
+
+      # Kotlin/Native derlemesi yalnızca macOS'ta yapılabiliyor. Bu iş olmadan
+      # "iOS'ta çalışıyor" iddiası doğrulanmamış kalırdı: ortak kodun gerçekten
+      # Apple hedefine derlendiğini kanıtlayan tek yer burası.
+      - name: Simülatör framework'ü (arm64)
+        run: ./gradlew --no-daemon :shared:linkDebugFrameworkIosSimulatorArm64
+
+      - name: Cihaz framework'ü (arm64)
+        run: ./gradlew --no-daemon :shared:linkDebugFrameworkIosArm64
+
+      # Aynı testler Kotlin/Native üzerinde de koşuyor: JVM'de geçip Native'de
+      # patlayan bir davranış farkı (yuvarlama, tarih, metin) burada yakalanır.
+      - name: Ortak modül testleri (Kotlin/Native)
+        run: ./gradlew --no-daemon :shared:iosSimulatorArm64Test

@@ -1,6 +1,12 @@
 package com.gymapp.domain
 
+// `kotlin.jvm.*` yalnızca JVM hedeflerinde varsayılan import; ortak kodda
+// açıkça alınması gerekiyor. Android tarafında sessizce çalışıyordu, hatayı
+// Kotlin/Native derlemesi yakaladı.
+import kotlin.jvm.JvmInline
 import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /**
  * Parasal tutar — **kuruş** (minor unit) cinsinden tam sayı.
@@ -61,7 +67,7 @@ value class Money(val minor: Long) : Comparable<Money> {
 
         /** TL cinsinden değeri kuruşa çevirir (yarıyı yukarı yuvarlar). */
         fun ofMajor(amount: Double): Money =
-            if (!amount.isFinite()) ZERO else Money(Math.round(amount * 100))
+            if (!amount.isFinite()) ZERO else Money((amount * 100).roundToLong())
 
         /** Kullanıcı girdisini ("1.234,56" / "1234.56") güvenle ayrıştırır. */
         fun parseOrNull(input: String): Money? {
@@ -120,7 +126,7 @@ value class Rate(val basisPoints: Int) : Comparable<Rate> {
         /** Kullanıcının girdiği yüzdeyi (0..100) baz puana çevirir. */
         fun ofPercent(percent: Double): Rate {
             if (!percent.isFinite()) return ZERO
-            return Rate(Math.round(percent.coerceIn(0.0, 100.0) * 100).toInt())
+            return Rate((percent.coerceIn(0.0, 100.0) * 100).roundToInt())
         }
 
         fun ofPercentOrZero(percent: Double?): Rate =
