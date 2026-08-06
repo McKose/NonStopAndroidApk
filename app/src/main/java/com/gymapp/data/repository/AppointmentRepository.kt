@@ -7,6 +7,7 @@ import com.gymapp.data.local.dao.StaffDao
 import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
+import com.gymapp.domain.Now
 import com.gymapp.domain.AppointmentState
 import com.gymapp.domain.Ids
 import com.gymapp.domain.LedgerCategory
@@ -60,7 +61,7 @@ class AppointmentRepository @Inject constructor(
         require(endTimeMs > startTimeMs) { "Randevu bitişi başlangıcından sonra olmalıdır." }
 
         database.withTransaction {
-            val nowMs = System.currentTimeMillis()
+            val nowMs = Now.epochMillis()
 
             val member = memberDao.getMemberById(memberId)
                 ?: throw IllegalArgumentException("Üye bulunamadı.")
@@ -128,7 +129,7 @@ class AppointmentRepository @Inject constructor(
 
             val shouldSettle = state == AppointmentState.COMPLETED
             val isSettled = appointment.settledAtMs != null
-            val nowMs = System.currentTimeMillis()
+            val nowMs = Now.epochMillis()
 
             if (shouldSettle && !isSettled) {
                 val member = memberDao.getMemberById(appointment.memberId)

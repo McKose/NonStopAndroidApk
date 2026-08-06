@@ -30,6 +30,18 @@ data class MillisRange(val startInclusive: Long, val endExclusive: Long) {
  */
 object Periods {
 
+    /** Bir günün milisaniye karşılığı. */
+    private const val DAY_MS: Long = 24L * 60 * 60 * 1000
+
+    /**
+     * Gün sayısını milisaniyeye çevirir.
+     *
+     * `java.util.concurrent.TimeUnit` JVM'e özgü olduğu için ortak kodda kullanılamaz.
+     * Not: sabit gün uzunluğu kullanılır — üyelik süresi takvim değil **süre** olarak
+     * tanımlı, dolayısıyla yaz saati geçişleri süreyi kısaltıp uzatmaz.
+     */
+    fun daysInMillis(days: Int): Long = days * DAY_MS
+
     /** Verilen anın içinde bulunduğu gün. */
     fun dayOf(
         epochMillis: Long,

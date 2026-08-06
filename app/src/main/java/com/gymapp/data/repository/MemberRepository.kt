@@ -2,9 +2,12 @@ package com.gymapp.data.repository
 
 import com.gymapp.data.local.dao.MeasurementDao
 import com.gymapp.data.local.dao.MemberDao
+import com.gymapp.data.local.db.isUniqueConstraintViolation
 import com.gymapp.data.local.entity.MeasurementEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.PackageEntity
+import com.gymapp.domain.Now
+import com.gymapp.domain.Periods
 import com.gymapp.domain.Ids
 import com.gymapp.domain.MemberManualStatus
 import com.gymapp.domain.Money
@@ -12,7 +15,6 @@ import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Pricing
 import kotlinx.coroutines.flow.Flow
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -66,8 +68,8 @@ class MemberRepository @Inject constructor(
             throw IllegalArgumentException("Bu telefon numarası zaten kayıtlı.")
         }
 
-        val nowMs = System.currentTimeMillis()
-        val endDateMs = nowMs + TimeUnit.DAYS.toMillis(pkg.validityDays.toLong())
+        val nowMs = Now.epochMillis()
+        val endDateMs = nowMs + Periods.daysInMillis(pkg.validityDays)
 
         val basePrice = Money(pkg.basePriceMinor)
         val safeInstallment = Pricing.normalizeInstallment(paymentType, installmentCount)
@@ -113,8 +115,11 @@ class MemberRepository @Inject constructor(
             // ham SQLite hatası yerine anlaşılır mesaj döndür.
             try {
                 memberDao.insertMember(member)
-            } catch (e: android.database.sqlite.SQLiteConstraintException) {
-                throw IllegalArgumentException("Bu telefon numarası zaten kayıtlı.", e)
+            } catch (e: Exception) {
+                if (e.isUniqueConstraintViolation()) {
+                    throw IllegalArgumentException("Bu telefon numarası zaten kayıtlı.", e)
+                }
+                throw e
             }
         }
 
@@ -144,12 +149,12 @@ class MemberRepository @Inject constructor(
         val member = memberDao.getMemberById(memberId)
             ?: throw IllegalArgumentException("Üye bulunamadı.")
 
-        val nowMs = System.currentTimeMillis()
+        val nowMs = Now.epochMillis()
 
         // Üyelik henüz bitmediyse yeni süre mevcut bitiş tarihinden başlar; aksi hâlde bugünden.
         val currentEndDate = member.endDateMs ?: nowMs
         val baseDate = if (currentEndDate > nowMs) currentEndDate else nowMs
-        val endDateMs = baseDate + TimeUnit.DAYS.toMillis(selectedPackage.validityDays.toLong())
+        val endDateMs = baseDate + Periods.daysInMillis(selectedPackage.validityDays)
 
         val basePrice = Money(selectedPackage.basePriceMinor)
         val safeInstallment = Pricing.normalizeInstallment(paymentType, installmentCount)
@@ -241,7 +246,7 @@ class MemberRepository @Inject constructor(
     suspend fun updatePaymentStatus(memberId: String, isPaid: Boolean): Result<Unit> = runCatching {
         val member = memberDao.getMemberById(memberId)
             ?: throw IllegalArgumentException("Üye bulunamadı.")
-        val nowMs = System.currentTimeMillis()
+        val nowMs = Now.epochMillis()
 
         if (isPaid) {
             // Kalan borç kadar tahsilat yaz; borç yoksa yapılacak bir şey yok.
@@ -288,10 +293,10 @@ class MemberRepository @Inject constructor(
 
     /** Tombstone siler; üyeye bağlı randevu, ölçüm ve defter kayıtları öksüz kalmaz. */
     suspend fun deleteMember(id: String) =
-        memberDao.softDeleteMember(id, System.currentTimeMillis())
+        memberDao.softDeleteMember(id, Now.epochMillis())
 
     suspend fun updateMemberInfo(member: MemberEntity) =
-        memberDao.updateMember(member.copy(updatedAtMs = System.currentTimeMillis()))
+        memberDao.updateMember(member.copy(updatedAtMs = Now.epochMillis()))
 
     // ─── Ölçümler ─────────────────────────────────────────────────────────────
 
@@ -311,7 +316,7 @@ class MemberRepository @Inject constructor(
         arm: Double,
         notes: String,
     ): Result<Unit> = runCatching {
-        val nowMs = System.currentTimeMillis()
+        val nowMs = Now.epochMillis()
         measurementDao.insert(
             MeasurementEntity(
                 id = Ids.new(),
@@ -335,5 +340,5 @@ class MemberRepository @Inject constructor(
 
     /** Fiziksel silmez; tombstone işaretler ki silme de senkronize olabilsin. */
     suspend fun deleteMeasurement(measurementId: String) =
-        measurementDao.softDelete(measurementId, System.currentTimeMillis())
+        measurementDao.softDelete(measurementId, Now.epochMillis())
 }

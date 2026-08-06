@@ -8,6 +8,7 @@ import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.entity.OrderEntity
 import com.gymapp.data.local.entity.ProductEntity
 import com.gymapp.data.local.entity.StockMovementEntity
+import com.gymapp.domain.Now
 import com.gymapp.domain.DeliveryStatus
 import com.gymapp.domain.Ids
 import com.gymapp.domain.LedgerCategory
@@ -59,7 +60,7 @@ class ProductRepository @Inject constructor(
         require(name.isNotBlank()) { "Ürün adı boş olamaz." }
 
         database.withTransaction {
-            val nowMs = System.currentTimeMillis()
+            val nowMs = Now.epochMillis()
             val id = productId ?: Ids.new()
 
             val existing = productId?.let { productDao.getById(it) }
@@ -110,7 +111,7 @@ class ProductRepository @Inject constructor(
 
     /** Ürünü tombstone ile siler; geçmiş hareketler ve satışlar öksüz kalmaz. */
     suspend fun deleteProduct(productId: String) =
-        productDao.softDelete(productId, System.currentTimeMillis())
+        productDao.softDelete(productId, Now.epochMillis())
 
     /**
      * Siparişi tek transaction içinde işler.
@@ -155,7 +156,7 @@ class ProductRepository @Inject constructor(
             val finalPrice = total - safeDiscount
 
             // 2) Sipariş
-            val nowMs = System.currentTimeMillis()
+            val nowMs = Now.epochMillis()
             val orderId = Ids.new()
             orderDao.insert(
                 OrderEntity(

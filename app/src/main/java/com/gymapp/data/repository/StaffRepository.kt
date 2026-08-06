@@ -1,7 +1,9 @@
 package com.gymapp.data.repository
 
 import com.gymapp.data.local.dao.StaffDao
+import com.gymapp.data.local.db.isUniqueConstraintViolation
 import com.gymapp.data.local.entity.StaffEntity
+import com.gymapp.domain.Now
 import com.gymapp.domain.Ids
 import com.gymapp.domain.Money
 import com.gymapp.domain.StaffRole
@@ -70,7 +72,7 @@ class StaffRepository @Inject constructor(
             )
         }
 
-        val nowMs = System.currentTimeMillis()
+        val nowMs = Now.epochMillis()
         val existing = staffId?.let { staffDao.getStaffById(it) }
 
         try {
@@ -114,13 +116,16 @@ class StaffRepository @Inject constructor(
                 )
                 existing.id
             }
-        } catch (e: android.database.sqlite.SQLiteConstraintException) {
-            throw IllegalArgumentException("Bu kullanıcı adı zaten alınmış.", e)
+        } catch (e: Exception) {
+            if (e.isUniqueConstraintViolation()) {
+                throw IllegalArgumentException("Bu kullanıcı adı zaten alınmış.", e)
+            }
+            throw e
         }
     }
 
     suspend fun deleteStaff(staffId: String) =
-        staffDao.softDelete(staffId, System.currentTimeMillis())
+        staffDao.softDelete(staffId, Now.epochMillis())
 
     private companion object {
         const val DEFAULT_PASSWORD = "123"

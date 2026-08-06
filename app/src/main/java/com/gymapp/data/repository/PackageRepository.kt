@@ -2,6 +2,7 @@ package com.gymapp.data.repository
 
 import com.gymapp.data.local.dao.PackageDao
 import com.gymapp.data.local.entity.PackageEntity
+import com.gymapp.domain.Now
 import com.gymapp.domain.Ids
 import com.gymapp.domain.Money
 import com.gymapp.domain.PackageCategory
@@ -41,7 +42,7 @@ class PackageRepository @Inject constructor(
         require(validityDays > 0) { "Geçerlilik süresi en az 1 gün olmalıdır." }
         require(sessionCount == null || sessionCount > 0) { "Seans sayısı sıfırdan büyük olmalıdır." }
 
-        val nowMs = System.currentTimeMillis()
+        val nowMs = Now.epochMillis()
         val existing = packageId?.let { packageDao.getPackageById(it) }
 
         if (existing == null) {
@@ -79,5 +80,5 @@ class PackageRepository @Inject constructor(
 
     /** Tombstone siler; pakete bağlı üyelerin geçmişi öksüz kalmaz. */
     suspend fun deletePackage(packageId: String) =
-        packageDao.softDelete(packageId, System.currentTimeMillis())
+        packageDao.softDelete(packageId, Now.epochMillis())
 }
