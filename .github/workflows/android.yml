@@ -72,7 +72,12 @@ jobs:
     name: iOS framework derle (Kotlin/Native)
     runs-on: macos-latest
     timeout-minutes: 30
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # Yalnızca PR taslaktan çıkarıldığında ya da elle. master'a merge'de tekrar
+    # koşmuyor: squash sonrası master'ın içeriği doğrulanan PR ağacıyla birebir
+    # aynı, aynı doğrulamayı 10x ücretle ikinci kez yapmanın karşılığı yok.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
 
     steps:
       - uses: actions/checkout@v4
@@ -95,7 +100,6 @@ jobs:
       # Gerçek cihaz hedefi yalnızca master'da: simülatör derlemesi Kotlin/Native
       # ön ucunun geçtiğini zaten kanıtlıyor, bu adım son bir güvence.
       - name: Cihaz framework'ü (arm64)
-        if: github.event_name == 'push'
         run: ./gradlew --no-daemon :shared:linkDebugFrameworkIosArm64
 
       # Aynı testler Kotlin/Native üzerinde de koşuyor: JVM'de geçip Native'de
