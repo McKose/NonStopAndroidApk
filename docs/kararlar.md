@@ -44,6 +44,40 @@ kaybolur) ya da tersi olabilirdi (var olmayan değişiklik gönderilmeye çalı�
 çağırıyor (üye → defter, sipariş → defter, randevu → defter); iç çağrılar kendi
 transaction'ını açmaz.
 
+## Kimlik doğrulama: Supabase Auth, her personele ayrı hesap
+
+**Karar:** Kimlik doğrulama Supabase Auth'a ait; her personelin kendi e-posta +
+şifre hesabı var. Uygulamaya gömülen `anon` anahtarı tek başına hiçbir veriye
+erişemez.
+
+**Reddedilen alternatif:** Uygulamaya tek bir servis anahtarı gömmek. APK bir zip
+dosyasıdır; anahtarı çıkarmak dakikalar sürer ve özel bir beceri gerektirmez. O
+anahtarı ele geçiren kişi bütün salonların bütün verisine erişirdi. Ayrıca
+"kullanıcı yalnızca kendi salonunu görsün" kuralını yazacak bir yer kalmazdı:
+sunucu açısından tüm istekler aynı kimlikten gelirdi.
+
+**Neden kişi başına hesap, ortak hesap değil:** Salonda hakediş ve tahsilat kaydı
+tutuluyor. Kimin hangi kaydı girdiğinin ayırt edilebilmesi, para söz konusu
+olduğunda ihtiyari bir ayrıntı değil.
+
+**Sonucu:** Uygulamadaki yerel `staff.password` (varsayılanı `"123"` olan, düz
+metin saklanan alan) ortadan kalkıyor. Sunucudaki `staff` tablosunda şifre kolonu
+bilinçli olarak yok.
+
+## Salon (kiracı) modeli
+
+**Karar:** Bugün tek salon, ama şema baştan çok salonlu. Her satırda `tenant_id`
+var ve `gyms.id`'yi gösteriyor.
+
+**Neden şimdi:** İkinci salon eklendiğinde şema değişikliği ve veri taşıma
+gerekmiyor — bugün `gyms` tablosunda bir satır var, yarın on satır. Sonradan
+eklemek, canlı veriyle taşıma yapmak demekti.
+
+**Erişim kuralı:** "Kullanıcı yalnızca bağlı olduğu salonun satırlarına erişir."
+Kuralın `with check` yarısı en az `using` kadar önemli ve unutulması kolay:
+olmasaydı istemci başka salonun `tenant_id`'siyle satır yazabilirdi — okuyamayacağı
+ama bozabileceği veriye. Bu, CI'da her koşuda sınanıyor.
+
 ## Senkronizasyon: geçici ve kalıcı hata ayrımı
 
 **Karar:** Gönderim sonucu üç durumlu — başarı, geçici hata, kalıcı hata.

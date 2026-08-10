@@ -106,6 +106,37 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  # Sunucu şeması ve erişim kuralları. Ubuntu koşucusu, 1x ücret.
+  #
+  # Salon yalıtımı yalnızca satır bazlı güvenlik kurallarına dayanıyor ve yanlış
+  # yazılmış bir kural sessizdir: uygulama çalışır, testler geçer, veri sızar.
+  # Bu yüzden kuralın kendisi her koşuda gerçek bir PostgreSQL üzerinde sınanıyor.
+  supabase:
+    name: Sunucu şeması ve erişim kuralları
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Şemayı uygula ve salon yalıtımını sına
+        env:
+          PGURL: postgres://postgres:postgres@localhost:5432/postgres
+        run: ./supabase/tests/run.sh
+
   # macOS koşucuları dakika kotasından **10 kat** düşer. Bir dilim boyunca
   # genellikle birkaç tur Android tarafındaki hataları düzeltmekle geçiyor ve o
   # turların iOS'la ilgisi olmuyor. Bu yüzden macOS işi yalnızca:
