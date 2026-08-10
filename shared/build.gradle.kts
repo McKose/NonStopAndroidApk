@@ -24,6 +24,21 @@ kotlin {
         }
     }
 
+    /**
+     * Masaüstü JVM hedefi — **uygulama için değil, veritabanı testleri için**.
+     *
+     * Room sorgularının ve transaction davranışının doğruluğu ancak gerçek bir
+     * SQLite üzerinde koşarak doğrulanabiliyor. Bunu Android birim testlerinde
+     * yapmak mümkün değil: `sqlite-bundled`'ın Android sürümü yerel kütüphaneleri
+     * APK içinde taşıyor ve masaüstü JVM'de yüklenemiyor. iOS simülatöründe
+     * koşmak ise mümkün ama macOS koşucusu gerektirir ve dakika kotasından 10 kat
+     * düşer — her dilimde koşacak testler için kabul edilemez.
+     *
+     * JVM hedefinde `sqlite-bundled` kendi yerel kütüphanesiyle geliyor,
+     * dolayısıyla testler Linux koşucusunda 1x ücretle koşuyor.
+     */
+    jvm()
+
     // Kotlin/Native hedefleri: gerçek cihaz (arm64) ve simülatör (Apple Silicon + Intel).
     listOf(
         iosArm64(),
@@ -38,6 +53,20 @@ kotlin {
     }
 
     sourceSets {
+        /**
+         * Android ve JVM'in ortak kaynak kümesi.
+         *
+         * Tek sakini `randomUuid` karşılığı: iki hedef de `java.util.UUID`
+         * kullanıyor. Ayrı dosyalarda dursaydı aynı satır iki yerde durur ve biri
+         * değişince diğeri sessizce geride kalırdı. Varsayılan hiyerarşi şablonu
+         * android+jvm için böyle bir ara küme üretmiyor, elle kuruluyor.
+         */
+        val jvmSharedMain by creating {
+            dependsOn(commonMain.get())
+        }
+        androidMain.get().dependsOn(jvmSharedMain)
+        jvmMain.get().dependsOn(jvmSharedMain)
+
         commonMain.dependencies {
             implementation(libs.kotlinx.datetime)
             api(libs.koin.core)
@@ -53,6 +82,14 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
+
+        // Veritabanı testleri yalnızca JVM'de: gerçek SQLite gerektiriyorlar ve
+        // ortak kaynak kümesine konsalardı iOS testlerinde de koşup macOS
+        // koşucusunu 10x ücretle meşgul ederlerdi.
+        jvmTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+        }
     }
 }
 
@@ -66,6 +103,7 @@ room {
  */
 dependencies {
     add("kspAndroid", libs.androidx.room.compiler)
+    add("kspJvm", libs.androidx.room.compiler)
     add("kspIosArm64", libs.androidx.room.compiler)
     add("kspIosSimulatorArm64", libs.androidx.room.compiler)
     add("kspIosX64", libs.androidx.room.compiler)

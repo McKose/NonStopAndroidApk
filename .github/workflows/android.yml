@@ -50,6 +50,12 @@ jobs:
       - name: Ortak modül testleri
         run: ./gradlew --no-daemon :shared:testDebugUnitTest
 
+      # Veritabanı testleri JVM hedefinde: gerçek SQLite üzerinde koşuyorlar.
+      # Android birim testlerinde koşamazlar (gömülü sürücünün Android sürümü
+      # masaüstü JVM'de yüklenemiyor), iOS'ta koşsalar 10x ücretli olurlardı.
+      - name: Veritabanı testleri (JVM)
+        run: ./gradlew --no-daemon :shared:jvmTest
+
       - name: Uygulama birim testleri
         run: ./gradlew --no-daemon :app:testDebugUnitTest
 
