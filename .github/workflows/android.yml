@@ -94,6 +94,18 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      # Room'un ürettiği şema anlık görüntüleri. Depoda tutulmadıkları sürece
+      # migration testi yazmak mümkün değil: MigrationTestHelper eski sürümün
+      # veritabanını bu JSON'lardan kuruyor. Şu an hiçbiri işlenmiş değil.
+      - name: Şema anlık görüntülerini yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-schemas
+          path: shared/schemas/
+          retention-days: 7
+          if-no-files-found: warn
+
   # macOS koşucuları dakika kotasından **10 kat** düşer. Bir dilim boyunca
   # genellikle birkaç tur Android tarafındaki hataları düzeltmekle geçiyor ve o
   # turların iOS'la ilgisi olmuyor. Bu yüzden macOS işi yalnızca:
