@@ -1,7 +1,11 @@
 package com.gymapp.data.repository
 
 import com.gymapp.data.local.dao.PackageDao
+import com.gymapp.data.local.db.GymDatabase
+import com.gymapp.data.local.db.inTransaction
 import com.gymapp.data.local.entity.PackageEntity
+import com.gymapp.data.sync.SyncQueue
+import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.Now
 import com.gymapp.domain.Ids
 import com.gymapp.domain.Money
@@ -10,7 +14,9 @@ import com.gymapp.domain.TrainingType
 import kotlinx.coroutines.flow.Flow
 
 class PackageRepository(
-    private val packageDao: PackageDao
+    private val database: GymDatabase,
+    private val packageDao: PackageDao,
+    private val syncQueue: SyncQueue,
 ) {
     private val tenantId = Ids.DEFAULT_TENANT
 
@@ -39,43 +45,58 @@ class PackageRepository(
         require(validityDays > 0) { "Geçerlilik süresi en az 1 gün olmalıdır." }
         require(sessionCount == null || sessionCount > 0) { "Seans sayısı sıfırdan büyük olmalıdır." }
 
-        val nowMs = Now.epochMillis()
-        val existing = packageId?.let { packageDao.getPackageById(it) }
+        database.inTransaction {
+            val nowMs = Now.epochMillis()
+            val existing = packageId?.let { packageDao.getPackageById(it) }
 
-        if (existing == null) {
-            val id = packageId ?: Ids.new()
-            packageDao.insertPackage(
-                PackageEntity(
-                    id = id,
-                    tenantId = tenantId,
-                    name = name.trim(),
-                    type = type,
-                    category = category,
-                    validityDays = validityDays,
-                    sessionCount = sessionCount,
-                    basePriceMinor = basePrice.coerceNonNegative().minor,
-                    createdAtMs = nowMs,
-                    updatedAtMs = nowMs,
+            val savedId = if (existing == null) {
+                val id = packageId ?: Ids.new()
+                packageDao.insertPackage(
+                    PackageEntity(
+                        id = id,
+                        tenantId = tenantId,
+                        name = name.trim(),
+                        type = type,
+                        category = category,
+                        validityDays = validityDays,
+                        sessionCount = sessionCount,
+                        basePriceMinor = basePrice.coerceNonNegative().minor,
+                        createdAtMs = nowMs,
+                        updatedAtMs = nowMs,
+                    )
                 )
-            )
-            id
-        } else {
-            packageDao.updatePackage(
-                existing.copy(
-                    name = name.trim(),
-                    type = type,
-                    category = category,
-                    validityDays = validityDays,
-                    sessionCount = sessionCount,
-                    basePriceMinor = basePrice.coerceNonNegative().minor,
-                    updatedAtMs = nowMs,
+                id
+            } else {
+                packageDao.updatePackage(
+                    existing.copy(
+                        name = name.trim(),
+                        type = type,
+                        category = category,
+                        validityDays = validityDays,
+                        sessionCount = sessionCount,
+                        basePriceMinor = basePrice.coerceNonNegative().minor,
+                        updatedAtMs = nowMs,
+                    )
                 )
-            )
-            existing.id
+                existing.id
+            }
+
+            syncQueue.enqueue(SyncTable.PACKAGES, savedId, tenantId, nowMs)
+            savedId
         }
     }
 
-    /** Tombstone siler; pakete bağlı üyelerin geçmişi öksüz kalmaz. */
-    suspend fun deletePackage(packageId: String) =
-        packageDao.softDelete(packageId, Now.epochMillis())
+    /**
+     * Tombstone siler; pakete bağlı üyelerin geçmişi öksüz kalmaz.
+     *
+     * Silme de bir değişiklik: tombstone satır kuyruğa girmezse silme sunucuya
+     * hiç gitmez ve kayıt diğer cihazlarda yaşamaya devam eder.
+     */
+    suspend fun deletePackage(packageId: String) {
+        val nowMs = Now.epochMillis()
+        database.inTransaction {
+            packageDao.softDelete(packageId, nowMs)
+            syncQueue.enqueue(SyncTable.PACKAGES, packageId, tenantId, nowMs)
+        }
+    }
 }

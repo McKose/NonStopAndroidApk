@@ -1,6 +1,8 @@
 package com.gymapp.data.repository
 
 import com.gymapp.data.local.dao.LedgerDao
+import com.gymapp.data.local.db.GymDatabase
+import com.gymapp.data.local.db.inTransaction
 import com.gymapp.data.local.entity.LedgerEntryEntity
 import com.gymapp.domain.Ids
 import com.gymapp.domain.LedgerCategory
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
  * yazıcılar deftere taşındığı için o kaynak ve tablo kaldırıldı.
  */
 class FinanceRepository(
+    private val database: GymDatabase,
     private val ledgerDao: LedgerDao,
     private val ledgerRepository: LedgerRepository,
 ) {
@@ -28,6 +31,10 @@ class FinanceRepository(
 
     // ─── Yazma: yalnızca defter ─────────────────────────────────────────────
 
+    // Defter yazmaları artık gönderim kuyruğuna da kayıt bırakıyor; ikisi tek
+    // transaction içinde olmalı. LedgerRepository transaction açmadığı için
+    // (hep başkasının içinden çağrılıyor) doğrudan çağıran yer olarak burası açıyor.
+
     /** Gider kaydı (kira, fatura, maaş, alım). */
     suspend fun addExpense(
         amount: Money,
@@ -35,13 +42,17 @@ class FinanceRepository(
         description: String,
         method: PaymentMethod,
         occurredAtMs: Long,
-    ): Result<String> = ledgerRepository.recordExpense(
-        amount = amount,
-        category = category,
-        description = description,
-        method = method,
-        occurredAtMs = occurredAtMs,
-    )
+    ): Result<String> = runCatching {
+        database.inTransaction {
+            ledgerRepository.recordExpense(
+                amount = amount,
+                category = category,
+                description = description,
+                method = method,
+                occurredAtMs = occurredAtMs,
+            ).getOrThrow()
+        }
+    }
 
     /** Elle girilen tahsilat kaydı. */
     suspend fun addIncome(
@@ -50,15 +61,22 @@ class FinanceRepository(
         description: String,
         method: PaymentMethod,
         occurredAtMs: Long,
-    ): Result<String> = ledgerRepository.recordPayment(
-        amount = amount,
-        method = method,
-        description = description,
-        category = category,
-        occurredAtMs = occurredAtMs,
-    )
+    ): Result<String> = runCatching {
+        database.inTransaction {
+            ledgerRepository.recordPayment(
+                amount = amount,
+                method = method,
+                description = description,
+                category = category,
+                occurredAtMs = occurredAtMs,
+            ).getOrThrow()
+        }
+    }
 
     /** Hatalı kaydı ters kayıtla iptal eder (kayıt silinmez). */
-    suspend fun voidEntry(entryId: String, reason: String): Result<String?> =
-        ledgerRepository.reverse(entryId, reason)
+    suspend fun voidEntry(entryId: String, reason: String): Result<String?> = runCatching {
+        database.inTransaction {
+            ledgerRepository.reverse(entryId, reason).getOrThrow()
+        }
+    }
 }

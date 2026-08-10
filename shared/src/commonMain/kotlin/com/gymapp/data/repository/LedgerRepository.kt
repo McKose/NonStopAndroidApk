@@ -2,6 +2,8 @@ package com.gymapp.data.repository
 
 import com.gymapp.data.local.dao.LedgerDao
 import com.gymapp.data.local.entity.LedgerEntryEntity
+import com.gymapp.data.sync.SyncQueue
+import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.Now
 import com.gymapp.domain.Ids
 import com.gymapp.domain.LedgerCategory
@@ -19,9 +21,15 @@ import kotlinx.coroutines.flow.map
  *
  * Defter append-only olduğu için burada **güncelleme ve silme yoktur**;
  * düzeltme [reverse] ile yapılır.
+ *
+ * **Burada transaction açılmaz.** Bu repository'nin yazma metotları neredeyse her
+ * zaman başka bir repository'nin transaction'ı içinden çağrılıyor (üye kaydı,
+ * sipariş, randevu tamamlama). Kural: transaction'ı giriş noktası açar. Doğrudan
+ * çağıran tek yer [FinanceRepository] ve orası kendi transaction'ını açıyor.
  */
 class LedgerRepository(
     private val ledgerDao: LedgerDao,
+    private val syncQueue: SyncQueue,
 ) {
 
     // ─── Yazma ──────────────────────────────────────────────────────────────
@@ -115,6 +123,9 @@ class LedgerRepository(
             createdAtMs = Now.epochMillis(),
         )
         ledgerDao.insert(reversal)
+        syncQueue.enqueue(
+            SyncTable.LEDGER_ENTRIES, reversal.id, reversal.tenantId, reversal.createdAtMs,
+        )
         reversal.id
     }
 
@@ -142,7 +153,15 @@ class LedgerRepository(
                 createdAtMs = Now.epochMillis(),
             )
         }
-        if (reversals.isNotEmpty()) ledgerDao.insertAll(reversals)
+        if (reversals.isNotEmpty()) {
+            ledgerDao.insertAll(reversals)
+            // Her kayıt kendi tenant'ıyla kuyruğa alınıyor. Hepsine ilk kaydın
+            // tenant'ını vermek bugün doğru sonucu üretirdi (tek kiracı var) ama
+            // çok kiracılıya geçişte kayıtları yanlış hesaba yazardı.
+            reversals.forEach {
+                syncQueue.enqueue(SyncTable.LEDGER_ENTRIES, it.id, it.tenantId, it.createdAtMs)
+            }
+        }
         reversals.size
     }
 
@@ -162,7 +181,15 @@ class LedgerRepository(
                 createdAtMs = Now.epochMillis(),
             )
         }
-        if (reversals.isNotEmpty()) ledgerDao.insertAll(reversals)
+        if (reversals.isNotEmpty()) {
+            ledgerDao.insertAll(reversals)
+            // Her kayıt kendi tenant'ıyla kuyruğa alınıyor. Hepsine ilk kaydın
+            // tenant'ını vermek bugün doğru sonucu üretirdi (tek kiracı var) ama
+            // çok kiracılıya geçişte kayıtları yanlış hesaba yazardı.
+            reversals.forEach {
+                syncQueue.enqueue(SyncTable.LEDGER_ENTRIES, it.id, it.tenantId, it.createdAtMs)
+            }
+        }
         reversals.size
     }
 
@@ -253,6 +280,7 @@ class LedgerRepository(
             createdAtMs = Now.epochMillis(),
         )
         ledgerDao.insert(entry)
+        syncQueue.enqueue(SyncTable.LEDGER_ENTRIES, entry.id, tenantId, entry.createdAtMs)
         entry.id
     }
 }

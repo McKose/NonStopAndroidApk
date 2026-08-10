@@ -7,6 +7,8 @@ import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.db.inTransaction
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
+import com.gymapp.data.sync.SyncQueue
+import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.Now
 import com.gymapp.domain.AppointmentState
 import com.gymapp.domain.Ids
@@ -29,6 +31,7 @@ class AppointmentRepository(
     private val memberDao: MemberDao,
     private val staffDao: StaffDao,
     private val ledgerRepository: LedgerRepository,
+    private val syncQueue: SyncQueue,
 ) {
     private val tenantId = Ids.DEFAULT_TENANT
 
@@ -98,6 +101,7 @@ class AppointmentRepository(
                     updatedAtMs = nowMs,
                 )
             )
+            syncQueue.enqueue(SyncTable.APPOINTMENTS, appointmentId, tenantId, nowMs)
             appointmentId
         }
     }
@@ -127,6 +131,10 @@ class AppointmentRepository(
             val shouldSettle = state == AppointmentState.COMPLETED
             val isSettled = appointment.settledAtMs != null
             val nowMs = Now.epochMillis()
+
+            // Seans sayacı yalnızca finansal etkinin uygulandığı/geri alındığı
+            // geçişlerde değişiyor; üye satırı da o zaman kuyruğa alınmalı.
+            val memberChanged = shouldSettle != isSettled
 
             if (shouldSettle && !isSettled) {
                 val member = memberDao.getMemberById(appointment.memberId)
@@ -168,6 +176,11 @@ class AppointmentRepository(
                     updatedAtMs = nowMs,
                 )
             )
+
+            syncQueue.enqueue(SyncTable.APPOINTMENTS, appointmentId, tenantId, nowMs)
+            if (memberChanged) {
+                syncQueue.enqueue(SyncTable.MEMBERS, appointment.memberId, tenantId, nowMs)
+            }
         }
     }
 }
