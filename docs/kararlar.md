@@ -44,6 +44,26 @@ kaybolur) ya da tersi olabilirdi (var olmayan değişiklik gönderilmeye çalı�
 çağırıyor (üye → defter, sipariş → defter, randevu → defter); iç çağrılar kendi
 transaction'ını açmaz.
 
+## Senkronizasyon: geçici ve kalıcı hata ayrımı
+
+**Karar:** Gönderim sonucu üç durumlu — başarı, geçici hata, kalıcı hata.
+
+**Geçici hatada tur durur** (ağ yok, 5xx, zaman aşımı). Sıradaki kayıtlar da
+başarısız olacağı için hepsini denemek deneme sayaçlarını boş yere şişirir ve
+geri çekilme süresini yanlış yere uzatır.
+
+**Kalıcı hatada tur devam eder** (sunucu kaydı reddetti). Tek bozuk kayıt
+arkasındaki her şeyi süresiz bekletmemeli. Kayıt kuyrukta kalır ve `lastError`
+ile işaretlenir — sessizce silmek hem veri hem teşhis kaybı olurdu.
+
+**Sıra korunur.** Satırlar arasında bağımlılık var (sipariş üyeye, randevu
+eğitmene bakıyor); sırayı bozmak sunucuda henüz var olmayan bir satıra referans
+göndermek demek.
+
+**Uzak uç arayüzü satırın içeriğini taşımaz**, yalnızca "hangi tablodaki hangi
+satır" der. Gönderilecek verinin şekli sunucu ve kimlik doğrulama seçimine bağlı;
+sınır oradan geçince motor o karar verilmeden yazılabildi.
+
 ## Para: kuruş cinsinden tam sayı
 
 **Karar:** Parasal tutarlar `Double` değil, kuruş cinsinden `Long` (`Money`).
