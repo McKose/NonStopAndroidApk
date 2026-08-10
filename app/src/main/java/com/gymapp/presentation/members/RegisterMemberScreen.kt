@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.labelTr
@@ -234,7 +235,7 @@ fun RegisterMemberScreen(
                             Text("Paket Fiyatı")
                             Text("₺${Money(formState.selectedPackage?.basePriceMinor ?: 0L)}")
                         }
-                        if ((formState.discount.toDoubleOrNull() ?: 0.0) > 0.0) {
+                        if ((Decimals.parseOrDefault(formState.discount)) > 0.0) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween

@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.MemberEntity
+import com.gymapp.domain.Decimals
 import com.gymapp.domain.Membership
 import com.gymapp.domain.SessionQuota
 import com.gymapp.domain.labelTr
@@ -393,14 +394,14 @@ fun AddMeasurementDialog(
         confirmButton = {
             Button(onClick = {
                 onConfirm(
-                    height.toDoubleOrNull() ?: 0.0,
-                    weight.toDoubleOrNull() ?: 0.0,
-                    shoulder.toDoubleOrNull() ?: 0.0,
-                    chest.toDoubleOrNull() ?: 0.0,
-                    waist.toDoubleOrNull() ?: 0.0,
-                    hips.toDoubleOrNull() ?: 0.0,
-                    leg.toDoubleOrNull() ?: 0.0,
-                    arm.toDoubleOrNull() ?: 0.0,
+                    Decimals.parseOrDefault(height),
+                    Decimals.parseOrDefault(weight),
+                    Decimals.parseOrDefault(shoulder),
+                    Decimals.parseOrDefault(chest),
+                    Decimals.parseOrDefault(waist),
+                    Decimals.parseOrDefault(hips),
+                    Decimals.parseOrDefault(leg),
+                    Decimals.parseOrDefault(arm),
                     notes,
                 )
             }) { Text("Kaydet") }

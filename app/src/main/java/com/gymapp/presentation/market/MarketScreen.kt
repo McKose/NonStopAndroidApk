@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.ProductEntity
+import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
 import java.util.Locale
 
@@ -173,7 +174,7 @@ fun MarketScreen(
                 onPaymentTypeSelect = viewModel::setPaymentType,
                 onPaymentStatusSelect = viewModel::setPaymentStatus,
                 onDeliveryStatusSelect = viewModel::setDeliveryStatus,
-                onDiscountChange = { viewModel.setDiscount(it.toDoubleOrNull() ?: 0.0) },
+                onDiscountChange = { viewModel.setDiscount(Decimals.parseOrDefault(it)) },
                 // Sheet burada kapatılmaz: sonuç OrderCompleted olayıyla gelince kapanır,
                 // böylece başarısız sipariş sessizce "başarılı" gibi görünmez.
                 onConfirm = viewModel::checkout
@@ -489,7 +490,7 @@ fun AddProductDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val p = price.toDoubleOrNull() ?: 0.0
+                    val p = Decimals.parseOrDefault(price)
                     val s = stock.toIntOrNull() ?: 0
                     if (name.isNotBlank()) {
                         onConfirm(name, category, p, s)
