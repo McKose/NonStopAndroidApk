@@ -3,7 +3,12 @@ name: Android CI
 on:
   push:
     branches: [master]
+    paths-ignore: ['**.md', 'LICENSE', '.gitignore']
+  # `ready_for_review` varsayılan tetikleyiciler arasında değil; onsuz PR'ı
+  # taslaktan çıkarmak iOS işini hiç başlatmazdı.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore: ['**.md', 'LICENSE', '.gitignore']
   workflow_dispatch:
 
 concurrency:
@@ -56,10 +61,23 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  # macOS koşucuları dakika kotasından **10 kat** düşer. Bir dilim boyunca
+  # genellikle birkaç tur Android tarafındaki hataları düzeltmekle geçiyor ve o
+  # turların iOS'la ilgisi olmuyor. Bu yüzden macOS işi yalnızca:
+  #   - master'a merge'de,
+  #   - PR taslaktan çıkarıldığında (yani "artık doğrula" dediğimizde),
+  #   - elle tetiklendiğinde
+  # çalışır. Taslak PR'a yapılan ara push'lar yalnızca ucuz Linux işini koşturur.
   ios:
     name: iOS framework derle (Kotlin/Native)
     runs-on: macos-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
+    # Yalnızca PR taslaktan çıkarıldığında ya da elle. master'a merge'de tekrar
+    # koşmuyor: squash sonrası master'ın içeriği doğrulanan PR ağacıyla birebir
+    # aynı, aynı doğrulamayı 10x ücretle ikinci kez yapmanın karşılığı yok.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
 
     steps:
       - uses: actions/checkout@v4
@@ -79,6 +97,8 @@ jobs:
       - name: Simülatör framework'ü (arm64)
         run: ./gradlew --no-daemon :shared:linkDebugFrameworkIosSimulatorArm64
 
+      # Gerçek cihaz hedefi yalnızca master'da: simülatör derlemesi Kotlin/Native
+      # ön ucunun geçtiğini zaten kanıtlıyor, bu adım son bir güvence.
       - name: Cihaz framework'ü (arm64)
         run: ./gradlew --no-daemon :shared:linkDebugFrameworkIosArm64
 

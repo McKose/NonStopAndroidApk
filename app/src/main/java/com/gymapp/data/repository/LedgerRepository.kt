@@ -2,6 +2,7 @@ package com.gymapp.data.repository
 
 import com.gymapp.data.local.dao.LedgerDao
 import com.gymapp.data.local.entity.LedgerEntryEntity
+import com.gymapp.domain.Now
 import com.gymapp.domain.Ids
 import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.LedgerType
@@ -34,7 +35,7 @@ class LedgerRepository @Inject constructor(
         amount: Money,
         description: String,
         category: LedgerCategory = LedgerCategory.MEMBERSHIP,
-        occurredAtMs: Long = System.currentTimeMillis(),
+        occurredAtMs: Long = Now.epochMillis(),
         tenantId: String = Ids.DEFAULT_TENANT,
     ): Result<String> = record(
         type = LedgerType.CHARGE,
@@ -54,7 +55,7 @@ class LedgerRepository @Inject constructor(
         category: LedgerCategory = LedgerCategory.MEMBERSHIP,
         memberId: String? = null,
         orderId: String? = null,
-        occurredAtMs: Long = System.currentTimeMillis(),
+        occurredAtMs: Long = Now.epochMillis(),
         tenantId: String = Ids.DEFAULT_TENANT,
     ): Result<String> = record(
         type = LedgerType.PAYMENT,
@@ -76,7 +77,7 @@ class LedgerRepository @Inject constructor(
         method: PaymentMethod = PaymentMethod.CASH,
         staffId: String? = null,
         appointmentId: String? = null,
-        occurredAtMs: Long = System.currentTimeMillis(),
+        occurredAtMs: Long = Now.epochMillis(),
         tenantId: String = Ids.DEFAULT_TENANT,
     ): Result<String> = record(
         type = LedgerType.EXPENSE,
@@ -101,7 +102,7 @@ class LedgerRepository @Inject constructor(
     suspend fun reverse(
         entryId: String,
         reason: String,
-        occurredAtMs: Long = System.currentTimeMillis(),
+        occurredAtMs: Long = Now.epochMillis(),
     ): Result<String?> = runCatching {
         val original = ledgerDao.getById(entryId)
             ?: throw IllegalArgumentException("Finans kaydı bulunamadı.")
@@ -114,7 +115,7 @@ class LedgerRepository @Inject constructor(
             description = "İPTAL — $reason",
             occurredAtMs = occurredAtMs,
             reversesId = original.id,
-            createdAtMs = System.currentTimeMillis(),
+            createdAtMs = Now.epochMillis(),
         )
         ledgerDao.insert(reversal)
         reversal.id
@@ -131,7 +132,7 @@ class LedgerRepository @Inject constructor(
     suspend fun reversePaymentsForMember(
         memberId: String,
         reason: String,
-        occurredAtMs: Long = System.currentTimeMillis(),
+        occurredAtMs: Long = Now.epochMillis(),
         tenantId: String = Ids.DEFAULT_TENANT,
     ): Result<Int> = runCatching {
         val active = ledgerDao.activePaymentsForMember(tenantId, memberId)
@@ -141,7 +142,7 @@ class LedgerRepository @Inject constructor(
                 description = "İPTAL — $reason",
                 occurredAtMs = occurredAtMs,
                 reversesId = original.id,
-                createdAtMs = System.currentTimeMillis(),
+                createdAtMs = Now.epochMillis(),
             )
         }
         if (reversals.isNotEmpty()) ledgerDao.insertAll(reversals)
@@ -152,7 +153,7 @@ class LedgerRepository @Inject constructor(
     suspend fun reverseForAppointment(
         appointmentId: String,
         reason: String,
-        occurredAtMs: Long = System.currentTimeMillis(),
+        occurredAtMs: Long = Now.epochMillis(),
     ): Result<Int> = runCatching {
         val active = ledgerDao.activeEntriesForAppointment(appointmentId)
         val reversals = active.map { original ->
@@ -161,7 +162,7 @@ class LedgerRepository @Inject constructor(
                 description = "İPTAL — $reason",
                 occurredAtMs = occurredAtMs,
                 reversesId = original.id,
-                createdAtMs = System.currentTimeMillis(),
+                createdAtMs = Now.epochMillis(),
             )
         }
         if (reversals.isNotEmpty()) ledgerDao.insertAll(reversals)
@@ -252,7 +253,7 @@ class LedgerRepository @Inject constructor(
             appointmentId = appointmentId,
             description = description.trim(),
             occurredAtMs = occurredAtMs,
-            createdAtMs = System.currentTimeMillis(),
+            createdAtMs = Now.epochMillis(),
         )
         ledgerDao.insert(entry)
         entry.id
