@@ -69,19 +69,16 @@ object SessionQuota {
 
     fun hasSessionsLeft(remaining: Int?): Boolean = remaining == null || remaining > 0
 
-    /** Seans düşümü; sınırsız kotada değişiklik olmaz, sıfırın altına inilmez. */
-    fun consume(remaining: Int?): Int? = when {
-        remaining == null -> null
-        remaining > 0 -> remaining - 1
-        else -> remaining
-    }
-
-    /** Randevu geri alındığında seans iadesi; kota tavanını aşmaz. */
-    fun restore(remaining: Int?, total: Int?): Int? = when {
-        remaining == null -> null
-        total != null && remaining >= total -> remaining
-        else -> remaining + 1
-    }
+    // Seans düşümü ve iadesi bilinçli olarak **burada değil**: ikisi de
+    // `MemberDao.decrementSession` / `incrementSession` içinde tek bir atomik
+    // SQL UPDATE olarak duruyor. Kotlin'de yapmak oku-değiştir-yaz demek olurdu
+    // ve iki eşzamanlı randevu aynı seansı düşebilirdi.
+    //
+    // Burada bir kez `consume`/`restore` olarak da yazılmıştı: kimse çağırmıyor,
+    // yalnızca testleri vardı. Aynı kuralın ikinci bir kopyası, üstelik üretimde
+    // koşan kopyanın kendisi test edilmezken — testler geçtiği için kural
+    // doğrulanmış görünüyordu. Kopya kaldırıldı; SQL'i doğrulamanın yolu
+    // veritabanı testi yazmak.
 }
 
 // ─── Görünen etiketler ──────────────────────────────────────────────────────

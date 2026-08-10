@@ -26,6 +26,7 @@ import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.StaffEntity
 import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
+import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Rate
 import com.gymapp.domain.StaffRole
 import com.gymapp.domain.labelTr
@@ -173,7 +174,11 @@ private fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit, onDelete: () 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color.Gray)
                     Spacer(Modifier.width(4.dp))
-                    Text(staff.phone, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Text(
+                        PhoneNumber.formatForDisplay(staff.phone),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                    )
                 }
             }
 
