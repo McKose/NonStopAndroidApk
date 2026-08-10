@@ -19,8 +19,10 @@ import com.gymapp.data.local.entity.*
  *
  * **Buradan sonrası katı migration disiplini**: her şema değişikliği bir sürüm
  * artışı ve elle yazılmış bir [androidx.room.migration.Migration] gerektirir.
- * `exportSchema = true` olduğu için her sürümün anlık görüntüsü `app/schemas`
+ * `exportSchema = true` olduğu için her sürümün anlık görüntüsü `shared/schemas`
  * altında depoya işlenir ve geçişler test edilebilir.
+ *
+ * **v2**: gönderim kuyruğu (`sync_outbox`) eklendi — bkz. [MIGRATION_1_2].
  *
  * Tüm tablolar ortak biçimde:
  *  - **UUID birincil anahtar** — `autoGenerate` `Long` anahtarlar çok cihazlı
@@ -44,8 +46,10 @@ import com.gymapp.data.local.entity.*
         // Append-only tablolar: düzeltme silme/güncelleme ile değil ters kayıtla yapılır.
         LedgerEntryEntity::class,
         StockMovementEntity::class,
+        // Gönderim kuyruğu: yerel bir tablo, sunucuya kendisi senkronize edilmez.
+        SyncOutboxEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -61,6 +65,7 @@ abstract class GymDatabase : RoomDatabase() {
     abstract fun measurementDao(): MeasurementDao
     abstract fun ledgerDao(): LedgerDao
     abstract fun stockMovementDao(): StockMovementDao
+    abstract fun syncOutboxDao(): SyncOutboxDao
 }
 
 /**
