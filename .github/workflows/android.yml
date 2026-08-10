@@ -106,6 +106,84 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  # Sunucu şeması ve erişim kuralları. Ubuntu koşucusu, 1x ücret.
+  #
+  # Salon yalıtımı yalnızca satır bazlı güvenlik kurallarına dayanıyor ve yanlış
+  # yazılmış bir kural sessizdir: uygulama çalışır, testler geçer, veri sızar.
+  # Bu yüzden kuralın kendisi her koşuda gerçek bir PostgreSQL üzerinde sınanıyor.
+  supabase:
+    name: Sunucu şeması ve erişim kuralları
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Şemayı uygula ve salon yalıtımını sına
+        env:
+          PGURL: postgres://postgres:postgres@localhost:5432/postgres
+        run: ./supabase/tests/run.sh
+
+  # Değişikliğin Kotlin/Native derlemesini etkileyip etkilemediğini belirler.
+  #
+  # Yalnızca SQL, belge ya da CI dosyası değişen bir PR'da macOS işini koşturmak
+  # 10x ücreti hiçbir şey doğrulamadan harcamak demek. Üçüncü taraf bir action
+  # eklemeden, düz `git diff` ile karar veriliyor.
+  #
+  # Yön bilinçli olarak **güvenli tarafa** eğik: karar veremediğimiz her durumda
+  # (workflow_dispatch, beklenmedik bir dosya, boş taban) sonuç `true` oluyor ve
+  # iOS işi koşuyor. Ters kurgu — tanıdık desenleri arayıp bulunca koşmak —
+  # desende bir eksik kalınca doğrulamayı sessizce kaybettirirdi; bu kurguda aynı
+  # hata yalnızca gereksiz bir tur maliyetine yol açar.
+  degisiklik-kapsami:
+    name: Değişiklik kapsamını belirle
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      kod-degisti: ${{ steps.kontrol.outputs.kod-degisti }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: kontrol
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+
+          if [ -z "$base" ] || [ -z "$head" ]; then
+            echo "PR bağlamı yok — iOS işi koşacak."
+            echo "kod-degisti=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          degisenler="$(git diff --name-only "$base" "$head")"
+          echo "Değişen dosyalar:"; echo "$degisenler"
+
+          # Derlemeyi etkilemediği bilinen yollar. Bunların DIŞINDA tek bir dosya
+          # bile varsa iOS işi koşar.
+          if echo "$degisenler" | grep -qvE '^(docs/|supabase/|\.github/|.*\.md$|LICENSE$|\.gitignore$)'; then
+            echo "Derlemeyi etkileyen değişiklik var."
+            echo "kod-degisti=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Yalnızca belge/SQL/CI değişmiş — iOS işi atlanacak."
+            echo "kod-degisti=false" >> "$GITHUB_OUTPUT"
+          fi
+
   # macOS koşucuları dakika kotasından **10 kat** düşer. Bir dilim boyunca
   # genellikle birkaç tur Android tarafındaki hataları düzeltmekle geçiyor ve o
   # turların iOS'la ilgisi olmuyor. Bu yüzden macOS işi yalnızca:
@@ -120,9 +198,11 @@ jobs:
     # Yalnızca PR taslaktan çıkarıldığında ya da elle. master'a merge'de tekrar
     # koşmuyor: squash sonrası master'ın içeriği doğrulanan PR ağacıyla birebir
     # aynı, aynı doğrulamayı 10x ücretle ikinci kez yapmanın karşılığı yok.
+    needs: degisiklik-kapsami
     if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
+      needs.degisiklik-kapsami.outputs.kod-degisti == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'pull_request' && github.event.pull_request.draft == false))
 
     steps:
       - uses: actions/checkout@v4
