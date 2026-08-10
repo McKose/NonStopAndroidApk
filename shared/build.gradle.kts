@@ -53,20 +53,12 @@ kotlin {
     }
 
     sourceSets {
-        /**
-         * Android ve JVM'in ortak kaynak kümesi.
-         *
-         * Tek sakini `randomUuid` karşılığı: iki hedef de `java.util.UUID`
-         * kullanıyor. Ayrı dosyalarda dursaydı aynı satır iki yerde durur ve biri
-         * değişince diğeri sessizce geride kalırdı. Varsayılan hiyerarşi şablonu
-         * android+jvm için böyle bir ara küme üretmiyor, elle kuruluyor.
-         */
-        val jvmSharedMain by creating {
-            dependsOn(commonMain.get())
-        }
-        androidMain.get().dependsOn(jvmSharedMain)
-        jvmMain.get().dependsOn(jvmSharedMain)
-
+        // NOT: android + jvm için elle bir ara kaynak kümesi (`dependsOn`)
+        // kurulmamalı. Elle eklenen her `dependsOn` kenarı Kotlin'in varsayılan
+        // hiyerarşi şablonunu tamamen devre dışı bırakıyor; o şablon da
+        // `iosMain`'i üç iOS hedefine bağlayan şey. Denendi: `randomUuid`
+        // karşılığı tek yere indi ama iOS karşılıkları hiçbir hedefe bağlanmadı.
+        // Tek satırlık tekrar bu bedelden ucuz.
         commonMain.dependencies {
             implementation(libs.kotlinx.datetime)
             api(libs.koin.core)
