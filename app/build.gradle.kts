@@ -64,9 +64,10 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons)
-    // Entity, DAO ve veritabanı :shared modülünde; burada yalnızca
-    // `withTransaction` gibi Android tarafı yardımcıları kullanılıyor.
-    implementation(libs.androidx.room.ktx)
+    // room-ktx kaldırıldı: tek kullanıcısı repository'lerdeki `withTransaction`
+    // idi, o da ortak koda taşınırken `GymDatabase.inTransaction` ile
+    // değiştirildi. Entity, DAO, veritabanı ve repository'lerin tamamı artık
+    // :shared modülünde.
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
     testImplementation(libs.junit)
