@@ -141,6 +141,38 @@ class MoneyTest {
         assertEquals(Money.ofMajor(0.5), Money.parseOrNull(" 0,50 "))
     }
 
+    /**
+     * Nokta ondalık ayıracı olarak da kabul edilir.
+     *
+     * Eski ayrıştırıcı **her** noktayı binlik ayıracı sayıp siliyordu: "1234.56"
+     * yazan kullanıcı 123.456,00 TL kaydediyordu. Finans ekranındaki tutar alanı
+     * bu ayrıştırıcıyı kullandığı ve Android'in sayı klavyesi cihaz diline göre
+     * nokta üretebildiği için gerçekten ulaşılabilir bir yoldu.
+     */
+    @Test
+    fun `nokta ondalik ayiraci olarak kabul edilir`() {
+        assertEquals(Money.ofMajor(1234.56), Money.parseOrNull("1234.56"))
+        assertEquals(Money.ofMajor(0.5), Money.parseOrNull("0.50"))
+        assertEquals(Money.ofMajor(99.9), Money.parseOrNull("99.9"))
+        // İngilizce biçim: son ayıraç ondalıktır.
+        assertEquals(Money.ofMajor(1234.56), Money.parseOrNull("1,234.56"))
+    }
+
+    /**
+     * Tek başına nokta belirsiz: "1.500" hem 1500 hem 1,5 olabilir.
+     *
+     * Tam üç haneli son grup Türkçe binlik okumasıyla çözülür; tam kısım sıfırla
+     * başlıyorsa gruplama imkânsız olduğu için ondalık okunur.
+     */
+    @Test
+    fun `belirsiz nokta turkce binlik olarak okunur`() {
+        assertEquals(Money.ofMajor(1500.0), Money.parseOrNull("1.500"))
+        assertEquals(Money.ofMajor(10500.0), Money.parseOrNull("10.500"))
+        assertEquals(Money.ofMajor(1234567.0), Money.parseOrNull("1.234.567"))
+        // Sıfırla başlayan tam kısım gruplanamaz.
+        assertEquals(Money.ofMajor(0.5), Money.parseOrNull("0.500"))
+    }
+
     @Test
     fun `gecersiz girdi null doner`() {
         assertEquals(null, Money.parseOrNull(""))

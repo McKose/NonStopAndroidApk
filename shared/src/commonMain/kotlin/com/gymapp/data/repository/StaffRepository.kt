@@ -6,6 +6,7 @@ import com.gymapp.data.local.entity.StaffEntity
 import com.gymapp.domain.Now
 import com.gymapp.domain.Ids
 import com.gymapp.domain.Money
+import com.gymapp.domain.Rate
 import com.gymapp.domain.StaffRole
 import kotlinx.coroutines.flow.Flow
 
@@ -49,6 +50,14 @@ class StaffRepository(
     ): Result<String> = runCatching {
         require(fullName.isNotBlank()) { "Ad soyad boş olamaz." }
         require(phone.isNotBlank()) { "Telefon boş olamaz." }
+
+        // Oran aralığı burada doğrulanıyor, ekranda değil. Şu an tek çağrı yeri
+        // `Rate.ofPercent` ile zaten 0–100 arasına kırpıyor; kural ekranda kalırsa
+        // ikinci bir çağrı yeri eklendiğinde sessizce delinir. Aralık dışı bir
+        // değer randevu tamamlanırken hatalı hakediş yazardı.
+        require(commissionBasisPoints in 0..Rate.SCALE) {
+            "Hakediş oranı %0 ile %100 arasında olmalıdır."
+        }
 
         val normalizedNickname = nickname.trim()
         require(normalizedNickname.isNotBlank()) { "Kullanıcı adı boş olamaz." }
