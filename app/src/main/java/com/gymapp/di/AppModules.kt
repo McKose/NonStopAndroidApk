@@ -10,6 +10,7 @@ import com.gymapp.data.repository.MemberRepository
 import com.gymapp.data.repository.PackageRepository
 import com.gymapp.data.repository.ProductRepository
 import com.gymapp.data.repository.StaffRepository
+import com.gymapp.data.sync.SyncQueue
 import com.gymapp.presentation.calendar.CalendarViewModel
 import com.gymapp.presentation.common.GlobalErrorHandler
 import com.gymapp.presentation.dashboard.DashboardViewModel
@@ -49,6 +50,7 @@ val databaseModule = module {
     single { get<GymDatabase>().measurementDao() }
     single { get<GymDatabase>().ledgerDao() }
     single { get<GymDatabase>().stockMovementDao() }
+    single { get<GymDatabase>().syncOutboxDao() }
 }
 
 /**
@@ -69,6 +71,9 @@ val appModule = module {
     singleOf(::ProductRepository)
     singleOf(::AppointmentRepository)
     singleOf(::FinanceRepository)
+
+    // Gönderim kuyruğu: repository'ler değişen satırları buraya yazacak (Faz 4).
+    singleOf(::SyncQueue)
 
     viewModelOf(::MemberViewModel)
     viewModelOf(::CalendarViewModel)

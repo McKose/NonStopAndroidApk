@@ -24,4 +24,5 @@ internal const val GYM_DATABASE_NAME = "gym_database.db"
 internal fun RoomDatabase.Builder<GymDatabase>.buildGymDatabase(): GymDatabase =
     setDriver(BundledSQLiteDriver())
         .setQueryCoroutineContext(Dispatchers.Default)
+        .addMigrations(*ALL_MIGRATIONS)
         .build()
