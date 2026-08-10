@@ -50,6 +50,30 @@ jobs:
       - name: Ortak modül testleri
         run: ./gradlew --no-daemon :shared:testDebugUnitTest
 
+      # Veritabanı testleri JVM hedefinde: gerçek SQLite üzerinde koşuyorlar.
+      # Android birim testlerinde koşamazlar (gömülü sürücünün Android sürümü
+      # masaüstü JVM'de yüklenemiyor), iOS'ta koşsalar 10x ücretli olurlardı.
+      - name: Veritabanı testleri (JVM)
+        run: ./gradlew --no-daemon :shared:jvmTest
+
+      # "Yeşil" ile "koştu" aynı şey değil: kaynak dizini yanlış olsaydı görev
+      # hiç test bulamaz ve yine de başarılı sayılırdı. Bu adım sonuç dosyalarını
+      # sayıp sıfırsa işi düşürüyor — test altyapısının kendisi de doğrulanmalı.
+      - name: Veritabanı testlerinin koştuğunu doğrula
+        run: |
+          results="shared/build/test-results/jvmTest"
+          if [ ! -d "$results" ]; then
+            echo "HATA: $results yok — jvmTest hiç test bulamamış."
+            exit 1
+          fi
+          total=$(grep -ho 'tests="[0-9]*"' "$results"/*.xml \
+            | grep -o '[0-9]*' | awk '{ s += $1 } END { print s + 0 }')
+          echo "Koşan veritabanı testi: ${total:-0}"
+          if [ "${total:-0}" -eq 0 ]; then
+            echo "HATA: hiç test koşmamış."
+            exit 1
+          fi
+
       - name: Uygulama birim testleri
         run: ./gradlew --no-daemon :app:testDebugUnitTest
 

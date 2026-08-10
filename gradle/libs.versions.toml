@@ -70,6 +70,7 @@ koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compos
 # Kotlin Multiplatform — ortak (commonMain) bağımlılıklar
 kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinxDatetime" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 
 # Test
 junit                    = { group = "junit",               name = "junit",          version.ref = "junit" }
