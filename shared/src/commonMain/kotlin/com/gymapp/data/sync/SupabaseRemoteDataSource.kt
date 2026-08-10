@@ -57,7 +57,16 @@ class SupabaseRemoteDataSource(
                 header("Authorization", "Bearer $token")
                 header("Prefer", "resolution=merge-duplicates,return=minimal")
                 contentType(ContentType.Application.Json)
-                setBody(payload)
+                // Gövde JsonObject olarak değil, metne çevrilmiş hâlde veriliyor.
+                //
+                // `setBody(payload)` çağrısı Ktor'un içerik dönüştürücüsünün
+                // kurulmuş olmasını gerektiriyor; kurulmadığında serileştirme
+                // aşamasında istisna atıyor ve bu istisna aşağıdaki geniş
+                // `catch` tarafından "ağ hatası" sanılıyordu — yani istemcinin
+                // yapılandırma hatası, geçici bir ağ sorunu gibi görünüyordu.
+                // `JsonObject.toString()` geçerli JSON üretiyor; böylece uzak uç
+                // çağıranın istemciyi nasıl kurduğuna bağımlı olmuyor.
+                setBody(payload.toString())
             }
             pushResultForStatus(response.status.value, runCatching { response.bodyAsText() }.getOrNull())
         } catch (e: Exception) {
@@ -67,7 +76,13 @@ class SupabaseRemoteDataSource(
             // `Exception` bilinçli olarak geniş: Ktor'un her motoru (OkHttp,
             // Darwin) kendi istisna tiplerini fırlatıyor ve bunları tek tek
             // saymak, yeni bir platform eklendiğinde sessizce eksik kalırdı.
-            PushResult.Retryable("Ağ hatası: ${e.message ?: e::class.simpleName}")
+            //
+            // Bedeli: ağ dışı bir hata (ör. yanlış yapılandırma) da buraya
+            // düşüyor ve geçici sayılıyor. Bu gerçekten yaşandı — gövde
+            // serileştirme hatası "ağ hatası" olarak raporlanmıştı. Bu yüzden
+            // gerekçeye istisna **tipi** de yazılıyor: yanlış eşleme kaçınılmazsa
+            // bile en azından teşhis edilebilir olsun.
+            PushResult.Retryable("Ağ hatası (${e::class.simpleName}): ${e.message ?: "-"}")
         }
     }
 }

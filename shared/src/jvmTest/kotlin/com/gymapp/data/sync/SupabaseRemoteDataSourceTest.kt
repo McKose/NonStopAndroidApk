@@ -93,24 +93,50 @@ class SupabaseRemoteDataSourceTest {
         assertTrue(sonuc.reason.contains("row-level security"), "Teşhis için sunucu mesajı taşınmalı")
     }
 
+    /**
+     * Yalnızca tipe bakmak yetmiyor — gerekçe de kontrol ediliyor.
+     *
+     * İlk hâlleri `assertIs<Retryable>` ile yetiniyordu ve tam da bu yüzden
+     * **yanlış sebeple geçtiler**: istek serileştirme hatasıyla motora hiç
+     * ulaşmıyordu, dönen `Retryable` ağ hatası dalından geliyordu. Tip doğruydu,
+     * yol tamamen yanlıştı. Gerekçede durum kodunu aramak bu yolu kapatıyor.
+     */
     @Test
     fun `sunucu mesgulse gecici hata doner`() = runTest {
-        assertIs<PushResult.Retryable>(kaynak(HttpStatusCode.RequestTimeout).push(SyncTable.PRODUCTS, "p-1"))
-        assertIs<PushResult.Retryable>(kaynak(HttpStatusCode.TooManyRequests).push(SyncTable.PRODUCTS, "p-1"))
+        gecici(HttpStatusCode.RequestTimeout, "408")
+        gecici(HttpStatusCode.TooManyRequests, "429")
     }
 
     @Test
     fun `sunucu hatasi gecici sayilir`() = runTest {
-        assertIs<PushResult.Retryable>(kaynak(HttpStatusCode.InternalServerError).push(SyncTable.PRODUCTS, "p-1"))
-        assertIs<PushResult.Retryable>(kaynak(HttpStatusCode.BadGateway).push(SyncTable.PRODUCTS, "p-1"))
-        assertIs<PushResult.Retryable>(kaynak(HttpStatusCode.ServiceUnavailable).push(SyncTable.PRODUCTS, "p-1"))
+        gecici(HttpStatusCode.InternalServerError, "500")
+        gecici(HttpStatusCode.BadGateway, "502")
+        gecici(HttpStatusCode.ServiceUnavailable, "503")
     }
 
     @Test
     fun `bozuk istek kalici sayilir`() = runTest {
-        assertIs<PushResult.Permanent>(kaynak(HttpStatusCode.BadRequest).push(SyncTable.PRODUCTS, "p-1"))
-        assertIs<PushResult.Permanent>(kaynak(HttpStatusCode.NotFound).push(SyncTable.PRODUCTS, "p-1"))
-        assertIs<PushResult.Permanent>(kaynak(HttpStatusCode.Conflict).push(SyncTable.PRODUCTS, "p-1"))
+        kalici(HttpStatusCode.BadRequest, "400")
+        kalici(HttpStatusCode.NotFound, "404")
+        kalici(HttpStatusCode.Conflict, "409")
+    }
+
+    private suspend fun gecici(status: HttpStatusCode, kod: String) {
+        val sonuc = kaynak(status).push(SyncTable.PRODUCTS, "p-1")
+        assertIs<PushResult.Retryable>(sonuc, "$kod geçici sayılmalı")
+        assertTrue(
+            sonuc.reason.contains(kod),
+            "Gerekçe $kod içermeli, ağ hatası dalından gelmemeli — gelen: ${sonuc.reason}",
+        )
+    }
+
+    private suspend fun kalici(status: HttpStatusCode, kod: String) {
+        val sonuc = kaynak(status).push(SyncTable.PRODUCTS, "p-1")
+        assertIs<PushResult.Permanent>(sonuc, "$kod kalıcı sayılmalı")
+        assertTrue(
+            sonuc.reason.contains(kod),
+            "Gerekçe $kod içermeli — gelen: ${sonuc.reason}",
+        )
     }
 
     // ─── Ön koşullar ────────────────────────────────────────────────────────
@@ -170,5 +196,8 @@ class SupabaseRemoteDataSourceTest {
 
         assertIs<PushResult.Retryable>(sonuc)
         assertTrue(sonuc.reason.contains("Ağ hatası"))
+        // İstisna tipi gerekçede olmalı: ağ dışı bir hata buraya düştüğünde
+        // teşhis edilebilmesinin tek yolu bu.
+        assertTrue(sonuc.reason.contains("IOException"), "İstisna tipi taşınmalı: ${sonuc.reason}")
     }
 }

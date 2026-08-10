@@ -73,8 +73,6 @@ kotlin {
             implementation(libs.androidx.sqlite.bundled)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.content.negotiation)
-            implementation(libs.ktor.serialization.kotlinx.json)
         }
 
         // HTTP motoru platforma özgü: Android'de OkHttp, iOS'ta Darwin (NSURLSession),
