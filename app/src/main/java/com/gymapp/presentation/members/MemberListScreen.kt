@@ -22,6 +22,7 @@ import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Membership
 import com.gymapp.domain.MembershipState
+import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.labelTr
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -186,7 +187,10 @@ fun MemberItem(
                         }
                     }
                 }
-                Text(text = member.phone, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = PhoneNumber.formatForDisplay(member.phone),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
                 // Durum kayıtlı kolondan değil bitiş tarihinden türetiliyor; süresi
                 // dolmuş üye artık "Aktif" görünmüyor. Paket kimliği (UUID) kullanıcıya
                 // hiçbir şey ifade etmediği için gösterilmiyor.

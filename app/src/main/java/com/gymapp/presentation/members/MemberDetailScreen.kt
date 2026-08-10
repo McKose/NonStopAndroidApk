@@ -22,6 +22,7 @@ import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Decimals
 import com.gymapp.domain.Membership
+import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.SessionQuota
 import com.gymapp.domain.labelTr
 import java.text.SimpleDateFormat
@@ -113,7 +114,7 @@ fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = koinViewMo
     ) {
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                DetailRow(label = "Telefon", value = member.phone)
+                DetailRow(label = "Telefon", value = PhoneNumber.formatForDisplay(member.phone))
                 member.email?.let { DetailRow(label = "E-posta", value = it) }
                 DetailRow(
                     label = "Durum",

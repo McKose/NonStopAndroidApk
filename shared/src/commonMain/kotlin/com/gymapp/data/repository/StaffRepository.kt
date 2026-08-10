@@ -6,6 +6,7 @@ import com.gymapp.data.local.entity.StaffEntity
 import com.gymapp.domain.Now
 import com.gymapp.domain.Ids
 import com.gymapp.domain.Money
+import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Rate
 import com.gymapp.domain.StaffRole
 import kotlinx.coroutines.flow.Flow
@@ -62,6 +63,12 @@ class StaffRepository(
         val normalizedNickname = nickname.trim()
         require(normalizedNickname.isNotBlank()) { "Kullanıcı adı boş olamaz." }
 
+        // Numara cep numarasıysa üyelerdeki gibi E.164'e çevrilir; değilse (sabit
+        // hat olabilir) olduğu gibi saklanır. Üye tarafı cep numarası **zorunlu**
+        // kılıyor çünkü orada tekillik kısıtı numaraya bağlı; personelde tekillik
+        // kullanıcı adında olduğu için aynı zorunluluk getirilmedi.
+        val normalizedPhone = PhoneNumber.normalizeTr(phone) ?: phone.trim()
+
         // Kullanıcı adı tenant içinde tekil; kontrolü burada yapıyoruz ki anlaşılır
         // mesaj dönebilelim, ama son söz veritabanındaki UNIQUE index'te.
         //
@@ -94,7 +101,7 @@ class StaffRepository(
                         branch = branch.trim(),
                         commissionBasisPoints = commissionBasisPoints,
                         monthlySalaryMinor = monthlySalary.coerceNonNegative().minor,
-                        phone = phone.trim(),
+                        phone = normalizedPhone,
                         nickname = normalizedNickname,
                         // NOT (Faz 4): şifre hash'lenmeli; kimlik doğrulama sunucuya taşınacak.
                         password = password ?: DEFAULT_PASSWORD,
@@ -113,7 +120,7 @@ class StaffRepository(
                         branch = branch.trim(),
                         commissionBasisPoints = commissionBasisPoints,
                         monthlySalaryMinor = monthlySalary.coerceNonNegative().minor,
-                        phone = phone.trim(),
+                        phone = normalizedPhone,
                         nickname = normalizedNickname,
                         password = password ?: existing.password,
                         isActive = isActive,
