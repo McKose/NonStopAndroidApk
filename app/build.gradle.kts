@@ -2,13 +2,16 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.hilt.android)
-    alias(libs.plugins.ksp)
 }
 
 android {
     namespace  = "com.gymapp"
-    compileSdk = 35
+    // Bağımlılık yığınındaki androidx modülleri en az 36'ya karşı derlenmeyi
+    // isteyebiliyor; güncel kararlı seviyede kalmak en ucuzu.
+    // `targetSdk` bilinçli olarak 35'te kalıyor — compileSdk yalnızca hangi
+    // API'lere karşı derlendiğimizi belirler, çalışma zamanı davranışını
+    // değiştiren targetSdk'dır.
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.gymapp"
@@ -64,9 +67,8 @@ dependencies {
     // Entity, DAO ve veritabanı :shared modülünde; burada yalnızca
     // `withTransaction` gibi Android tarafı yardımcıları kullanılıyor.
     implementation(libs.androidx.room.ktx)
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
-    implementation(libs.hilt.navigation.compose)
+    implementation(libs.koin.android)
+    implementation(libs.koin.androidx.compose)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

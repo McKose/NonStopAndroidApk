@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.gymapp.domain.labelTr
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
@@ -31,7 +31,7 @@ fun DashboardScreen(
     onNavigateToCalendar: () -> Unit,
     onNavigateToPackages: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    viewModel: DashboardViewModel = hiltViewModel()
+    viewModel: DashboardViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 

@@ -8,11 +8,8 @@ import com.gymapp.domain.Money
 import com.gymapp.domain.PackageCategory
 import com.gymapp.domain.TrainingType
 import kotlinx.coroutines.flow.Flow
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class PackageRepository @Inject constructor(
+class PackageRepository(
     private val packageDao: PackageDao
 ) {
     private val tenantId = Ids.DEFAULT_TENANT

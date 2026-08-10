@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.StaffEntity
 import com.gymapp.domain.Money
 import com.gymapp.domain.Rate
@@ -33,7 +33,7 @@ import com.gymapp.domain.labelTr
 @Composable
 fun PersonnelScreen(
     onNavigateBack: () -> Unit,
-    viewModel: PersonnelViewModel = hiltViewModel()
+    viewModel: PersonnelViewModel = koinViewModel()
 ) {
     val staffList by viewModel.staffList.collectAsState(initial = emptyList())
     val snackbarHostState = remember { SnackbarHostState() }

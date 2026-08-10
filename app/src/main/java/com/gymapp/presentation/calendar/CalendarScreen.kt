@@ -16,7 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
 import java.time.Instant
@@ -37,7 +37,7 @@ import com.gymapp.domain.labelTr
 @Composable
 fun CalendarScreen(
     onNavigateBack: () -> Unit,
-    viewModel: CalendarViewModel = hiltViewModel()
+    viewModel: CalendarViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()

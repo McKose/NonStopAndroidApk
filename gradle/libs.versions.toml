@@ -14,11 +14,19 @@ navigationCompose = "2.9.0"
 # Room
 room            = "2.7.1"
 
-# Hilt
-# Tavanı AGP belirliyor: Hilt 2.59.2+ AGP 9.0 istiyor, elimizde 8.13.2 var.
-# 2.58, AGP 8.4+ ile uyumlu olan en yeni sürüm.
-hilt            = "2.58"
-hiltNavCompose  = "1.2.0"
+# Koin — bağımlılık enjeksiyonu.
+# Hilt yerine geçti: Hilt yalnızca JVM/Android'de çalışıyor, Koin ise ortak
+# koddan (KMP) kullanılabiliyor. Repository katmanı :shared'e taşınabilsin diye şart.
+#
+# Neden 4.1.1 ve neden 4.2.x değil: Koin 4.2.0/4.2.1/4.2.2'nin Kotlin/Native
+# klib'leri Kotlin 2.3.20 ile üretilmiş (abi_version=2.3.0). Kotlin 2.2.21
+# derleyicisi en fazla ABI 2.2.0 okuyabildiği için iOS hedefi bu klib'i
+# çözemiyor — JVM tarafı sorunsuz derlendiği hâlde `compileKotlinIosArm64`
+# "KLIB resolver: incompatible ABI version" ile düşüyor. 4.1.1 Kotlin 2.1.21
+# ile üretilmiş (abi_version=1.201.0) ve mevcut derleyiciyle uyumlu.
+# Kotlin 2.3'e çıkıldığında (artık KSP'nin de 2.3.x sürümleri var) 4.2.x'e
+# dönülebilir; o yükseltme Room/AGP/Compose'u da kapsadığı için ayrı bir dilim.
+koin            = "4.1.1"
 
 # Kotlin Multiplatform
 kotlinxDatetime = "0.6.1"
@@ -55,10 +63,10 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 # doğan davranış farkları böylece ortadan kalkar.
 androidx-sqlite-bundled = { group = "androidx.sqlite", name = "sqlite-bundled", version.ref = "androidxSqlite" }
 
-# Hilt
-hilt-android          = { group = "com.google.dagger", name = "hilt-android",          version.ref = "hilt" }
-hilt-android-compiler = { group = "com.google.dagger", name = "hilt-android-compiler",  version.ref = "hilt" }
-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavCompose" }
+# Koin
+koin-core             = { group = "io.insert-koin", name = "koin-core",             version.ref = "koin" }
+koin-android          = { group = "io.insert-koin", name = "koin-android",          version.ref = "koin" }
+koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
 
 # Kotlin Multiplatform — ortak (commonMain) bağımlılıklar
 kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinxDatetime" }
@@ -75,6 +83,5 @@ android-library     = { id = "com.android.library",                version.ref =
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-android      = { id = "org.jetbrains.kotlin.android",       version.ref = "kotlin" }
 kotlin-compose      = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-hilt-android        = { id = "com.google.dagger.hilt.android",     version.ref = "hilt" }
 ksp                 = { id = "com.google.devtools.ksp",            version.ref = "ksp" }
 room                = { id = "androidx.room",                      version.ref = "room" }

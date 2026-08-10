@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.gymapp.domain.Money
 import com.gymapp.domain.PackageCategory
 import com.gymapp.domain.TrainingType
@@ -22,7 +22,7 @@ import com.gymapp.domain.labelTr
 fun AddPackageScreen(
     packageId: String? = null,
     onNavigateBack: () -> Unit,
-    viewModel: PackageViewModel = hiltViewModel()
+    viewModel: PackageViewModel = koinViewModel()
 ) {
     // Sınırsız (abonman) paket seans sayısı taşımaz; `-1` sentinel'i yerine
     // ayrı bir anahtar kullanılıyor, böylece geçersiz değer girilemiyor.

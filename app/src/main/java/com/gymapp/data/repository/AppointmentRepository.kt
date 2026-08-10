@@ -16,8 +16,6 @@ import com.gymapp.domain.Money
 import com.gymapp.domain.Rate
 import com.gymapp.domain.TrainingType
 import kotlinx.coroutines.flow.Flow
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Randevu akışı ve finansal yan etkileri.
@@ -25,8 +23,7 @@ import javax.inject.Singleton
  * Orkestrasyon bilinçli olarak DAO'da değil burada: defter erişimi repository
  * katmanında olduğu için DAO'da durması yukarı doğru bağımlılık gerektiriyordu.
  */
-@Singleton
-class AppointmentRepository @Inject constructor(
+class AppointmentRepository(
     private val database: GymDatabase,
     private val appointmentDao: AppointmentDao,
     private val memberDao: MemberDao,

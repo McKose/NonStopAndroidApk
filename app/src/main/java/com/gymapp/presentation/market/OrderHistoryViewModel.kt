@@ -5,14 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.dao.OrderDao
 import com.gymapp.data.local.entity.OrderEntity
 import com.gymapp.domain.Ids
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
-import javax.inject.Inject
 
-@HiltViewModel
-class OrderHistoryViewModel @Inject constructor(
+class OrderHistoryViewModel(
     private val orderDao: OrderDao
 ) : ViewModel() {
 

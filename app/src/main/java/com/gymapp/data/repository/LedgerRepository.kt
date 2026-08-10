@@ -10,8 +10,6 @@ import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Finans defteri üzerinde tip güvenli işlemler.
@@ -22,8 +20,7 @@ import javax.inject.Singleton
  * Defter append-only olduğu için burada **güncelleme ve silme yoktur**;
  * düzeltme [reverse] ile yapılır.
  */
-@Singleton
-class LedgerRepository @Inject constructor(
+class LedgerRepository(
     private val ledgerDao: LedgerDao,
 ) {
 

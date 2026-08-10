@@ -9,11 +9,9 @@ import com.gymapp.data.repository.ProductRepository
 import com.gymapp.domain.DeliveryStatus
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class MarketUiState(
     val products: List<ProductEntity> = emptyList(),
@@ -51,8 +49,7 @@ private data class MarketForm(
     val isCheckingOut: Boolean = false,
 )
 
-@HiltViewModel
-class MarketViewModel @Inject constructor(
+class MarketViewModel(
     private val repository: ProductRepository,
     private val memberRepository: MemberRepository
 ) : ViewModel() {

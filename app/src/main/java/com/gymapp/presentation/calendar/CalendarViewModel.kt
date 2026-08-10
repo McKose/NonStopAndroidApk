@@ -11,13 +11,11 @@ import com.gymapp.data.repository.StaffRepository
 import com.gymapp.domain.AppointmentState
 import com.gymapp.domain.Periods
 import com.gymapp.domain.TrainingType
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
-import javax.inject.Inject
 
 data class CalendarUiState(
     val appointments: List<AppointmentEntity> = emptyList(),
@@ -33,8 +31,7 @@ sealed interface CalendarEvent {
     data class Failed(val message: String) : CalendarEvent
 }
 
-@HiltViewModel
-class CalendarViewModel @Inject constructor(
+class CalendarViewModel(
     private val appointmentRepository: AppointmentRepository,
     memberRepository: MemberRepository,
     staffRepository: StaffRepository,

@@ -24,7 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import java.text.SimpleDateFormat
@@ -34,7 +34,7 @@ import java.util.*
 @Composable
 fun FinanceScreen(
     onNavigateBack: () -> Unit,
-    viewModel: FinanceViewModel = hiltViewModel()
+    viewModel: FinanceViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }

@@ -3,13 +3,9 @@ package com.gymapp.data.local.preferences
 import android.content.Context
 import android.content.SharedPreferences
 import com.gymapp.domain.StaffRole
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class AppPreferences @Inject constructor(
-    @ApplicationContext context: Context
+class AppPreferences(
+    context: Context
 ) {
     private val prefs: SharedPreferences = context.getSharedPreferences("gym_app_prefs", Context.MODE_PRIVATE)
 

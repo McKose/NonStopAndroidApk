@@ -8,8 +8,6 @@ import com.gymapp.domain.Ids
 import com.gymapp.domain.Money
 import com.gymapp.domain.StaffRole
 import kotlinx.coroutines.flow.Flow
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Personel kayıtları.
@@ -18,8 +16,7 @@ import javax.inject.Singleton
  * kuruyordu; kimlik, zaman damgası ve birim dönüşümü (yüzde → baz puan, TL → kuruş)
  * artık tek noktada.
  */
-@Singleton
-class StaffRepository @Inject constructor(
+class StaffRepository(
     private val staffDao: StaffDao
 ) {
     private val tenantId = Ids.DEFAULT_TENANT

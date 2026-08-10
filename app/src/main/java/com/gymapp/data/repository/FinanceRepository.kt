@@ -7,8 +7,6 @@ import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import kotlinx.coroutines.flow.Flow
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Finans okuma/yazma — tek kaynak: `ledger_entries`.
@@ -16,8 +14,7 @@ import javax.inject.Singleton
  * Geçiş boyunca eski `transactions` tablosu da okunuyordu (dual-read); tüm
  * yazıcılar deftere taşındığı için o kaynak ve tablo kaldırıldı.
  */
-@Singleton
-class FinanceRepository @Inject constructor(
+class FinanceRepository(
     private val ledgerDao: LedgerDao,
     private val ledgerRepository: LedgerRepository,
 ) {

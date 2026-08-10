@@ -7,12 +7,10 @@ import com.gymapp.data.repository.StaffRepository
 import com.gymapp.domain.Money
 import com.gymapp.domain.Rate
 import com.gymapp.domain.StaffRole
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /** Bir kez tüketilen kullanıcı bildirimleri. */
 sealed interface PersonnelEvent {
@@ -20,8 +18,7 @@ sealed interface PersonnelEvent {
     data class Failed(val message: String) : PersonnelEvent
 }
 
-@HiltViewModel
-class PersonnelViewModel @Inject constructor(
+class PersonnelViewModel(
     private val repository: StaffRepository
 ) : ViewModel() {
 

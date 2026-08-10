@@ -7,7 +7,6 @@ import com.gymapp.data.repository.PackageRepository
 import com.gymapp.domain.Money
 import com.gymapp.domain.PackageCategory
 import com.gymapp.domain.TrainingType
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -15,7 +14,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /** Bir kez tüketilen kullanıcı bildirimleri. */
 sealed interface PackageEvent {
@@ -23,8 +21,7 @@ sealed interface PackageEvent {
     data class Failed(val message: String) : PackageEvent
 }
 
-@HiltViewModel
-class PackageViewModel @Inject constructor(
+class PackageViewModel(
     private val repository: PackageRepository
 ) : ViewModel() {
 
