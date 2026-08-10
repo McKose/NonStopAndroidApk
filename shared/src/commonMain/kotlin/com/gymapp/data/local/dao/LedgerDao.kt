@@ -63,6 +63,14 @@ interface LedgerDao {
      *
      * Pozitif değer borcu gösterir. Ödeme durumu artık ayrı bir kolonda
      * saklanmıyor; defterden türetiliyor.
+     *
+     * MARKET kayıtları hariç. Market satışı kasada anında kapanıyor ve hiç
+     * CHARGE üretmiyor, yalnızca PAYMENT üretiyor; üyeye bağlı bir market
+     * tahsilatı buraya girseydi üyenin **paket borcunu** azaltırdı. Yani üye
+     * 100 TL'lik protein bar aldığında paket borcu 100 TL düşerdi.
+     * [activePaymentsForMember] ile aynı süzgeci kullanmak zorunda: biri
+     * diğerinden farklı bir kayıt kümesine baksaydı "ödemeyi geri al"
+     * sonrasında bakiye eski hâline dönmezdi.
      */
     @Query("""
         SELECT COALESCE(SUM(
@@ -73,6 +81,7 @@ interface LedgerDao {
         FROM ledger_entries e
         WHERE e.tenantId = :tenantId
           AND e.memberId = :memberId
+          AND e.category <> 'MARKET'
           AND e.reversesId IS NULL
           AND NOT EXISTS (
               SELECT 1 FROM ledger_entries r WHERE r.reversesId = e.id
@@ -85,15 +94,21 @@ interface LedgerDao {
     suspend fun isReversed(entryId: String): Boolean
 
     /**
-     * Üyenin henüz iptal edilmemiş tahsilat kayıtları.
+     * Üyenin henüz iptal edilmemiş **paket** tahsilatları.
      *
      * Ödeme geri alındığında bunlar ters kayıtla iptal edilir.
+     *
+     * MARKET hariç: "paket ödemesini geri al" işlemi üyenin market
+     * alışverişlerini de iptal ediyordu — kasada kapanmış satışlar ciro
+     * toplamından siliniyor, üyenin borcu şişiyordu. Süzgeç
+     * [outstandingBalanceMinor] ile birebir aynı olmak zorunda.
      */
     @Query("""
         SELECT * FROM ledger_entries e
         WHERE e.tenantId = :tenantId
           AND e.memberId = :memberId
           AND e.type = 'PAYMENT'
+          AND e.category <> 'MARKET'
           AND e.reversesId IS NULL
           AND NOT EXISTS (
               SELECT 1 FROM ledger_entries r WHERE r.reversesId = e.id
