@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.labelTr
@@ -24,7 +24,7 @@ fun RegisterMemberScreen(
     onNavigateBack: () -> Unit,
     isRenewal: Boolean = false,
     memberId: String = "",
-    viewModel: MemberViewModel = hiltViewModel()
+    viewModel: MemberViewModel = koinViewModel()
 ) {
     val formState by viewModel.formState.collectAsState()
     val packages by viewModel.packages.collectAsState()

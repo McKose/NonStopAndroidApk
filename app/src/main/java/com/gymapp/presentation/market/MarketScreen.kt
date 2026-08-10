@@ -21,7 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.ProductEntity
 import com.gymapp.domain.Money
@@ -34,7 +34,7 @@ private const val LOW_STOCK_THRESHOLD = 5
 fun MarketScreen(
     onNavigateBack: () -> Unit,
     onNavigateToOrders: () -> Unit,
-    viewModel: MarketViewModel = hiltViewModel()
+    viewModel: MarketViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }

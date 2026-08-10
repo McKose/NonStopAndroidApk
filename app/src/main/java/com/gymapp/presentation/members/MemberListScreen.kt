@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Membership
 import com.gymapp.domain.MembershipState
@@ -34,7 +34,7 @@ fun MemberListScreen(
     onNavigateToMarket: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToRenew: (String) -> Unit,
-    viewModel: MemberViewModel = hiltViewModel()
+    viewModel: MemberViewModel = koinViewModel()
 ) {
     val uiState by viewModel.listUiState.collectAsState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)

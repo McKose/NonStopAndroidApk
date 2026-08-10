@@ -40,6 +40,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.datetime)
+            api(libs.koin.core)
             implementation(libs.kotlinx.coroutines.core)
             // Entity ve DAO tipleri modül dışına açıldığı için `api`.
             api(libs.androidx.room.runtime)

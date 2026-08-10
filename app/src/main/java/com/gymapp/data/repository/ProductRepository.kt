@@ -17,11 +17,8 @@ import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.StockMovementReason
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class ProductRepository @Inject constructor(
+class ProductRepository(
     private val database: GymDatabase,
     private val productDao: ProductDao,
     private val orderDao: OrderDao,

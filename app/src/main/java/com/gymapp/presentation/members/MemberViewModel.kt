@@ -9,11 +9,9 @@ import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Pricing
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 // ─── UI State ────────────────────────────────────────────────────────────────
 
@@ -48,8 +46,7 @@ data class RegisterFormState(
     val previewPrice: Double = 0.0
 )
 
-@HiltViewModel
-class MemberViewModel @Inject constructor(
+class MemberViewModel(
     private val repository: MemberRepository,
     private val packageRepository: com.gymapp.data.repository.PackageRepository
 ) : ViewModel() {

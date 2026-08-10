@@ -22,9 +22,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import com.gymapp.presentation.common.GlobalErrorHandler
-import javax.inject.Inject
+import org.koin.android.ext.android.inject
 import android.widget.Toast
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.gymapp.presentation.calendar.CalendarScreen
 import com.gymapp.presentation.dashboard.DashboardScreen
 import com.gymapp.presentation.login.LoginScreen
@@ -39,12 +39,10 @@ import com.gymapp.presentation.market.OrderHistoryScreen
 import com.gymapp.presentation.settings.SettingsScreen
 import com.gymapp.presentation.settings.PersonnelScreen
 
-import dagger.hilt.android.AndroidEntryPoint
 import com.gymapp.ui.theme.GymAppTheme
 
-@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    @Inject lateinit var errorHandler: GlobalErrorHandler
+    private val errorHandler: GlobalErrorHandler by inject()
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {

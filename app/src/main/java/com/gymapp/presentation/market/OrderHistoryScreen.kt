@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.OrderEntity
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
@@ -26,7 +26,7 @@ import java.util.*
 @Composable
 fun OrderHistoryScreen(
     onNavigateBack: () -> Unit,
-    viewModel: OrderHistoryViewModel = hiltViewModel()
+    viewModel: OrderHistoryViewModel = koinViewModel()
 ) {
     val orders by viewModel.orders.collectAsState()
 

@@ -15,11 +15,8 @@ import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Pricing
 import kotlinx.coroutines.flow.Flow
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class MemberRepository @Inject constructor(
+class MemberRepository(
     private val memberDao: MemberDao,
     private val ledgerRepository: LedgerRepository,
     private val measurementDao: MeasurementDao,

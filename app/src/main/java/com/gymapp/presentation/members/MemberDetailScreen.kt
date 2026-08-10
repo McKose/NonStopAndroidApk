@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Membership
 import com.gymapp.domain.SessionQuota
@@ -31,7 +31,7 @@ import java.util.*
 fun MemberDetailScreen(
     memberId: String,
     onNavigateBack: () -> Unit,
-    viewModel: MemberViewModel = hiltViewModel()
+    viewModel: MemberViewModel = koinViewModel()
 ) {
     val member by viewModel.getMemberById(memberId).collectAsState(initial = null)
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -104,7 +104,7 @@ fun MemberDetailScreen(
 }
 
 @Composable
-fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewModel()) {
+fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = koinViewModel()) {
     val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
     Column(
         modifier = Modifier.padding(16.dp).fillMaxSize(),
@@ -152,7 +152,7 @@ fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewMo
 }
 
 @Composable
-fun HealthProfileTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewModel()) {
+fun HealthProfileTab(member: MemberEntity, viewModel: MemberViewModel = koinViewModel()) {
     var isEditing by remember { mutableStateOf(false) }
     var healthRisks by remember { mutableStateOf(member.healthRisks ?: "") }
     var healthNotes by remember { mutableStateOf(member.healthNotes ?: "") }
@@ -250,7 +250,7 @@ fun HealthProfileTab(member: MemberEntity, viewModel: MemberViewModel = hiltView
 }
 
 @Composable
-fun MeasurementsTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewModel()) {
+fun MeasurementsTab(member: MemberEntity, viewModel: MemberViewModel = koinViewModel()) {
     val measurements by viewModel.getMeasurements(member.id).collectAsState(initial = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -410,7 +410,7 @@ fun AddMeasurementDialog(
 }
 
 @Composable
-fun PackagesTab(member: MemberEntity, viewModel: MemberViewModel = hiltViewModel()) {
+fun PackagesTab(member: MemberEntity, viewModel: MemberViewModel = koinViewModel()) {
     val packages by viewModel.packages.collectAsState()
     val activePackage = packages.find { it.id == member.activePackageId }
     val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }

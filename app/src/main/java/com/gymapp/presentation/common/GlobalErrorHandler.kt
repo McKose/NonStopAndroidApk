@@ -3,11 +3,8 @@ package com.gymapp.presentation.common
 import android.util.Log
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class GlobalErrorHandler @Inject constructor() {
+class GlobalErrorHandler() {
     private val _errors = MutableSharedFlow<String>()
     val errors = _errors.asSharedFlow()
 

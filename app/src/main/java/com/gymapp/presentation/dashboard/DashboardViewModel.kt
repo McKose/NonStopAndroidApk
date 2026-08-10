@@ -15,14 +15,12 @@ import com.gymapp.domain.MembershipState
 import com.gymapp.domain.Money
 import com.gymapp.domain.Periods
 import com.gymapp.domain.StaffRole
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
 
 private const val LOW_STOCK_THRESHOLD = 5
 
@@ -40,8 +38,7 @@ data class DashboardUiState(
     val isTrainer: Boolean get() = userRole == StaffRole.TRAINER
 }
 
-@HiltViewModel
-class DashboardViewModel @Inject constructor(
+class DashboardViewModel(
     private val memberRepository: MemberRepository,
     private val appointmentRepository: AppointmentRepository,
     private val staffRepository: StaffRepository,

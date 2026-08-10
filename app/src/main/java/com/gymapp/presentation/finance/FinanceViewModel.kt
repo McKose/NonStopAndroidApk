@@ -7,12 +7,10 @@ import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.Periods
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import javax.inject.Inject
 
 data class FinanceUiState(
     val entries: List<FinanceEntry> = emptyList(),
@@ -35,8 +33,7 @@ sealed interface FinanceEvent {
     data class Failed(val message: String) : FinanceEvent
 }
 
-@HiltViewModel
-class FinanceViewModel @Inject constructor(
+class FinanceViewModel(
     private val repository: FinanceRepository
 ) : ViewModel() {
 
