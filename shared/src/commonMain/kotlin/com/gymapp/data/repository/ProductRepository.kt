@@ -8,6 +8,8 @@ import com.gymapp.data.local.db.inTransaction
 import com.gymapp.data.local.entity.OrderEntity
 import com.gymapp.data.local.entity.ProductEntity
 import com.gymapp.data.local.entity.StockMovementEntity
+import com.gymapp.data.sync.SyncQueue
+import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.Now
 import com.gymapp.domain.DeliveryStatus
 import com.gymapp.domain.Ids
@@ -24,6 +26,7 @@ class ProductRepository(
     private val orderDao: OrderDao,
     private val stockMovementDao: StockMovementDao,
     private val ledgerRepository: LedgerRepository,
+    private val syncQueue: SyncQueue,
 ) {
     private val tenantId = Ids.DEFAULT_TENANT
 
@@ -88,9 +91,10 @@ class ProductRepository(
                 val current = stockMovementDao.onHand(tenantId, id)
                 val delta = desiredStock.coerceAtLeast(0) - current
                 if (delta != 0) {
+                    val movementId = Ids.new()
                     stockMovementDao.insert(
                         StockMovementEntity(
-                            id = Ids.new(),
+                            id = movementId,
                             tenantId = tenantId,
                             productId = id,
                             quantityDelta = delta,
@@ -100,15 +104,28 @@ class ProductRepository(
                             createdAtMs = nowMs,
                         )
                     )
+                    syncQueue.enqueue(SyncTable.STOCK_MOVEMENTS, movementId, tenantId, nowMs)
                 }
             }
+
+            syncQueue.enqueue(SyncTable.PRODUCTS, id, tenantId, nowMs)
             id
         }
     }
 
-    /** Ürünü tombstone ile siler; geçmiş hareketler ve satışlar öksüz kalmaz. */
-    suspend fun deleteProduct(productId: String) =
-        productDao.softDelete(productId, Now.epochMillis())
+    /**
+     * Ürünü tombstone ile siler; geçmiş hareketler ve satışlar öksüz kalmaz.
+     *
+     * Silme de bir değişiklik: tombstone satır kuyruğa girmezse silme sunucuya
+     * hiç gitmez ve ürün diğer cihazlarda yaşamaya devam eder.
+     */
+    suspend fun deleteProduct(productId: String) {
+        val nowMs = Now.epochMillis()
+        database.inTransaction {
+            productDao.softDelete(productId, nowMs)
+            syncQueue.enqueue(SyncTable.PRODUCTS, productId, tenantId, nowMs)
+        }
+    }
 
     /**
      * Siparişi tek transaction içinde işler.
@@ -174,20 +191,22 @@ class ProductRepository(
             )
 
             // 3) Stok çıkışları — siparişe bağlı, geri alınabilir olması için ayrı kayıt.
-            stockMovementDao.insertAll(
-                cartItems.map { (productId, quantity) ->
-                    StockMovementEntity(
-                        id = Ids.new(),
-                        tenantId = tenantId,
-                        productId = productId,
-                        quantityDelta = -quantity,
-                        reason = StockMovementReason.SALE,
-                        orderId = orderId,
-                        occurredAtMs = nowMs,
-                        createdAtMs = nowMs,
-                    )
-                }
-            )
+            val movements = cartItems.map { (productId, quantity) ->
+                StockMovementEntity(
+                    id = Ids.new(),
+                    tenantId = tenantId,
+                    productId = productId,
+                    quantityDelta = -quantity,
+                    reason = StockMovementReason.SALE,
+                    orderId = orderId,
+                    occurredAtMs = nowMs,
+                    createdAtMs = nowMs,
+                )
+            }
+            stockMovementDao.insertAll(movements)
+
+            syncQueue.enqueue(SyncTable.ORDERS, orderId, tenantId, nowMs)
+            syncQueue.enqueueAll(SyncTable.STOCK_MOVEMENTS, movements.map { it.id }, tenantId, nowMs)
 
             // 4) Tahsilat — yalnızca ödeme alındıysa (nakit esaslı).
             if (paymentStatus == "PAID" && finalPrice.isPositive) {

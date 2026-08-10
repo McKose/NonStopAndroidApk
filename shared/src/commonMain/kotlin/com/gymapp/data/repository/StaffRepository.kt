@@ -1,8 +1,12 @@
 package com.gymapp.data.repository
 
 import com.gymapp.data.local.dao.StaffDao
+import com.gymapp.data.local.db.GymDatabase
+import com.gymapp.data.local.db.inTransaction
 import com.gymapp.data.local.db.isUniqueConstraintViolation
 import com.gymapp.data.local.entity.StaffEntity
+import com.gymapp.data.sync.SyncQueue
+import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.Now
 import com.gymapp.domain.Ids
 import com.gymapp.domain.Money
@@ -19,7 +23,9 @@ import kotlinx.coroutines.flow.Flow
  * artık tek noktada.
  */
 class StaffRepository(
-    private val staffDao: StaffDao
+    private val database: GymDatabase,
+    private val staffDao: StaffDao,
+    private val syncQueue: SyncQueue,
 ) {
     private val tenantId = Ids.DEFAULT_TENANT
 
@@ -74,71 +80,82 @@ class StaffRepository(
         //
         // Silinmiş kayıtlar da aranıyor: tombstone satırları index'te durduğu için
         // görülmezlerse kayıt anlaşılmaz bir kısıt hatasıyla düşerdi.
-        val clash = staffDao.findByNicknameIncludingDeleted(tenantId, normalizedNickname)
-        if (clash != null && clash.id != staffId) {
-            throw IllegalArgumentException(
-                if (clash.deletedAtMs == null) {
-                    "Bu kullanıcı adı zaten alınmış."
+        database.inTransaction {
+            val clash = staffDao.findByNicknameIncludingDeleted(tenantId, normalizedNickname)
+            if (clash != null && clash.id != staffId) {
+                throw IllegalArgumentException(
+                    if (clash.deletedAtMs == null) {
+                        "Bu kullanıcı adı zaten alınmış."
+                    } else {
+                        "Bu kullanıcı adı silinmiş bir personele ait; farklı bir ad seçin."
+                    }
+                )
+            }
+
+            val nowMs = Now.epochMillis()
+            val existing = staffId?.let { staffDao.getStaffById(it) }
+
+            val savedId = try {
+                if (existing == null) {
+                    val id = staffId ?: Ids.new()
+                    staffDao.insertStaff(
+                        StaffEntity(
+                            id = id,
+                            tenantId = tenantId,
+                            fullName = fullName.trim(),
+                            title = title.trim(),
+                            role = role,
+                            branch = branch.trim(),
+                            commissionBasisPoints = commissionBasisPoints,
+                            monthlySalaryMinor = monthlySalary.coerceNonNegative().minor,
+                            phone = normalizedPhone,
+                            nickname = normalizedNickname,
+                            // NOT (Faz 4): şifre hash'lenmeli; kimlik doğrulama sunucuya taşınacak.
+                            password = password ?: DEFAULT_PASSWORD,
+                            isActive = isActive,
+                            createdAtMs = nowMs,
+                            updatedAtMs = nowMs,
+                        )
+                    )
+                    id
                 } else {
-                    "Bu kullanıcı adı silinmiş bir personele ait; farklı bir ad seçin."
+                    staffDao.updateStaff(
+                        existing.copy(
+                            fullName = fullName.trim(),
+                            title = title.trim(),
+                            role = role,
+                            branch = branch.trim(),
+                            commissionBasisPoints = commissionBasisPoints,
+                            monthlySalaryMinor = monthlySalary.coerceNonNegative().minor,
+                            phone = normalizedPhone,
+                            nickname = normalizedNickname,
+                            password = password ?: existing.password,
+                            isActive = isActive,
+                            updatedAtMs = nowMs,
+                        )
+                    )
+                    existing.id
                 }
-            )
-        }
-
-        val nowMs = Now.epochMillis()
-        val existing = staffId?.let { staffDao.getStaffById(it) }
-
-        try {
-            if (existing == null) {
-                val id = staffId ?: Ids.new()
-                staffDao.insertStaff(
-                    StaffEntity(
-                        id = id,
-                        tenantId = tenantId,
-                        fullName = fullName.trim(),
-                        title = title.trim(),
-                        role = role,
-                        branch = branch.trim(),
-                        commissionBasisPoints = commissionBasisPoints,
-                        monthlySalaryMinor = monthlySalary.coerceNonNegative().minor,
-                        phone = normalizedPhone,
-                        nickname = normalizedNickname,
-                        // NOT (Faz 4): şifre hash'lenmeli; kimlik doğrulama sunucuya taşınacak.
-                        password = password ?: DEFAULT_PASSWORD,
-                        isActive = isActive,
-                        createdAtMs = nowMs,
-                        updatedAtMs = nowMs,
-                    )
-                )
-                id
-            } else {
-                staffDao.updateStaff(
-                    existing.copy(
-                        fullName = fullName.trim(),
-                        title = title.trim(),
-                        role = role,
-                        branch = branch.trim(),
-                        commissionBasisPoints = commissionBasisPoints,
-                        monthlySalaryMinor = monthlySalary.coerceNonNegative().minor,
-                        phone = normalizedPhone,
-                        nickname = normalizedNickname,
-                        password = password ?: existing.password,
-                        isActive = isActive,
-                        updatedAtMs = nowMs,
-                    )
-                )
-                existing.id
+            } catch (e: Exception) {
+                if (e.isUniqueConstraintViolation()) {
+                    throw IllegalArgumentException("Bu kullanıcı adı zaten alınmış.", e)
+                }
+                throw e
             }
-        } catch (e: Exception) {
-            if (e.isUniqueConstraintViolation()) {
-                throw IllegalArgumentException("Bu kullanıcı adı zaten alınmış.", e)
-            }
-            throw e
+
+            syncQueue.enqueue(SyncTable.STAFF, savedId, tenantId, nowMs)
+            savedId
         }
     }
 
-    suspend fun deleteStaff(staffId: String) =
-        staffDao.softDelete(staffId, Now.epochMillis())
+    /** Silme de bir değişiklik: tombstone satır kuyruğa girmezse silme senkronize olmaz. */
+    suspend fun deleteStaff(staffId: String) {
+        val nowMs = Now.epochMillis()
+        database.inTransaction {
+            staffDao.softDelete(staffId, nowMs)
+            syncQueue.enqueue(SyncTable.STAFF, staffId, tenantId, nowMs)
+        }
+    }
 
     private companion object {
         const val DEFAULT_PASSWORD = "123"

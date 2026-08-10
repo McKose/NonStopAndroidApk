@@ -8,6 +8,8 @@ import com.gymapp.data.local.db.isUniqueConstraintViolation
 import com.gymapp.data.local.entity.MeasurementEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.PackageEntity
+import com.gymapp.data.sync.SyncQueue
+import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.Now
 import com.gymapp.domain.Periods
 import com.gymapp.domain.Ids
@@ -32,6 +34,7 @@ class MemberRepository(
     private val memberDao: MemberDao,
     private val ledgerRepository: LedgerRepository,
     private val measurementDao: MeasurementDao,
+    private val syncQueue: SyncQueue,
 ) {
     private val tenantId = Ids.DEFAULT_TENANT
 
@@ -144,6 +147,7 @@ class MemberRepository(
                 suffix = null,
             )
 
+            syncQueue.enqueue(SyncTable.MEMBERS, memberId, tenantId, nowMs)
             memberId
         }
     }
@@ -205,6 +209,8 @@ class MemberRepository(
                 occurredAtMs = paymentDateMs ?: nowMs,
                 suffix = "Yenileme",
             )
+
+            syncQueue.enqueue(SyncTable.MEMBERS, memberId, tenantId, nowMs)
         }
     }
 
@@ -282,6 +288,7 @@ class MemberRepository(
                 memberDao.updateMember(
                     member.copy(paymentStatus = "PAID", paymentDateMs = nowMs, updatedAtMs = nowMs)
                 )
+                syncQueue.enqueue(SyncTable.MEMBERS, memberId, tenantId, nowMs)
             } else {
                 val reversed = ledgerRepository.reversePaymentsForMember(
                     memberId = memberId,
@@ -293,6 +300,7 @@ class MemberRepository(
                 memberDao.updateMember(
                     member.copy(paymentStatus = "PENDING", paymentDateMs = null, updatedAtMs = nowMs)
                 )
+                syncQueue.enqueue(SyncTable.MEMBERS, memberId, tenantId, nowMs)
             }
         }
     }
@@ -310,12 +318,27 @@ class MemberRepository(
 
     fun getMemberById(id: String): Flow<MemberEntity?> = memberDao.getMemberByIdFlow(id)
 
-    /** Tombstone siler; üyeye bağlı randevu, ölçüm ve defter kayıtları öksüz kalmaz. */
-    suspend fun deleteMember(id: String) =
-        memberDao.softDeleteMember(id, Now.epochMillis())
+    /**
+     * Tombstone siler; üyeye bağlı randevu, ölçüm ve defter kayıtları öksüz kalmaz.
+     *
+     * Silme de bir değişiklik: tombstone satır kuyruğa girmezse silme sunucuya hiç
+     * gitmez ve üye diğer cihazlarda yaşamaya devam eder.
+     */
+    suspend fun deleteMember(id: String) {
+        val nowMs = Now.epochMillis()
+        database.inTransaction {
+            memberDao.softDeleteMember(id, nowMs)
+            syncQueue.enqueue(SyncTable.MEMBERS, id, tenantId, nowMs)
+        }
+    }
 
-    suspend fun updateMemberInfo(member: MemberEntity) =
-        memberDao.updateMember(member.copy(updatedAtMs = Now.epochMillis()))
+    suspend fun updateMemberInfo(member: MemberEntity) {
+        val nowMs = Now.epochMillis()
+        database.inTransaction {
+            memberDao.updateMember(member.copy(updatedAtMs = nowMs))
+            syncQueue.enqueue(SyncTable.MEMBERS, member.id, tenantId, nowMs)
+        }
+    }
 
     // ─── Ölçümler ─────────────────────────────────────────────────────────────
 
@@ -336,28 +359,37 @@ class MemberRepository(
         notes: String,
     ): Result<Unit> = runCatching {
         val nowMs = Now.epochMillis()
-        measurementDao.insert(
-            MeasurementEntity(
-                id = Ids.new(),
-                tenantId = tenantId,
-                memberId = memberId,
-                dateMs = nowMs,
-                height = height,
-                weight = weight,
-                shoulder = shoulder,
-                chest = chest,
-                waist = waist,
-                hips = hips,
-                leg = leg,
-                arm = arm,
-                notes = notes.trim(),
-                createdAtMs = nowMs,
-                updatedAtMs = nowMs,
+        val measurementId = Ids.new()
+        database.inTransaction {
+            measurementDao.insert(
+                MeasurementEntity(
+                    id = measurementId,
+                    tenantId = tenantId,
+                    memberId = memberId,
+                    dateMs = nowMs,
+                    height = height,
+                    weight = weight,
+                    shoulder = shoulder,
+                    chest = chest,
+                    waist = waist,
+                    hips = hips,
+                    leg = leg,
+                    arm = arm,
+                    notes = notes.trim(),
+                    createdAtMs = nowMs,
+                    updatedAtMs = nowMs,
+                )
             )
-        )
+            syncQueue.enqueue(SyncTable.MEASUREMENTS, measurementId, tenantId, nowMs)
+        }
     }
 
     /** Fiziksel silmez; tombstone işaretler ki silme de senkronize olabilsin. */
-    suspend fun deleteMeasurement(measurementId: String) =
-        measurementDao.softDelete(measurementId, Now.epochMillis())
+    suspend fun deleteMeasurement(measurementId: String) {
+        val nowMs = Now.epochMillis()
+        database.inTransaction {
+            measurementDao.softDelete(measurementId, nowMs)
+            syncQueue.enqueue(SyncTable.MEASUREMENTS, measurementId, tenantId, nowMs)
+        }
+    }
 }
