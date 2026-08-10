@@ -17,7 +17,16 @@ room            = "2.7.1"
 # Koin — bağımlılık enjeksiyonu.
 # Hilt yerine geçti: Hilt yalnızca JVM/Android'de çalışıyor, Koin ise ortak
 # koddan (KMP) kullanılabiliyor. Repository katmanı :shared'e taşınabilsin diye şart.
-koin            = "4.2.2"
+#
+# Neden 4.1.1 ve neden 4.2.x değil: Koin 4.2.0/4.2.1/4.2.2'nin Kotlin/Native
+# klib'leri Kotlin 2.3.20 ile üretilmiş (abi_version=2.3.0). Kotlin 2.2.21
+# derleyicisi en fazla ABI 2.2.0 okuyabildiği için iOS hedefi bu klib'i
+# çözemiyor — JVM tarafı sorunsuz derlendiği hâlde `compileKotlinIosArm64`
+# "KLIB resolver: incompatible ABI version" ile düşüyor. 4.1.1 Kotlin 2.1.21
+# ile üretilmiş (abi_version=1.201.0) ve mevcut derleyiciyle uyumlu.
+# Kotlin 2.3'e çıkıldığında (artık KSP'nin de 2.3.x sürümleri var) 4.2.x'e
+# dönülebilir; o yükseltme Room/AGP/Compose'u da kapsadığı için ayrı bir dilim.
+koin            = "4.1.1"
 
 # Kotlin Multiplatform
 kotlinxDatetime = "0.6.1"

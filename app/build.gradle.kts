@@ -6,10 +6,11 @@ plugins {
 
 android {
     namespace  = "com.gymapp"
-    // 36: Koin'in Compose entegrasyonuyla gelen androidx yığını (navigationevent
-    // 1.0.2) bunu şart koşuyor. `targetSdk` bilinçli olarak 35'te kalıyor —
-    // compileSdk yalnızca hangi API'lere karşı derlendiğimizi belirler,
-    // çalışma zamanı davranışını değiştiren targetSdk'dır.
+    // Bağımlılık yığınındaki androidx modülleri en az 36'ya karşı derlenmeyi
+    // isteyebiliyor; güncel kararlı seviyede kalmak en ucuzu.
+    // `targetSdk` bilinçli olarak 35'te kalıyor — compileSdk yalnızca hangi
+    // API'lere karşı derlendiğimizi belirler, çalışma zamanı davranışını
+    // değiştiren targetSdk'dır.
     compileSdk = 36
 
     defaultConfig {

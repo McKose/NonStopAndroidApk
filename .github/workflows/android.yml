@@ -36,6 +36,15 @@ jobs:
       - name: Gradle kur (cache dahil)
         uses: gradle/actions/setup-gradle@v4
 
+      # Ortak (metadata) derlemesi Linux'ta da koşabiliyor ve bağımlılıkların
+      # klib'lerini gerçekten çözüyor. Değeri: KMP bağımlılıklarından biri bizim
+      # Kotlin sürümümüzden yeni bir derleyiciyle üretilmişse ("KLIB resolver:
+      # incompatible ABI version") hata burada, 1x ücretli koşucuda çıkar —
+      # yoksa aynı hatayı ancak 10x ücretli macOS işinde görürdük. Bu adım
+      # tam olarak PR #18'de Koin 4.2.2 ile yaşanan turu önlemek için var.
+      - name: Ortak kod (metadata) derle — KMP bağımlılık uyumu
+        run: ./gradlew --no-daemon :shared:compileCommonMainKotlinMetadata
+
       # Ortak modülün testleri iş kurallarının tamamını kapsıyor; Android'e özgü
       # kod barındırmadığı için buradaki sonuç iOS için de geçerli.
       - name: Ortak modül testleri
