@@ -1,10 +1,10 @@
 package com.gymapp.data.repository
 
-import androidx.room.withTransaction
 import com.gymapp.data.local.dao.AppointmentDao
 import com.gymapp.data.local.dao.MemberDao
 import com.gymapp.data.local.dao.StaffDao
 import com.gymapp.data.local.db.GymDatabase
+import com.gymapp.data.local.db.inTransaction
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Now
@@ -57,7 +57,7 @@ class AppointmentRepository(
     ): Result<String> = runCatching {
         require(endTimeMs > startTimeMs) { "Randevu bitişi başlangıcından sonra olmalıdır." }
 
-        database.withTransaction {
+        database.inTransaction {
             val nowMs = Now.epochMillis()
 
             val member = memberDao.getMemberById(memberId)
@@ -120,7 +120,7 @@ class AppointmentRepository(
         state: AppointmentState,
         notes: String?,
     ): Result<Unit> = runCatching {
-        database.withTransaction {
+        database.inTransaction {
             val appointment = appointmentDao.getById(appointmentId)
                 ?: throw IllegalArgumentException("Randevu bulunamadı.")
 

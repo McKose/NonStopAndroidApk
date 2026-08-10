@@ -41,7 +41,11 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.kotlinx.datetime)
             api(libs.koin.core)
-            implementation(libs.kotlinx.coroutines.core)
+            // Repository'ler dışarıya `Flow` döndürüyor; tip imzada göründüğü
+            // için `api`. `implementation` olsaydı uygulama tarafı bu tipi
+            // yalnızca başka bir bağımlılığın tesadüfen getirmesi sayesinde
+            // görürdü.
+            api(libs.kotlinx.coroutines.core)
             // Entity ve DAO tipleri modül dışına açıldığı için `api`.
             api(libs.androidx.room.runtime)
             implementation(libs.androidx.sqlite.bundled)

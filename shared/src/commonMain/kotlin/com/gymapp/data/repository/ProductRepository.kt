@@ -1,10 +1,10 @@
 package com.gymapp.data.repository
 
-import androidx.room.withTransaction
 import com.gymapp.data.local.dao.OrderDao
 import com.gymapp.data.local.dao.ProductDao
 import com.gymapp.data.local.dao.StockMovementDao
 import com.gymapp.data.local.db.GymDatabase
+import com.gymapp.data.local.db.inTransaction
 import com.gymapp.data.local.entity.OrderEntity
 import com.gymapp.data.local.entity.ProductEntity
 import com.gymapp.data.local.entity.StockMovementEntity
@@ -56,7 +56,7 @@ class ProductRepository(
     ): Result<String> = runCatching {
         require(name.isNotBlank()) { "Ürün adı boş olamaz." }
 
-        database.withTransaction {
+        database.inTransaction {
             val nowMs = Now.epochMillis()
             val id = productId ?: Ids.new()
 
@@ -131,7 +131,7 @@ class ProductRepository(
     ): Result<String> = runCatching {
         require(cartItems.isNotEmpty()) { "Sepet boş." }
 
-        database.withTransaction {
+        database.inTransaction {
             var total = Money.ZERO
 
             // 1) Doğrulama — fiyat ve stok DB'den okunur, UI listesine güvenilmez.
