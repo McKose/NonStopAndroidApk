@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 /**
@@ -70,7 +71,17 @@ kotlin {
             // Entity ve DAO tipleri modül dışına açıldığı için `api`.
             api(libs.androidx.room.runtime)
             implementation(libs.androidx.sqlite.bundled)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.kotlinx.json)
         }
+
+        // HTTP motoru platforma özgü: Android'de OkHttp, iOS'ta Darwin (NSURLSession),
+        // testlerin koştuğu JVM'de yine OkHttp.
+        androidMain.dependencies { implementation(libs.ktor.client.okhttp) }
+        jvmMain.dependencies { implementation(libs.ktor.client.okhttp) }
+        iosMain.dependencies { implementation(libs.ktor.client.darwin) }
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
@@ -81,6 +92,9 @@ kotlin {
         jvmTest.dependencies {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
+            // Sahte HTTP motoru: durum kodu -> PushResult eşlemesini ağ olmadan,
+            // her kodu tek tek vererek sınamak için.
+            implementation(libs.ktor.client.mock)
         }
     }
 }
