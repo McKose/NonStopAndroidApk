@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
 import com.gymapp.domain.PackageCategory
 import com.gymapp.domain.TrainingType
@@ -166,7 +167,7 @@ fun AddPackageScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
 
-                val canSave = price.toDoubleOrNull() != null &&
+                val canSave = Decimals.parseOrNull(price) != null &&
                     (days.toIntOrNull() ?: 0) > 0 &&
                     (unlimited || (sessionCount.toIntOrNull() ?: 0) > 0)
 
@@ -177,7 +178,7 @@ fun AddPackageScreen(
                             name = generatedName,
                             type = type,
                             category = category,
-                            basePrice = price.toDoubleOrNull() ?: 0.0,
+                            basePrice = Decimals.parseOrDefault(price),
                             validityDays = days.toIntOrNull() ?: 30,
                             sessionCount = if (unlimited) null else sessionCount.toIntOrNull(),
                         )

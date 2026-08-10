@@ -24,6 +24,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.StaffEntity
+import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
 import com.gymapp.domain.Rate
 import com.gymapp.domain.StaffRole
@@ -338,8 +339,8 @@ private fun StaffDialog(
                             title = title.trim(),
                             branch = branch.trim(),
                             // Alan **yüzde** alır; baz puana çevrim tek noktada.
-                            commissionPercent = rate.toDoubleOrNull() ?: 0.0,
-                            salary = salary.toDoubleOrNull() ?: 0.0,
+                            commissionPercent = Decimals.parseOrDefault(rate),
+                            salary = Decimals.parseOrDefault(salary),
                             phone = phone.trim(),
                             nickname = nickname.trim(),
                             role = role,

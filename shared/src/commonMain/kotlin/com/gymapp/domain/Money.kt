@@ -73,51 +73,11 @@ value class Money(val minor: Long) : Comparable<Money> {
          * Kullanıcı girdisini ayrıştırır: "1.234,56", "1234,56", "1234.56",
          * "1,234.56", "1234" hepsi kabul edilir.
          *
-         * Önceki hâli **her** noktayı binlik ayıracı sayıp siliyordu, dolayısıyla
-         * "1234.56" yazan kullanıcı 123.456,00 TL kaydediyordu — 100 kat hata.
-         * Android'in sayı klavyesi cihaz diline göre nokta da üretebildiği için
-         * bu, finans ekranında gerçekten ulaşılabilir bir yoldu.
-         *
-         * Kural: iki ayıraç birden varsa **sonuncusu** ondalık ayıracıdır. Tek
-         * başına nokta belirsizdir ("1.234" hem 1234 hem 1,234 olabilir); tam üç
-         * haneli son grup ve sıfırla başlamayan tam kısım varsa Türkçe binlik
-         * okuması seçilir, aksi hâlde ondalık. Testler bu seçimi sabitliyor.
+         * Ayıraç kuralları [Decimals] içinde; para ile ölçüm alanlarının aynı
+         * girdiyi farklı okuması mümkün olmasın diye tek yerde tutuluyor.
          */
-        fun parseOrNull(input: String): Money? {
-            val trimmed = input.trim()
-            if (trimmed.isEmpty()) return null
-
-            val lastDot = trimmed.lastIndexOf('.')
-            val lastComma = trimmed.lastIndexOf(',')
-
-            val normalized = when {
-                lastDot >= 0 && lastComma >= 0 ->
-                    if (lastComma > lastDot) {
-                        trimmed.replace(".", "").replace(',', '.')  // 1.234,56
-                    } else {
-                        trimmed.replace(",", "")                    // 1,234.56
-                    }
-
-                lastComma >= 0 -> trimmed.replace(',', '.')         // 1234,56
-
-                lastDot >= 0 -> {
-                    val integerPart = trimmed.substring(0, lastDot)
-                    val decimals = trimmed.length - lastDot - 1
-                    // Tam kısım sıfırla başlıyorsa binlik gruplaması olamaz
-                    // ("0.500" = 0,5 TL); işaret karakteri atlanarak bakılır.
-                    val leadingDigit = integerPart.firstOrNull { it.isDigit() }
-                    val looksGrouped = trimmed.count { it == '.' } > 1 ||
-                        (decimals == 3 && leadingDigit != null && leadingDigit != '0')
-                    if (looksGrouped) trimmed.replace(".", "") else trimmed
-                }
-
-                else -> trimmed
-            }
-
-            val value = normalized.toDoubleOrNull() ?: return null
-            if (!value.isFinite()) return null
-            return ofMajor(value)
-        }
+        fun parseOrNull(input: String): Money? =
+            Decimals.parseOrNull(input)?.let { ofMajor(it) }
     }
 }
 

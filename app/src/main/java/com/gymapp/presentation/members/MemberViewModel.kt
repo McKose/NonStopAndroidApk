@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.PackageEntity
 import com.gymapp.data.repository.MemberRepository
+import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.PhoneNumber
@@ -102,7 +103,7 @@ class MemberViewModel(
 
     fun onDiscountChange(value: String) {
         _formState.update {
-            val disc = value.toDoubleOrNull() ?: 0.0
+            val disc = Decimals.parseOrDefault(value)
             it.copy(
                 discount = value,
                 previewPrice = repository.calculateFinalPrice(
@@ -136,7 +137,7 @@ class MemberViewModel(
                 installmentCount = newInstallment,
                 previewPrice = repository.calculateFinalPrice(
                     it.selectedPackage.basePriceMajor(),
-                    it.discount.toDoubleOrNull() ?: 0.0,
+                    Decimals.parseOrDefault(it.discount),
                     type,
                     newInstallment
                 )
@@ -150,7 +151,7 @@ class MemberViewModel(
                 installmentCount = count,
                 previewPrice = repository.calculateFinalPrice(
                     it.selectedPackage.basePriceMajor(),
-                    it.discount.toDoubleOrNull() ?: 0.0,
+                    Decimals.parseOrDefault(it.discount),
                     it.paymentType,
                     count
                 )
@@ -164,7 +165,7 @@ class MemberViewModel(
                 selectedPackage = pkg,
                 previewPrice = repository.calculateFinalPrice(
                     pkg.basePriceMajor(),
-                    it.discount.toDoubleOrNull() ?: 0.0,
+                    Decimals.parseOrDefault(it.discount),
                     it.paymentType,
                     it.installmentCount
                 )
@@ -216,7 +217,7 @@ class MemberViewModel(
                     selectedPackage = state.selectedPackage,
                     paymentType = state.paymentType,
                     installmentCount = state.installmentCount,
-                    discount = state.discount.toDoubleOrNull() ?: 0.0,
+                    discount = Decimals.parseOrDefault(state.discount),
                     paymentStatus = state.paymentStatus,
                     paymentDateMs = state.paymentDateMs
                 ).map { state.memberId }
@@ -228,7 +229,7 @@ class MemberViewModel(
                     selectedPackage = state.selectedPackage,
                     paymentType = state.paymentType,
                     installmentCount = state.installmentCount,
-                    discount = state.discount.toDoubleOrNull() ?: 0.0,
+                    discount = Decimals.parseOrDefault(state.discount),
                     paymentStatus = state.paymentStatus,
                     paymentDateMs = state.paymentDateMs,
                     healthRisks = state.healthRisks,
