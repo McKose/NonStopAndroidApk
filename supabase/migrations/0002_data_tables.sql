@@ -252,10 +252,31 @@ begin
         execute format('drop policy if exists %I on public.%I', t || '_tenant_access', t);
         execute format(
             'create policy %I on public.%I for all
+                 to authenticated
                  using (tenant_id in (select public.user_gym_ids()))
                  with check (tenant_id in (select public.user_gym_ids()))',
             t || '_tenant_access', t
         );
+        -- Tablo yetkisi, satır kuralından AYRI bir katman ve ikisi de gerekli.
+        -- Yetki olmadan satır bazlı güvenlik hiç devreye girmez: sorgu daha
+        -- önce "permission denied" ile düşer.
+        execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     end loop;
 end
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Rol yetkileri
+-- ---------------------------------------------------------------------------
+-- Satır bazlı güvenlik hangi SATIRLARIN görüneceğini söyler; tablo yetkisi ise
+-- tabloya erişilip erişilemeyeceğini. İkisi ayrı katman ve ikisi de gerekli.
+--
+-- Bu bölüm eksikti ve testler bunu göstermedi, çünkü grant'lar test dosyasının
+-- içindeydi — yani test, migrasyonun kurmadığı bir durumu doğruluyordu. Grant'lar
+-- buraya taşındı, test dosyasından çıkarıldı.
+--
+-- `anon` rolüne bilinçli olarak HİÇBİR yetki verilmiyor: giriş yapmamış bir
+-- istemcinin salon verisine erişmesi için hiçbir sebep yok.
+grant usage on schema public to authenticated;
+grant select on public.gyms, public.gym_users to authenticated;
+grant execute on function public.user_gym_ids() to authenticated;
