@@ -176,7 +176,7 @@ jobs:
 
           # Derlemeyi etkilemediği bilinen yollar. Bunların DIŞINDA tek bir dosya
           # bile varsa iOS işi koşar.
-          if echo "$degisenler" | grep -qvE '^(docs/|supabase/|\.github/|.*\.md$|LICENSE$|\.gitignore$)'; then
+          if echo "$degisenler" | grep -qvE '^(docs/|supabase/|\.github/|\.agents/|\.claude/|skills-lock\.json$|.*\.md$|LICENSE$|\.gitignore$)'; then
             echo "Derlemeyi etkileyen değişiklik var."
             echo "kod-degisti=true" >> "$GITHUB_OUTPUT"
           else
