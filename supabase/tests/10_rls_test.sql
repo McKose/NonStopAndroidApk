@@ -14,19 +14,17 @@
 -- görür ve hiçbir şey kanıtlamazdı.
 -- ---------------------------------------------------------------------------
 
--- Rol küme genelinde ve gerçek Supabase projesinde **zaten var**; koşulsuz
--- `create role` orada da, testin ikinci koşusunda da düşerdi.
-do $$
-begin
-    if not exists (select 1 from pg_roles where rolname = 'authenticated') then
-        create role authenticated nologin;
-    end if;
-end
-$$;
-
-grant usage on schema public, auth to authenticated;
-grant select, insert, update, delete on all tables in schema public to authenticated;
-grant execute on function public.user_gym_ids(), auth.uid() to authenticated;
+-- DİKKAT: burada GRANT YOK ve olmamalı.
+--
+-- İlk hâlinde vardı ve tam da bu yüzden test yanıltıcıydı: migrasyon hiçbir
+-- yetki vermiyordu, testin kendisi veriyordu. Yani test, üretimde hiç oluşmayacak
+-- bir durumu doğruluyordu — gerçek bir Supabase projesinde tablolar erişilemez
+-- kalabilirdi ve bunu hiçbir şey söylemezdi. Yetkiler artık migrasyonun işi;
+-- burada verilmeleri o kusuru tekrar gizlerdi.
+--
+-- Tek istisna `auth.uid()`: taklit fonksiyon testin kendi kurgusu, migrasyonun
+-- değil.
+grant execute on function auth.uid() to authenticated;
 
 insert into auth.users (id, email) values
     ('11111111-1111-1111-1111-111111111111', 'a@salon.test'),
