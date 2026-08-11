@@ -71,6 +71,13 @@ comment on function public.user_gym_ids() is
 alter table public.gyms      enable row level security;
 alter table public.gym_users enable row level security;
 
+-- Politikalar önce siliniyor: `create policy`'nin `if not exists` biçimi yok ve
+-- olmadan dosya ikinci kez çalıştırıldığında "already exists" ile düşüyor.
+-- 0002 bu deseni kullanıyordu, burada unutulmuştu — gerçek bir kurulumda
+-- yakalandı.
+drop policy if exists gyms_select on public.gyms;
+drop policy if exists gym_users_select on public.gym_users;
+
 -- Kullanıcı yalnızca bağlı olduğu salonu görür.
 create policy gyms_select on public.gyms
     for select
