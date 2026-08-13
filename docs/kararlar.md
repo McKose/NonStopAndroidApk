@@ -167,3 +167,45 @@ Bağlantı olmadan kişi giriş yapabilir ama randevulardaki `staffId` ile eşle
 kurulamaz, dolayısıyla "bugün benim derslerim" boş görünür. Giriş bu yüzden
 engellenmiyor: salon sahibi gibi ders vermeyen bir kullanıcı için doğru sonuç
 zaten boş liste.
+
+## Oturum cihazda şifreli saklanır
+
+**Karar:** Yenileme jetonu Android Keystore ile şifrelenip uygulamaya özel
+tercih dosyasında tutulur. Şifrelenemiyorsa **hiç saklanmaz**.
+
+**Neden:** Saklanan şey, şifreyi bilmeden kullanıcının yerine geçmeye yeten bir
+jeton. Uygulamaya özel dosya başka uygulamalarca okunamıyor ama cihaz yedeği ya
+da root erişimiyle çıkarılabiliyor; anahtar Keystore'da olduğu için kopyalanan
+dosya başka bir cihazda işe yaramıyor.
+
+`androidx.security:security-crypto` kullanımdan kaldırıldığı için aynı işi yapan
+kırk satır elle yazıldı — bakımı bırakılmış bir bağımlılığa bağlanmaktansa.
+
+Şifreleme başarısız olduğunda düz metin yazmak yerine saklamamak bilinçli:
+bedeli uygulama kapandığında tekrar giriş istenmesi, alternatifi jetonu
+korumasız bırakmak.
+
+## Oturum geri yüklenmeden ekran gösterilmez
+
+**Karar:** Açılışta saklanan oturum okunana kadar yükleniyor göstergesi
+gösterilir; hangi ekranla başlanacağı ondan sonra belirlenir.
+
+**Neden:** Beklemeden başlansaydı giriş ekranı bir an görünür, oturum geri
+yüklenince altından değişirdi — kullanıcı o sırada e-postasını yazmaya başlamış
+olabilirdi. Okuma yerel ve şifre çözme dışında iş yapmıyor, yani bekleme gözle
+görülür değil.
+
+## Senkronizasyon yazma anında tetiklenmez
+
+**Karar:** Tetikleme girişte, oturum geri yüklendiğinde, uygulama önplandayken
+dakikada bir ve elle yapılır. Kuyruğa kayıt eklendiğinde tetiklenmez.
+
+**Neden:** Kuyruğa alma, satırı değiştiren yazmayla aynı transaction içinde
+yapılıyor. O anda başlayan bir tur henüz işlenmemiş kaydı göremez: boşuna koşar
+ve değişiklik bir sonraki tetiklemeye kalırdı. Düzenli tetikleme bu yarışı
+tamamen ortadan kaldırıyor.
+
+**İlgili karar:** Senkronizasyonun durumu ve bekleyen değişiklik sayısı Ayarlar
+ekranında görünür. Görünmez bir senkronizasyon, çalışmadığında da çalışıyormuş
+gibi görünür; bekleyen sayının düşmemesi kullanıcının fark edebileceği tek
+belirti.

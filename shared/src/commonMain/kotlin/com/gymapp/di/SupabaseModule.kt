@@ -1,7 +1,6 @@
 package com.gymapp.di
 
 import com.gymapp.data.auth.AuthApi
-import com.gymapp.data.auth.InMemorySessionStore
 import com.gymapp.data.auth.SessionManager
 import com.gymapp.data.auth.SessionStore
 import com.gymapp.data.auth.SupabaseAuthApi
@@ -38,12 +37,23 @@ import org.koin.dsl.module
  * karşılıkları bağlanıyor. Alternatif — eksik ayarda hata fırlatmak — uygulamayı
  * açılışta düşürürdü ve sebep yığın izinde kalırdı.
  *
+ * ### Saklama neden dışarıdan geliyor
+ * Oturumun cihazda nasıl saklandığı platforma özgü ve güvenlik açısından hassas:
+ * Android'de Keystore ile şifreli, iOS'ta Keychain. Burada varsayılan bir
+ * uygulama bağlansaydı, platform tarafında onu geçersiz kılmayı unutmak sessizce
+ * "oturum kalıcı değil" demek olurdu — belirtisi yalnızca kullanıcının her açılışta
+ * tekrar giriş yapması.
+ *
  * ### Oturum neden tek nesne
  * [SessionManager] hem [AccessTokenProvider] hem [TenantProvider] olarak
  * bağlanıyor ve **aynı** örnek. İki ayrı örnek olsaydı biri giriş yapmış diğeri
  * yapmamış olurdu: gönderim jetonu bulur, satırlar salonsuz yazılırdı.
  */
-fun supabaseModule(url: String, anonKey: String): Module {
+fun supabaseModule(
+    url: String,
+    anonKey: String,
+    sessionStore: SessionStore,
+): Module {
     val config = SupabaseConfig.orNull(url, anonKey)
 
     return module {
@@ -52,7 +62,7 @@ fun supabaseModule(url: String, anonKey: String): Module {
         // duruyor, dolayısıyla burada hedefe özgü bir şey yazmak gerekmiyor.
         single { HttpClient() }
 
-        single<SessionStore> { InMemorySessionStore() }
+        single { sessionStore }
 
         single<AuthApi> {
             if (config == null) MissingConfigAuthApi() else SupabaseAuthApi(config, get())
