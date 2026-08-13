@@ -1,0 +1,135 @@
+/* Panelin görünümü.
+ *
+ * Tek dosya, çerçeve yok: panel bir statik sunucuya olduğu gibi konabilsin diye
+ * derleme adımı bilinçli olarak yok. Renkler koyu/açık temaya göre değişiyor —
+ * salonda ekranın gün boyu açık kalması muhtemel. */
+
+:root {
+  color-scheme: light dark;
+  --zemin: #ffffff;
+  --yuzey: #f6f7f9;
+  --kenar: #e2e5ea;
+  --metin: #14181f;
+  --soluk: #5c6673;
+  --vurgu: #1f6feb;
+  --hata: #b3261e;
+  --iyi: #1a7f37;
+  --uyari: #9a6700;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --zemin: #0f1216;
+    --yuzey: #171b21;
+    --kenar: #2a3038;
+    --metin: #e6e9ee;
+    --soluk: #9aa4b2;
+    --vurgu: #4c8dff;
+    --hata: #ff6b6b;
+    --iyi: #4ac26b;
+    --uyari: #d9a441;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 24px;
+  background: var(--zemin);
+  color: var(--metin);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+h1 { font-size: 22px; margin: 0 0 4px; }
+.alt { color: var(--soluk); margin: 0; font-size: 14px; }
+
+.kart {
+  max-width: 420px;
+  margin: 10vh auto;
+  padding: 28px;
+  background: var(--yuzey);
+  border: 1px solid var(--kenar);
+  border-radius: 14px;
+}
+
+form { display: grid; gap: 14px; margin-top: 22px; }
+label { display: grid; gap: 6px; font-size: 14px; color: var(--soluk); }
+
+input {
+  padding: 10px 12px;
+  font-size: 15px;
+  color: var(--metin);
+  background: var(--zemin);
+  border: 1px solid var(--kenar);
+  border-radius: 8px;
+}
+input:focus-visible { outline: 2px solid var(--vurgu); outline-offset: 1px; }
+
+button {
+  padding: 10px 16px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #fff;
+  background: var(--vurgu);
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+button:disabled { opacity: .6; cursor: default; }
+button.ikincil { background: transparent; color: var(--soluk); border: 1px solid var(--kenar); }
+
+.baslik {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--kenar);
+}
+
+.sekmeler { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
+.sekmeler button {
+  background: transparent;
+  color: var(--soluk);
+  border: 1px solid var(--kenar);
+}
+.sekmeler button.secili { background: var(--vurgu); color: #fff; border-color: transparent; }
+
+.hata {
+  margin: 12px 0;
+  padding: 10px 12px;
+  color: var(--hata);
+  background: color-mix(in srgb, var(--hata) 10%, transparent);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+/* Geniş tablolar sayfayı yatay kaydırmıyor, kendi içinde kayıyor. */
+#icerik { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 10px 12px; text-align: start; border-bottom: 1px solid var(--kenar); white-space: nowrap; }
+th { color: var(--soluk); font-weight: 500; }
+tbody tr:hover { background: var(--yuzey); }
+
+.rozet {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: color-mix(in srgb, var(--soluk) 15%, transparent);
+}
+.rozet-aktif { color: var(--iyi); background: color-mix(in srgb, var(--iyi) 15%, transparent); }
+.rozet-suresi_doldu { color: var(--hata); background: color-mix(in srgb, var(--hata) 12%, transparent); }
+.rozet-donduruldu, .rozet-arsivde { color: var(--uyari); background: color-mix(in srgb, var(--uyari) 15%, transparent); }
+
+pre {
+  padding: 12px;
+  overflow-x: auto;
+  background: var(--zemin);
+  border: 1px solid var(--kenar);
+  border-radius: 8px;
+  font-size: 13px;
+}
+code { font-size: 13px; }
