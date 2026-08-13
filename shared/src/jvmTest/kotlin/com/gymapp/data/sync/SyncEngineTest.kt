@@ -56,7 +56,7 @@ class SyncEngineTest {
         enqueue("b", atMs = 2_000)
         val remote = FakeRemote()
 
-        val outcome = engine(remote).syncOnce()
+        val outcome = engine(remote).syncOnce(TEST_TENANT)
 
         assertEquals(SyncOutcome(pushed = 2), outcome)
         assertEquals(0, db.syncOutboxDao().pendingCount(TEST_TENANT))
@@ -74,7 +74,7 @@ class SyncEngineTest {
         enqueue("orta", atMs = 2_000)
         val remote = FakeRemote()
 
-        engine(remote).syncOnce()
+        engine(remote).syncOnce(TEST_TENANT)
 
         assertEquals(listOf("erken", "orta", "gec"), remote.calls.map { it.second })
     }
@@ -91,7 +91,7 @@ class SyncEngineTest {
         enqueue("b", atMs = 2_000)
         val remote = FakeRemote { _, _ -> PushResult.Retryable("ağ yok") }
 
-        val outcome = engine(remote).syncOnce()
+        val outcome = engine(remote).syncOnce(TEST_TENANT)
 
         assertTrue(outcome.stopped)
         assertEquals(1, outcome.failed)
@@ -112,7 +112,7 @@ class SyncEngineTest {
             if (id == "bozuk") PushResult.Permanent("sunucu reddetti") else PushResult.Success
         }
 
-        val outcome = engine(remote).syncOnce()
+        val outcome = engine(remote).syncOnce(TEST_TENANT)
 
         assertEquals(1, outcome.pushed)
         assertEquals(1, outcome.failed)
@@ -132,12 +132,12 @@ class SyncEngineTest {
         val remote = FakeRemote { _, _ -> PushResult.Permanent("hata") }
         var clock = 10_000L
 
-        engine(remote, now = { clock }).syncOnce()
+        engine(remote, now = { clock }).syncOnce(TEST_TENANT)
         assertEquals(1, remote.calls.size)
 
         // Taban geri çekilme 5 sn; 2 sn sonra sıra bu kayda gelmemeli.
         clock += 2_000
-        val outcome = engine(remote, now = { clock }).syncOnce()
+        val outcome = engine(remote, now = { clock }).syncOnce(TEST_TENANT)
 
         assertEquals(1, remote.calls.size, "Süre dolmadan tekrar denenmemeli")
         assertEquals(1, outcome.skipped)
@@ -149,10 +149,10 @@ class SyncEngineTest {
         val remote = FakeRemote { _, _ -> PushResult.Permanent("hata") }
         var clock = 10_000L
 
-        engine(remote, now = { clock }).syncOnce()
+        engine(remote, now = { clock }).syncOnce(TEST_TENANT)
 
         clock += 6_000
-        engine(remote, now = { clock }).syncOnce()
+        engine(remote, now = { clock }).syncOnce(TEST_TENANT)
 
         assertEquals(2, remote.calls.size)
     }
@@ -174,7 +174,7 @@ class SyncEngineTest {
             PushResult.Success
         }
 
-        val outcome = engine(remote).syncOnce()
+        val outcome = engine(remote).syncOnce(TEST_TENANT)
 
         assertEquals(0, outcome.pushed, "Eski kayıt düşürülmemeli")
         assertEquals(1, outcome.skipped)
@@ -195,7 +195,7 @@ class SyncEngineTest {
         )
         val remote = FakeRemote()
 
-        val outcome = engine(remote).syncOnce()
+        val outcome = engine(remote).syncOnce(TEST_TENANT)
 
         assertEquals(0, remote.calls.size, "Uzak uca hiç gidilmemeli")
         assertEquals(1, outcome.failed)
@@ -204,7 +204,7 @@ class SyncEngineTest {
 
     @Test
     fun `bos kuyrukta tur sonuc uretmez`() = runTest {
-        val outcome = engine(FakeRemote()).syncOnce()
+        val outcome = engine(FakeRemote()).syncOnce(TEST_TENANT)
 
         assertEquals(SyncOutcome(), outcome)
     }
@@ -214,7 +214,7 @@ class SyncEngineTest {
     private fun engine(
         remote: RemoteDataSource,
         now: () -> Long = { 10_000L },
-    ) = SyncEngine(db.syncOutboxDao(), remote, testTenants, now = now)
+    ) = SyncEngine(db.syncOutboxDao(), remote, now = now)
 
     private suspend fun enqueue(entityId: String, atMs: Long) =
         queue.enqueue(SyncTable.PACKAGES, entityId, TEST_TENANT, atMs)

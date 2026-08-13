@@ -1,27 +1,9 @@
 package com.gymapp.data.sync
 
-import com.gymapp.data.auth.TenantProvider
-import com.gymapp.data.auth.requireTenantId
 import com.gymapp.data.local.dao.SyncOutboxDao
 import com.gymapp.data.local.entity.SyncOutboxEntity
 import com.gymapp.domain.Ids
 import com.gymapp.domain.Now
-
-/**
- * Bir senkronizasyon turunun sonucu.
- *
- * @param pushed sunucuya yazılan ve kuyruktan düşen kayıt sayısı
- * @param failed hata alan kayıt sayısı (kuyrukta kalırlar)
- * @param skipped bu turda atlananlar: geri çekilme süresi dolmamış olanlar ve
- *        gönderim sırasında satırı tekrar değişenler
- * @param stopped tur geçici bir hata yüzünden erken bitti mi
- */
-data class SyncOutcome(
-    val pushed: Int = 0,
-    val failed: Int = 0,
-    val skipped: Int = 0,
-    val stopped: Boolean = false,
-)
 
 /**
  * Gönderim kuyruğunu boşaltan motor.
@@ -50,22 +32,24 @@ data class SyncOutcome(
 class SyncEngine(
     private val outboxDao: SyncOutboxDao,
     private val remote: RemoteDataSource,
-    private val tenants: TenantProvider,
     private val now: () -> Long = { Now.epochMillis() },
     private val batchSize: Int = DEFAULT_BATCH_SIZE,
     private val baseBackoffMs: Long = DEFAULT_BASE_BACKOFF_MS,
     private val maxBackoffMs: Long = DEFAULT_MAX_BACKOFF_MS,
-) {
+) : SyncRunner {
 
     /**
      * Kuyruktan bir tur işler.
      *
      * Tek çağrıda kuyruğun tamamını boşaltmaya çalışmaz: en fazla [batchSize]
-     * kayıt işler. Çağıranın (arka plan işi, uygulama açılışı, elle tetikleme)
-     * kuyruk boşalana kadar tekrar çağırması beklenir — [SyncOutcome.pushed]
-     * sıfır dönene kadar.
+     * kayıt işler. Kuyruğu bitirmek çağıranın işi ve o çağıran
+     * [SyncCoordinator] — turları o yönetiyor.
+     *
+     * Salon kimliği **parametre**, motorun kendi bulduğu bir değer değil: hangi
+     * salon için koşulduğuna karar vermek tur yönetiminin parçası ve motorun
+     * oturumdan haberdar olması onu gereksizce oturuma bağlardı.
      */
-    suspend fun syncOnce(tenantId: String = tenants.requireTenantId()): SyncOutcome {
+    override suspend fun syncOnce(tenantId: String): SyncOutcome {
         var pushed = 0
         var failed = 0
         var skipped = 0

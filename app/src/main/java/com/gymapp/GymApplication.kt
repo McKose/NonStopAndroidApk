@@ -1,6 +1,7 @@
 package com.gymapp
 
 import android.app.Application
+import com.gymapp.data.auth.AndroidSessionStore
 import com.gymapp.di.appModule
 import com.gymapp.di.databaseModule
 import com.gymapp.di.supabaseModule
@@ -34,7 +35,13 @@ class GymApplication : Application() {
             // o durumda giriş ekranı ne eklenmesi gerektiğini söylüyor.
             modules(
                 databaseModule,
-                supabaseModule(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_ANON_KEY),
+                supabaseModule(
+                    url = BuildConfig.SUPABASE_URL,
+                    anonKey = BuildConfig.SUPABASE_ANON_KEY,
+                    // Oturum Android Keystore ile şifrelenip saklanıyor;
+                    // uygulama kapansa da giriş korunuyor.
+                    sessionStore = AndroidSessionStore(this@GymApplication),
+                ),
                 appModule,
             )
         }
