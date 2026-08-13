@@ -15,3 +15,6 @@
 local.properties
 
 push_to_github.ps1
+
+# Panelin proje ayarları — kuruluma özgü, depoya girmez.
+web/config.js

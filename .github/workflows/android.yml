@@ -106,6 +106,30 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  # Web panelinin iş kuralları. Bağımlılık yok, Node'un yerleşik koşucusu.
+  #
+  # Paneldeki kurallar (tutar biçimi, üyelik durumu, tombstone ayıklama)
+  # uygulamadaki Kotlin karşılıklarının kopyası. Kopya olmaları kaçınılmaz —
+  # tarayıcı Kotlin çalıştırmıyor — ama sapmaları sessiz olurdu: panel silinmiş
+  # bir üyeyi listelemeye devam eder ve kimse fark etmezdi.
+  panel:
+    name: Web paneli testleri
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # `npm install` yok ve olmamalı: panelin bağımlılığı yok ve öyle kalmalı.
+      # Bir paket eklendiği anda derleme adımı gerekir ve panel artık "dosyaları
+      # kopyala, çalışsın" olmaktan çıkar.
+      - name: Panel testleri
+        run: node --test web/*.test.js
+
   # Sunucu şeması ve erişim kuralları. Ubuntu koşucusu, 1x ücret.
   #
   # Salon yalıtımı yalnızca satır bazlı güvenlik kurallarına dayanıyor ve yanlış
@@ -176,7 +200,7 @@ jobs:
 
           # Derlemeyi etkilemediği bilinen yollar. Bunların DIŞINDA tek bir dosya
           # bile varsa iOS işi koşar.
-          if echo "$degisenler" | grep -qvE '^(docs/|supabase/|\.github/|\.agents/|\.claude/|skills-lock\.json$|.*\.md$|LICENSE$|\.gitignore$)'; then
+          if echo "$degisenler" | grep -qvE '^(docs/|supabase/|web/|\.github/|\.agents/|\.claude/|skills-lock\.json$|.*\.md$|LICENSE$|\.gitignore$)'; then
             echo "Derlemeyi etkileyen değişiklik var."
             echo "kod-degisti=true" >> "$GITHUB_OUTPUT"
           else
