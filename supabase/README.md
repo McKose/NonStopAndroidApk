@@ -211,6 +211,9 @@ Ders vermeyen bir kullanıcı (ör. salon sahibi) için bu zaten doğru sonuç.
   şekilde eklenecek.
 - **Sunucudan aşağı çekme yok.** Senkronizasyon tek yönlü: cihazdan sunucuya.
   Panelden yapılan bir değişiklik cihaza inmiyor.
+- **Arkaplanda gönderim yok.** Tetikleme girişte, uygulama önplandayken dakikada
+  bir ve Ayarlar'daki "Sunucuya Eşitle" ile oluyor. Uygulama tamamen kapalıyken
+  gönderim yapılmıyor; bunun için bir arka plan işi (WorkManager) gerekiyor.
 - **Role dayalı ince yetkilendirme.** `gym_users.role` artık oturuma taşınıyor ve
   uygulama içi yetkiyi belirliyor, ama **sunucu kuralları** hâlâ rolü ayırt
   etmiyor: salona bağlı olan yazabiliyor.

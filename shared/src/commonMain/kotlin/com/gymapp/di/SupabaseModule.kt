@@ -15,7 +15,12 @@ import com.gymapp.data.sync.SupabaseConfig
 import com.gymapp.data.sync.MissingConfigAuthApi
 import com.gymapp.data.sync.SupabaseRemoteDataSource
 import com.gymapp.data.sync.SyncEngine
+import com.gymapp.data.sync.SyncCoordinator
+import com.gymapp.data.sync.SyncRunner
 import io.ktor.client.HttpClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -72,6 +77,21 @@ fun supabaseModule(url: String, anonKey: String): Module {
             }
         }
 
-        single { SyncEngine(outboxDao = get(), remote = get(), tenants = get()) }
+        single { SyncEngine(outboxDao = get(), remote = get()) }
+        single<SyncRunner> { get<SyncEngine>() }
+
+        // Kapsam uygulama ömrü boyunca yaşıyor ve bilinçli olarak iptal
+        // edilmiyor: senkronizasyon turu, onu tetikleyen ekran kapansa bile
+        // bitmeli. Ekran kapsamına bağlansaydı kullanıcı sayfadan çıktığında
+        // yarım kalan tur, gönderilmiş sayılan ama aslında gitmemiş kayıtlar
+        // bırakırdı. `SupervisorJob` de bir turdaki hatanın kapsamı
+        // düşürmemesi için.
+        single {
+            SyncCoordinator(
+                runner = get(),
+                tenants = get(),
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            )
+        }
     }
 }

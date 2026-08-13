@@ -21,7 +21,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.gymapp.data.sync.SyncCoordinator
 import com.gymapp.presentation.common.GlobalErrorHandler
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import android.widget.Toast
 import org.koin.androidx.compose.koinViewModel
@@ -43,11 +50,13 @@ import com.gymapp.ui.theme.GymAppTheme
 
 class MainActivity : ComponentActivity() {
     private val errorHandler: GlobalErrorHandler by inject()
+    private val sync: SyncCoordinator by inject()
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        baslatSenkronizasyonDongusu()
         setContent {
             val context = LocalContext.current
             LaunchedEffect(Unit) {
@@ -189,5 +198,40 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * Uygulama önplandayken düzenli aralıklarla gönderim tetikler.
+     *
+     * Yazma anında tetiklemek doğru olmazdı: kuyruğa alma, satırı değiştiren
+     * yazmayla aynı transaction içinde yapılıyor ve o an başlayan bir tur henüz
+     * işlenmemiş kaydı göremez. Düzenli tetikleme bu yarışı tamamen ortadan
+     * kaldırıyor.
+     *
+     * Döngü yaşam döngüsüne bağlı: uygulama arkaplandayken tetikleme durur.
+     * Sürekli koşan bir zamanlayıcı, kullanıcı uygulamaya bakmazken pil harcardı.
+     * Turun kendisi arkaplanda da tamamlanır — koordinatörün kapsamı uygulama
+     * ömrü boyunca yaşıyor.
+     */
+    private fun baslatSenkronizasyonDongusu() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (isActive) {
+                    sync.requestSync()
+                    delay(SENKRONIZASYON_ARALIGI_MS)
+                }
+            }
+        }
+    }
+
+    private companion object {
+        /**
+         * Önplandayken tetikleme aralığı.
+         *
+         * Kuyruk zaten boşsa tur neredeyse bedava (tek sorgu); doluysa zaten
+         * gönderilmesi gereken veri var. Daha sık tetiklemenin karşılığı yok,
+         * daha seyrek olması panelde verinin geç görünmesi demek.
+         */
+        const val SENKRONIZASYON_ARALIGI_MS = 60_000L
     }
 }

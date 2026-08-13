@@ -6,11 +6,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Percent
+import androidx.compose.material.icons.filled.Sync
+import com.gymapp.data.sync.SyncState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -26,6 +27,9 @@ fun SettingsScreen(
     onLogout: () -> Unit,
     viewModel: SettingsViewModel = koinViewModel()
 ) {
+    val syncState by viewModel.syncState.collectAsState()
+    val pendingCount by viewModel.pendingCount.collectAsState()
+
     var showCommissionDialog by remember { mutableStateOf(false) }
     var showSalonInfoDialog by remember { mutableStateOf(false) }
 
@@ -83,6 +87,13 @@ fun SettingsScreen(
             // alan hiçbir yerde okunmayan bir tercihi yazıyordu. Çalışıyormuş
             // gibi görünen ama hiçbir etkisi olmayan bir ayar, olmamasından
             // daha kötü.
+
+            SettingsItem(
+                title = "Sunucuya Eşitle",
+                subtitle = senkronizasyonOzeti(syncState, pendingCount),
+                icon = Icons.Default.Sync,
+                onClick = { viewModel.syncNow() }
+            )
 
             SettingsItem(
                 title = "Çıkış Yap",
@@ -197,4 +208,21 @@ fun SettingsItem(
             }
         }
     }
+}
+
+/**
+ * Senkronizasyon durumunun tek satırlık özeti.
+ *
+ * "Bekleyen: 0" ile "Bağlantı sorunu" arasındaki fark kullanıcı için önemli:
+ * ilki her şeyin gittiğini, ikincisi verinin cihazda beklediğini söylüyor.
+ * Tek bir "eşitleniyor" metni ikisini de gizlerdi.
+ */
+private fun senkronizasyonOzeti(durum: SyncState, bekleyen: Int): String = when (durum) {
+    is SyncState.Running -> "Gönderiliyor…"
+    is SyncState.NoSession -> "Oturum yok"
+    is SyncState.Problem -> "${durum.reason} Bekleyen: $bekleyen"
+    is SyncState.Done ->
+        if (bekleyen == 0) "Tüm değişiklikler gönderildi" else "Bekleyen: $bekleyen"
+    SyncState.Idle ->
+        if (bekleyen == 0) "Bekleyen değişiklik yok" else "Bekleyen: $bekleyen"
 }

@@ -6,6 +6,7 @@ import com.gymapp.data.auth.AuthResult
 import com.gymapp.data.auth.SessionManager
 import com.gymapp.data.local.dao.StaffDao
 import com.gymapp.data.local.preferences.AppPreferences
+import com.gymapp.data.sync.SyncCoordinator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -34,6 +35,7 @@ class LoginViewModel(
     private val sessions: SessionManager,
     private val staffDao: StaffDao,
     private val prefs: AppPreferences,
+    private val sync: SyncCoordinator,
 ) : ViewModel() {
 
     private val _error = MutableStateFlow<String?>(null)
@@ -52,6 +54,11 @@ class LoginViewModel(
                 when (val sonuc = sessions.signIn(email, password)) {
                     is AuthResult.Success -> {
                         oturumuKur(sonuc)
+                        // Girişten önce çevrimdışı biriken değişiklikler var
+                        // olabilir; oturum açılır açılmaz gönderilmeye başlansın.
+                        // Beklenmiyor: kullanıcıyı kuyruk boşalana kadar giriş
+                        // ekranında tutmanın bir karşılığı yok.
+                        sync.requestSync()
                         onLoginSuccess()
                     }
 
