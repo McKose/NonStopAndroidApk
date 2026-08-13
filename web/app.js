@@ -8,13 +8,14 @@
 
 import { SupabaseClient } from "./supabase.js";
 import { tutarYaz, tarihYaz, uyelikDurumu, durumEtiketi, silinmemisler } from "./domain.js";
+import { ayBasi, uyeDagilimi, yaklasanBitisler, defterToplami } from "./ozet.js";
 
 const $ = (id) => document.getElementById(id);
 
 const ayar = window.NONSTOP_CONFIG;
 const istemci = new SupabaseClient(ayar?.url, ayar?.anonKey);
 
-let aktifSekme = "uyeler";
+let aktifSekme = "ozet";
 
 // ─── Görünüm geçişleri ──────────────────────────────────────────────────────
 
@@ -94,6 +95,7 @@ $("sekmeler").addEventListener("click", (olay) => {
 });
 
 const SEKMELER = {
+  ozet: { ozel: ozetYukle },
   uyeler: { tablo: "gym_members", order: "full_name.asc", ciz: uyeleriCiz },
   paketler: { tablo: "gym_packages", order: "name.asc", ciz: paketleriCiz },
   randevular: { tablo: "appointments", order: "start_time_ms.desc", ciz: randevulariCiz },
@@ -105,6 +107,12 @@ async function sekmeYukle(ad) {
   $("icerik").innerHTML = "";
   hataYaz("panel-hata", null);
   $("yukleniyor").hidden = false;
+
+  if (tanim.ozel) {
+    await tanim.ozel(ad);
+    $("yukleniyor").hidden = true;
+    return;
+  }
 
   const sonuc = await istemci.oku(tanim.tablo, { order: tanim.order });
   $("yukleniyor").hidden = true;
@@ -125,6 +133,84 @@ async function sekmeYukle(ad) {
     return;
   }
   $("icerik").appendChild(tanim.ciz(satirlar));
+}
+
+// ─── Özet ───────────────────────────────────────────────────────────────────
+
+/**
+ * Özet sekmesi: iki tablo okunuyor ve sayılıyor.
+ *
+ * Sayma ve düz toplama dışında hesap yok. Üye bazında bakiye ve hakediş
+ * bilinçli olarak burada değil — ikisi de ortak Kotlin modülünde tanımlı gerçek
+ * iş kuralları ve kopyalanmaları panelde farklı, uygulamada farklı rakam
+ * üretirdi.
+ */
+async function ozetYukle(ad) {
+  const [uyeSonuc, defterSonuc] = await Promise.all([
+    istemci.oku("gym_members", { order: "end_date_ms.asc" }),
+    istemci.oku("ledger_entries", { order: "occurred_at_ms.desc" }),
+  ]);
+
+  for (const sonuc of [uyeSonuc, defterSonuc]) {
+    if (sonuc.tur === "oturumsuz") {
+      hataYaz("giris-hata", "Oturumunuzun süresi doldu, tekrar giriş yapın.");
+      return goster("giris");
+    }
+    if (sonuc.tur !== "tamam") return hataYaz("panel-hata", sonuc.mesaj);
+  }
+
+  if (ad !== aktifSekme) return;
+
+  const simdi = Date.now();
+  const uyeler = silinmemisler(uyeSonuc.satirlar);
+  const defter = defterSonuc.satirlar; // defter append-only; tombstone yok
+  const dagilim = uyeDagilimi(uyeler, simdi);
+  const buAy = defterToplami(defter, ayBasi(simdi), simdi);
+  const yaklasan = yaklasanBitisler(uyeler, simdi);
+
+  const kap = document.createElement("div");
+  kap.appendChild(kutular([
+    ["Aktif üye", String(dagilim.AKTIF + dagilim.SURESIZ)],
+    ["Süresi dolmuş", String(dagilim.SURESI_DOLDU)],
+    ["Dondurulmuş", String(dagilim.DONDURULDU)],
+    ["Bu ay tahsilat", tutarYaz(buAy.PAYMENT)],
+    ["Bu ay gider", tutarYaz(buAy.EXPENSE)],
+  ]));
+
+  const baslik = document.createElement("h2");
+  baslik.textContent = "14 gün içinde bitecek üyelikler";
+  kap.appendChild(baslik);
+
+  if (yaklasan.length === 0) {
+    const bos = document.createElement("p");
+    bos.className = "alt";
+    bos.textContent = "Yaklaşan bitiş yok.";
+    kap.appendChild(bos);
+  } else {
+    kap.appendChild(tabloYap(
+      ["Ad Soyad", "Telefon", "Bitiş", "Kalan seans"],
+      yaklasan.map((u) => [u.full_name, u.phone, tarihYaz(u.end_date_ms), u.remaining_sessions ?? "Sınırsız"]),
+    ));
+  }
+
+  $("icerik").appendChild(kap);
+}
+
+function kutular(ciftler) {
+  const kap = document.createElement("div");
+  kap.className = "kutular";
+  for (const [baslik, deger] of ciftler) {
+    const kutu = document.createElement("div");
+    kutu.className = "kutu";
+    const b = document.createElement("p");
+    b.className = "alt";
+    b.textContent = baslik;
+    const d = document.createElement("strong");
+    d.textContent = deger;
+    kutu.append(b, d);
+    kap.appendChild(kutu);
+  }
+  return kap;
 }
 
 // ─── Tablolar ───────────────────────────────────────────────────────────────

@@ -133,3 +133,19 @@ pre {
   font-size: 13px;
 }
 code { font-size: 13px; }
+
+/* Özet kutuları: dar ekranda alt alta, geniş ekranda yan yana. */
+.kutular {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.kutu {
+  padding: 14px 16px;
+  background: var(--yuzey);
+  border: 1px solid var(--kenar);
+  border-radius: 12px;
+}
+.kutu strong { display: block; margin-top: 4px; font-size: 22px; }
+h2 { font-size: 16px; margin: 0 0 10px; }
