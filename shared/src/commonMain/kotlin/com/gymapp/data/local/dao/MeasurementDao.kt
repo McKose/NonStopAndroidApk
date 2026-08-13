@@ -17,6 +17,15 @@ interface MeasurementDao {
     """)
     fun observeForMember(tenantId: String, memberId: String): Flow<List<MeasurementEntity>>
 
+    /**
+     * Tek kayıt — senkronizasyon gönderiminin okuduğu yer.
+     *
+     * Tombstone kayıtlar da dönüyor: silme de gönderilmesi gereken bir
+     * değişiklik, süzülseydi silinen satır sunucuda sonsuza kadar canlı kalırdı.
+     */
+    @Query("SELECT * FROM measurements WHERE id = :id")
+    suspend fun getById(id: String): MeasurementEntity?
+
     @Insert
     suspend fun insert(measurement: MeasurementEntity)
 
