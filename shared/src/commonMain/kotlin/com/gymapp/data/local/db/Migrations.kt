@@ -68,5 +68,28 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+/**
+ * v3 → v4: çekme su işaretleri tablosu eklendi.
+ *
+ * Veri taşımıyor. Tablo boş başlıyor ve bu doğru: su işareti yoksa her tablo
+ * baştan okunuyor, yani ilk çekmede sunucudaki her satır iniyor. Yazma üzerine
+ * yazdığı için tekrar inen satırlar zararsız.
+ */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `sync_pull_state` (
+                `tenantId` TEXT NOT NULL,
+                `entityTable` TEXT NOT NULL,
+                `lastPulledAtMs` INTEGER NOT NULL,
+                PRIMARY KEY(`tenantId`, `entityTable`)
+            )
+            """.trimIndent()
+        )
+    }
+}
+
 /** Sürüm sırasına göre uygulanacak geçişler. */
-internal val ALL_MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+internal val ALL_MIGRATIONS: Array<Migration> =
+    arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)

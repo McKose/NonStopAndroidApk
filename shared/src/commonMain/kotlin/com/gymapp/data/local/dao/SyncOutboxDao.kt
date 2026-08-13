@@ -57,6 +57,19 @@ interface SyncOutboxDao {
     """)
     suspend fun recordFailure(id: String, nowMs: Long, error: String?)
 
+    /**
+     * Bu tabloda gönderim bekleyen satırların kimlikleri.
+     *
+     * Çekme tarafı bunları atlıyor: yerelde henüz yukarı çıkmamış bir değişiklik
+     * varsa sunucudaki hâli eskidir ve üzerine yazmak kullanıcının az önce
+     * yaptığı değişikliği silmek olurdu.
+     */
+    @Query("""
+        SELECT entityId FROM sync_outbox
+        WHERE tenantId = :tenantId AND entityTable = :entityTable
+    """)
+    suspend fun pendingIds(tenantId: String, entityTable: String): List<String>
+
     /** Bekleyen kayıt sayısı — "senkronize edilmemiş değişiklik var" göstergesi. */
     @Query("SELECT COUNT(*) FROM sync_outbox WHERE tenantId = :tenantId")
     fun observePendingCount(tenantId: String): Flow<Int>

@@ -170,3 +170,55 @@ class PullEngine(
 
 private fun JsonObject.text(key: String): String? =
     runCatching { this[key]?.jsonPrimitive?.content }.getOrNull()?.takeIf { it.isNotBlank() }
+
+/** Bütün tabloların çekilmesi. */
+fun interface PullRunner {
+    suspend fun pullAll(tenantId: String): PullSummary
+}
+
+data class PullSummary(
+    val applied: Int = 0,
+    val skipped: Int = 0,
+    val unreadable: Int = 0,
+    val stopped: Boolean = false,
+    val reason: String? = null,
+)
+
+/**
+ * Tabloları sırayla çeker.
+ *
+ * İlk duran tablo turu bitiriyor. Gerekçe: durmanın açık ara en olası sebebi ağ
+ * ve o durumda kalan sekiz tablo için de aynı sonuç alınırdı — sekiz gereksiz
+ * istek, sekiz gereksiz zaman aşımı. Bir tabloya özgü kalıcı bir hata bu yüzden
+ * diğerlerini de bir tur geciktiriyor; bedeli, o tur bittiğinde bir sonrakinde
+ * kaldığı yerden devam edilmesi.
+ *
+ * Sıra `SyncTable` tanım sırası: üyeler ve paketler, onlara atıfta bulunan
+ * randevu ve siparişlerden önce iniyor. Yerel şemada yabancı anahtar kısıtı yok,
+ * yani sıra zorunlu değil; ama ekranların ara durumda tutarlı görünmesini
+ * sağlıyor.
+ */
+class AllTablesPuller(private val engine: PullEngine) : PullRunner {
+
+    override suspend fun pullAll(tenantId: String): PullSummary {
+        var applied = 0
+        var skipped = 0
+        var unreadable = 0
+
+        for (table in SyncTable.entries) {
+            val outcome = engine.pullTable(tenantId, table)
+            applied += outcome.applied
+            skipped += outcome.skipped
+            unreadable += outcome.unreadable
+
+            if (outcome.stopped) {
+                return PullSummary(
+                    applied, skipped, unreadable,
+                    stopped = true,
+                    reason = "${table.tableName}: ${outcome.reason ?: "durdu"}",
+                )
+            }
+        }
+        return PullSummary(applied, skipped, unreadable)
+    }
+}

@@ -218,11 +218,15 @@ fun SettingsItem(
  * Tek bir "eşitleniyor" metni ikisini de gizlerdi.
  */
 private fun senkronizasyonOzeti(durum: SyncState, bekleyen: Int): String = when (durum) {
-    is SyncState.Running -> "Gönderiliyor…"
+    is SyncState.Running -> "Eşitleniyor…"
     is SyncState.NoSession -> "Oturum yok"
     is SyncState.Problem -> "${durum.reason} Bekleyen: $bekleyen"
-    is SyncState.Done ->
-        if (bekleyen == 0) "Tüm değişiklikler gönderildi" else "Bekleyen: $bekleyen"
+    is SyncState.Done -> buildString {
+        append(if (bekleyen == 0) "Güncel" else "Bekleyen: $bekleyen")
+        // İnen kayıt sayısı ayrıca yazılıyor: "hiçbir şey göndermedim ama on
+        // satır indirdim" ile "hiçbir şey olmadı" kullanıcı için farklı.
+        if (durum.pulled > 0) append(" · ${durum.pulled} kayıt indirildi")
+    }
     SyncState.Idle ->
         if (bekleyen == 0) "Bekleyen değişiklik yok" else "Bekleyen: $bekleyen"
 }

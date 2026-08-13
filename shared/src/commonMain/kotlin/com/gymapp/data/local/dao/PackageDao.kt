@@ -31,4 +31,17 @@ interface PackageDao {
      */
     @Query("UPDATE gym_packages SET deletedAtMs = :nowMs, updatedAtMs = :nowMs WHERE id = :id")
     suspend fun softDelete(id: String, nowMs: Long)
+
+    /**
+     * Sunucudan gelen satırı yazar: yoksa ekler, varsa üzerine yazar.
+     *
+     * Çekme tarafının tek yazma yolu. `@Insert` ile ayrı bir `@Update` yerine
+     * tek çağrı olması bilinçli: hangisinin gerektiğine karar vermek için önce
+     * okumak gerekirdi ve o okuma ile yazma arasında satır değişebilirdi.
+     *
+     * Yerelde gönderim bekleyen satırlar buraya hiç gelmiyor; o ayıklama
+     * `PullEngine` içinde yapılıyor (yerel değişiklik sunucudakinden yenidir).
+     */
+    @Upsert
+    suspend fun upsertFromServer(row: PackageEntity)
 }
