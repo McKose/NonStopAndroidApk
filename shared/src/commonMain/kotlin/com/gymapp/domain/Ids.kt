@@ -10,10 +10,16 @@ package com.gymapp.domain
  */
 object Ids {
     fun new(): String = randomUuid()
-
-    /** Tek salonlu kurulumda kullanılan varsayılan kiracı kimliği. */
-    const val DEFAULT_TENANT: String = "default"
 }
+
+// KALDIRILDI: `DEFAULT_TENANT = "default"` sabiti.
+//
+// Salon kimliği artık oturumdan geliyor (`TenantProvider`) ve sunucudaki
+// `gyms.id` ile aynı değer. Sabit, tek salonlu kurulumda çalışıyor gibi
+// görünüyordu ama sunucuya gönderimde reddedilirdi: `tenant_id` orada `uuid`
+// tipinde ve `"default"` geçerli bir uuid değil. Sabiti bırakmak, bir çağrı
+// yerinin yanlışlıkla ona düşmesi ve o satırların hiçbir zaman senkronize
+// olmaması riskini canlı tutardı — sessizce.
 
 /**
  * Rastgele UUID — domain katmanındaki **tek** platforma özgü nokta.

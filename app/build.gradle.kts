@@ -1,8 +1,28 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
+
+// ---------------------------------------------------------------------------
+// Sunucu ayarları
+// ---------------------------------------------------------------------------
+// Proje adresi ve `anon` anahtarı **depoya işlenmiyor**; `local.properties`ten
+// okunuyor (o dosya .gitignore'da). Anahtarın kendisi gizli değil — istemcide
+// bulunması normaldir ve tek başına hiçbir veriye erişemez, her sorgu giriş
+// yapan kullanıcıya göre süzülür. Depoya konmamasının sebebi başka: proje
+// adresi ve anahtar kuruluma özgü, kaynak koda değil.
+//
+// Değerler yoksa derleme **düşmüyor**, boş kalıyor ve uygulama açılışta
+// anlaşılır bir hata gösteriyor. Düşürmek, projeyi ilk kez klonlayan birinin
+// hiçbir şeyi derleyememesi demek olurdu.
+val yerelAyarlar = Properties().apply {
+    val dosya = rootProject.file("local.properties")
+    if (dosya.exists()) dosya.inputStream().use { load(it) }
+}
+fun ayar(anahtar: String): String = yerelAyarlar.getProperty(anahtar).orEmpty()
 
 android {
     namespace  = "com.gymapp"
@@ -20,6 +40,9 @@ android {
         versionCode   = 1
         versionName   = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "SUPABASE_URL", "\"${ayar("supabase.url")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${ayar("supabase.anonKey")}\"")
     }
 
     buildTypes {
@@ -37,6 +60,9 @@ android {
     }
     buildFeatures {
         compose = true
+        // `buildConfigField` kullanıldığı için açık: AGP 8'de varsayılan kapalı
+        // ve kapalıyken alanlar sessizce üretilmiyor.
+        buildConfig = true
     }
 }
 

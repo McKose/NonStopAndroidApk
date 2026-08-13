@@ -102,6 +102,7 @@ fun PersonnelScreen(
                     nickname = form.nickname,
                     role = form.role,
                     password = form.password,
+                    authUserId = form.authUserId,
                 )
             }
         )
@@ -139,6 +140,7 @@ private data class StaffForm(
     val nickname: String,
     val role: StaffRole,
     val password: String?,
+    val authUserId: String?,
 )
 
 @Composable
@@ -227,6 +229,7 @@ private fun StaffDialog(
     var phone by remember { mutableStateOf(staff?.phone ?: "") }
     var nickname by remember { mutableStateOf(staff?.nickname ?: "") }
     var password by remember { mutableStateOf("") }
+    var authUserId by remember { mutableStateOf(staff?.authUserId ?: "") }
     var role by remember { mutableStateOf(staff?.role ?: StaffRole.TRAINER) }
     var roleExpanded by remember { mutableStateOf(false) }
 
@@ -316,6 +319,23 @@ private fun StaffDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     modifier = Modifier.fillMaxWidth()
                 )
+                // Bu personeli Supabase hesabına bağlayan alan.
+                //
+                // Elle yapıştırılıyor çünkü uygulama `auth.users` tablosunu
+                // okuyamıyor — erişim kuralları buna izin vermiyor ve vermesi de
+                // istenmez. Boş bırakıldığında kişi giriş yapabilir ama "bugün
+                // benim derslerim" listesi boş görünür; bağlantı olmadan
+                // randevulardaki `staffId` ile eşleşme kurulamaz.
+                OutlinedTextField(
+                    value = authUserId,
+                    onValueChange = { authUserId = it },
+                    label = { Text("Supabase kullanıcı kimliği") },
+                    supportingText = {
+                        Text("Panel → Authentication → Users → kullanıcının UID değeri")
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = salary,
@@ -350,6 +370,7 @@ private fun StaffDialog(
                             nickname = nickname.trim(),
                             role = role,
                             password = password.takeIf { it.isNotBlank() },
+                            authUserId = authUserId.trim().takeIf { it.isNotBlank() },
                         )
                     )
                 }

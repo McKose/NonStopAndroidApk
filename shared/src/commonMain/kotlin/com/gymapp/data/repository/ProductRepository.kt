@@ -1,5 +1,7 @@
 package com.gymapp.data.repository
 
+import com.gymapp.data.auth.TenantProvider
+import com.gymapp.data.auth.requireTenantId
 import com.gymapp.data.local.dao.OrderDao
 import com.gymapp.data.local.dao.ProductDao
 import com.gymapp.data.local.dao.StockMovementDao
@@ -27,8 +29,18 @@ class ProductRepository(
     private val stockMovementDao: StockMovementDao,
     private val ledgerRepository: LedgerRepository,
     private val syncQueue: SyncQueue,
+    private val tenants: TenantProvider,
 ) {
-    private val tenantId = Ids.DEFAULT_TENANT
+    /**
+     * Çalışılan salon; her sorgu ve her yazma bununla süzülüyor.
+     *
+     * Sabit `"default"` değeri kaldırıldı: salon kimliği artık oturumdan
+     * geliyor ve sunucudaki `gyms.id` ile aynı. Sabit değer, tek salonlu
+     * kurulumda çalışıyor gibi görünüp sunucuya gönderimde reddedilirdi —
+     * `tenant_id` orada `uuid`.
+     */
+    private val tenantId: String
+        get() = tenants.requireTenantId()
 
     fun getAllProducts(): Flow<List<ProductEntity>> = productDao.observeAll(tenantId)
 

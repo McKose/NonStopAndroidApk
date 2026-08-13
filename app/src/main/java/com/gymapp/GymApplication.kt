@@ -3,6 +3,7 @@ package com.gymapp
 import android.app.Application
 import com.gymapp.di.appModule
 import com.gymapp.di.databaseModule
+import com.gymapp.di.supabaseModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -28,7 +29,14 @@ class GymApplication : Application() {
         startKoin {
             androidLogger()
             androidContext(this@GymApplication)
-            modules(databaseModule, appModule)
+            // Sunucu ayarları depoya işlenmiyor; `local.properties`ten okunup
+            // BuildConfig üzerinden geliyor. Boş olmaları derlemeyi düşürmüyor —
+            // o durumda giriş ekranı ne eklenmesi gerektiğini söylüyor.
+            modules(
+                databaseModule,
+                supabaseModule(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_ANON_KEY),
+                appModule,
+            )
         }
     }
 }

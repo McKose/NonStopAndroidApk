@@ -1,5 +1,6 @@
 package com.gymapp.data.repository
 
+import com.gymapp.data.testTenants
 import com.gymapp.data.createTestDatabase
 import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.sync.SyncQueue
@@ -32,7 +33,7 @@ class LedgerBalanceTest {
     @BeforeTest
     fun setUp() {
         db = createTestDatabase()
-        ledger = LedgerRepository(db.ledgerDao(), SyncQueue(db.syncOutboxDao()))
+        ledger = LedgerRepository(db.ledgerDao(), SyncQueue(db.syncOutboxDao(), testTenants), testTenants)
     }
 
     @AfterTest

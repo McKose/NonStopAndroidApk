@@ -49,6 +49,7 @@ class PersonnelViewModel(
         nickname: String,
         role: StaffRole,
         password: String? = null,
+        authUserId: String? = null,
         isActive: Boolean = true,
     ) {
         viewModelScope.launch {
@@ -63,6 +64,7 @@ class PersonnelViewModel(
                 phone = phone,
                 nickname = nickname,
                 password = password?.takeIf { it.isNotBlank() },
+                authUserId = authUserId?.takeIf { it.isNotBlank() },
                 isActive = isActive,
             ).fold(
                 onSuccess = { _events.send(PersonnelEvent.Saved) },

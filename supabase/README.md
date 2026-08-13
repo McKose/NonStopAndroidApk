@@ -31,6 +31,9 @@ yazılabileceğini söyler. İkincisi olmasaydı bir istemci başka salonun
 2. **Şemayı uygulayın.** SQL Editor'de sırasıyla çalıştırın:
    - `migrations/0001_tenancy.sql`
    - `migrations/0002_data_tables.sql`
+   - `migrations/0003_staff_auth_link.sql`
+
+   Hepsi tekrar çalıştırılabilir: emin değilseniz yeniden koşturun, zarar vermez.
 
    `tests/` altındaki dosyalar **yüklenmez**; onlar yalnızca CI içindir.
 
@@ -157,11 +160,59 @@ Yerelde koşturmak için:
 PGURL="postgres://postgres:postgres@localhost:5432/postgres" ./supabase/tests/run.sh
 ```
 
+## Uygulamayı bu projeye bağlama
+
+Bu adım **kendi bilgisayarınızda**, projeyi derlediğiniz makinede yapılır.
+
+Proje adresi ve `anon` anahtarı depoya işlenmiyor; `local.properties` dosyasından
+okunuyor (o dosya `.gitignore`'da). Anahtarın kendisi gizli değil — istemcide
+bulunması normaldir ve tek başına hiçbir veriye erişemez. Depoya konmamasının
+sebebi başka: bu değerler kuruluma özgü, kaynak koda değil.
+
+1. Projenin **kök dizinindeki** `local.properties` dosyasını açın (yoksa
+   oluşturun; Android Studio genelde `sdk.dir` satırıyla zaten oluşturur).
+2. Sonuna şu iki satırı ekleyin:
+   ```properties
+   supabase.url=https://<proje-ref>.supabase.co
+   supabase.anonKey=<anon public anahtarı>
+   ```
+   İkisi de Project Settings → API altında.
+3. Uygulamayı **yeniden derleyin** (Gradle sync + Run). Değerler derleme
+   sırasında gömülüyor; sadece dosyayı kaydetmek yetmez.
+
+Satırlar eksikse derleme düşmez — uygulama açılır ve giriş ekranında
+"Sunucu ayarları eksik" der. Bilinçli: projeyi ilk kez klonlayan birinin hiçbir
+şeyi derleyememesi daha kötü olurdu.
+
+`service_role` anahtarı buraya da **konmaz**; o anahtar tüm erişim kurallarını
+baypas eder.
+
+## Personeli hesabına bağlama
+
+Bir personelin uygulamada "bugün benim derslerim" listesini görebilmesi için
+personel kaydının Supabase hesabına bağlanması gerekiyor.
+
+1. Panel → Authentication → Users → ilgili kullanıcının **UID** değerini kopyalayın.
+2. Uygulamada Ayarlar → Personel → kişiyi açın → **Supabase kullanıcı kimliği**
+   alanına yapıştırın → Güncelle.
+
+Elle yapılıyor çünkü uygulama `auth.users` tablosunu okuyamıyor; erişim kuralları
+buna izin vermiyor ve vermesi de istenmez.
+
+Bağlantı kurulmadan da giriş yapılabilir — yalnızca randevu eşleşmesi kurulamaz.
+Ders vermeyen bir kullanıcı (ör. salon sahibi) için bu zaten doğru sonuç.
+
 ## Henüz yapılmadı
 
-- **Uygulama tarafı bağlantı.** `RemoteDataSource`'un Supabase uygulaması ve
-  oturum yönetimi yazılmadı; senkronizasyon motoru hazır ve bekliyor.
-- **`tenantId` hâlâ sabit.** Uygulamada `"default"` değeri gömülü; oturumdaki
-  kullanıcının salonundan gelmesi gerekiyor.
-- **Role dayalı ince yetkilendirme.** `gym_users.role` alanı duruyor ama kurallar
-  şu an rolü ayırt etmiyor: salona bağlı olan yazabiliyor.
+- **Oturum kalıcı değil.** Uygulama kapanınca tekrar giriş isteniyor: oturum
+  şimdilik bellekte tutuluyor. Kalıcı saklama (Android'de şifreli tercih dosyası,
+  iOS'ta Keychain) `SessionStore` arayüzünün arkasında gelecek; açılışta oturumu
+  geri yükleyen çağrı da o adımda, giriş ekranı gösterilmeden önce beklenecek
+  şekilde eklenecek.
+- **Sunucudan aşağı çekme yok.** Senkronizasyon tek yönlü: cihazdan sunucuya.
+  Panelden yapılan bir değişiklik cihaza inmiyor.
+- **Role dayalı ince yetkilendirme.** `gym_users.role` artık oturuma taşınıyor ve
+  uygulama içi yetkiyi belirliyor, ama **sunucu kuralları** hâlâ rolü ayırt
+  etmiyor: salona bağlı olan yazabiliyor.
+- **`staff.password` kolonu duruyor** ama hiçbir yerde okunmuyor ve sunucuya
+  gönderilmiyor. Şemadan kaldırılması ayrı bir geçiş.

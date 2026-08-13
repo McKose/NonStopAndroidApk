@@ -1,5 +1,7 @@
 package com.gymapp.data.repository
 
+import com.gymapp.data.auth.TenantProvider
+import com.gymapp.data.auth.requireTenantId
 import com.gymapp.data.local.dao.StaffDao
 import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.db.inTransaction
@@ -26,15 +28,27 @@ class StaffRepository(
     private val database: GymDatabase,
     private val staffDao: StaffDao,
     private val syncQueue: SyncQueue,
+    private val tenants: TenantProvider,
 ) {
-    private val tenantId = Ids.DEFAULT_TENANT
+    /**
+     * Çalışılan salon; her sorgu ve her yazma bununla süzülüyor.
+     *
+     * Sabit `"default"` değeri kaldırıldı: salon kimliği artık oturumdan
+     * geliyor ve sunucudaki `gyms.id` ile aynı. Sabit değer, tek salonlu
+     * kurulumda çalışıyor gibi görünüp sunucuya gönderimde reddedilirdi —
+     * `tenant_id` orada `uuid`.
+     */
+    private val tenantId: String
+        get() = tenants.requireTenantId()
 
     fun getAllStaff(): Flow<List<StaffEntity>> = staffDao.getAllStaff(tenantId)
 
     suspend fun getById(staffId: String): StaffEntity? = staffDao.getStaffById(staffId)
 
-    suspend fun getByNickname(nickname: String): StaffEntity? =
-        staffDao.getStaffByNickname(tenantId, nickname.trim())
+    // KALDIRILDI: `getByNickname`. Tek çağıranı eski giriş akışıydı; kimlik
+    // doğrulama Supabase Auth'a taşınınca kullanıcı adıyla arama gerekmiyor.
+    // DAO'daki sorgu duruyor: personel yönetiminde kullanıcı adı çakışması
+    // hâlâ kontrol ediliyor.
 
     /**
      * Personeli kaydeder.
@@ -53,6 +67,7 @@ class StaffRepository(
         phone: String,
         nickname: String,
         password: String? = null,
+        authUserId: String? = null,
         isActive: Boolean = true,
     ): Result<String> = runCatching {
         require(fullName.isNotBlank()) { "Ad soyad boş olamaz." }
@@ -68,6 +83,15 @@ class StaffRepository(
 
         val normalizedNickname = nickname.trim()
         require(normalizedNickname.isNotBlank()) { "Kullanıcı adı boş olamaz." }
+
+        // Supabase kullanıcı kimliği bir uuid; biçim burada doğrulanıyor çünkü
+        // yanlış yazılmış bir değerin tek belirtisi "giriş yapıyorum ama kendi
+        // derslerimi göremiyorum" olurdu — hiçbir hata mesajı üretmeyen,
+        // teşhisi zor bir durum.
+        val normalizedAuthUserId = authUserId?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+        require(normalizedAuthUserId == null || UUID_REGEX.matches(normalizedAuthUserId)) {
+            "Supabase kullanıcı kimliği geçerli bir uuid olmalı."
+        }
 
         // Numara cep numarasıysa üyelerdeki gibi E.164'e çevrilir; değilse (sabit
         // hat olabilir) olduğu gibi saklanır. Üye tarafı cep numarası **zorunlu**
@@ -110,7 +134,8 @@ class StaffRepository(
                             monthlySalaryMinor = monthlySalary.coerceNonNegative().minor,
                             phone = normalizedPhone,
                             nickname = normalizedNickname,
-                            // NOT (Faz 4): şifre hash'lenmeli; kimlik doğrulama sunucuya taşınacak.
+                            authUserId = normalizedAuthUserId,
+                            // NOT: artık okunmuyor; kimlik doğrulama Supabase Auth'ta.
                             password = password ?: DEFAULT_PASSWORD,
                             isActive = isActive,
                             createdAtMs = nowMs,
@@ -129,6 +154,10 @@ class StaffRepository(
                             monthlySalaryMinor = monthlySalary.coerceNonNegative().minor,
                             phone = normalizedPhone,
                             nickname = normalizedNickname,
+                            // Boş bırakıldığında mevcut bağlantı korunuyor:
+                            // düzenleme ekranında alanı silmek, kişinin hesap
+                            // bağlantısını farkında olmadan koparmamalı.
+                            authUserId = normalizedAuthUserId ?: existing.authUserId,
                             password = password ?: existing.password,
                             isActive = isActive,
                             updatedAtMs = nowMs,
@@ -158,6 +187,9 @@ class StaffRepository(
     }
 
     private companion object {
+        /** 8-4-4-4-12 onaltılık; Supabase kullanıcı kimliklerinin biçimi. */
+        val UUID_REGEX = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
         const val DEFAULT_PASSWORD = "123"
     }
 }

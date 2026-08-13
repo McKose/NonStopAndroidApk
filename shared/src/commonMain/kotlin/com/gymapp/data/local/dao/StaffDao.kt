@@ -33,16 +33,26 @@ interface StaffDao {
     @Query("SELECT * FROM staff WHERE id = :id")
     suspend fun getStaffById(id: String): StaffEntity?
 
+    // KALDIRILDI: `getStaffByNickname`. Tek amacı kullanıcı adıyla giriş
+    // yapmaktı; kimlik doğrulama Supabase Auth'a taşındı. Çakışma kontrolü
+    // aşağıdaki `findByNicknameIncludingDeleted` ile yapılıyor ve o duruyor.
+
     /**
-     * Giriş için kullanıcı adı araması — yalnızca **aktif** kayıtlar.
-     * Silinmiş personel giriş yapamamalı.
+     * Giriş yapan Supabase kullanıcısının personel kaydı — yalnızca **aktif**.
+     *
+     * Kimlik doğrulama sunucuda yapıldığı için giriş anında elimizde yalnızca
+     * `auth.users.id` oluyor; randevu ve hakediş kayıtları ise yerel `staff.id`
+     * değerine bakıyor. Bu sorgu iki kimliği birbirine bağlıyor.
+     *
+     * Silinmiş personel dönmüyor: hesabı hâlâ açık olan eski bir çalışan giriş
+     * yapabilir ama kendini personel listesinde bulamamalı.
      */
     @Query("""
         SELECT * FROM staff
-        WHERE tenantId = :tenantId AND nickname = :nickname AND deletedAtMs IS NULL
+        WHERE tenantId = :tenantId AND authUserId = :authUserId AND deletedAtMs IS NULL
         LIMIT 1
     """)
-    suspend fun getStaffByNickname(tenantId: String, nickname: String): StaffEntity?
+    suspend fun findByAuthUserId(tenantId: String, authUserId: String): StaffEntity?
 
     /**
      * Kullanıcı adı çakışma kontrolü — silinmiş kayıtlar **dahil**.

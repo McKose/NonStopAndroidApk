@@ -1,5 +1,7 @@
 package com.gymapp.data.sync
 
+import com.gymapp.data.auth.TenantProvider
+import com.gymapp.data.auth.requireTenantId
 import com.gymapp.data.local.dao.SyncOutboxDao
 import com.gymapp.data.local.entity.SyncOutboxEntity
 import com.gymapp.domain.Ids
@@ -48,6 +50,7 @@ data class SyncOutcome(
 class SyncEngine(
     private val outboxDao: SyncOutboxDao,
     private val remote: RemoteDataSource,
+    private val tenants: TenantProvider,
     private val now: () -> Long = { Now.epochMillis() },
     private val batchSize: Int = DEFAULT_BATCH_SIZE,
     private val baseBackoffMs: Long = DEFAULT_BASE_BACKOFF_MS,
@@ -62,7 +65,7 @@ class SyncEngine(
      * kuyruk boşalana kadar tekrar çağırması beklenir — [SyncOutcome.pushed]
      * sıfır dönene kadar.
      */
-    suspend fun syncOnce(tenantId: String = Ids.DEFAULT_TENANT): SyncOutcome {
+    suspend fun syncOnce(tenantId: String = tenants.requireTenantId()): SyncOutcome {
         var pushed = 0
         var failed = 0
         var skipped = 0

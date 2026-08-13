@@ -1,5 +1,7 @@
 package com.gymapp.data.repository
 
+import com.gymapp.data.auth.TenantProvider
+import com.gymapp.data.auth.requireTenantId
 import com.gymapp.data.local.dao.LedgerDao
 import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.db.inTransaction
@@ -20,13 +22,14 @@ class FinanceRepository(
     private val database: GymDatabase,
     private val ledgerDao: LedgerDao,
     private val ledgerRepository: LedgerRepository,
+    private val tenants: TenantProvider,
 ) {
     // ─── Okuma ──────────────────────────────────────────────────────────────
 
     fun observeLedgerBetween(
         startMs: Long,
         endMs: Long,
-        tenantId: String = Ids.DEFAULT_TENANT,
+        tenantId: String = tenants.requireTenantId(),
     ): Flow<List<LedgerEntryEntity>> = ledgerDao.observeBetween(tenantId, startMs, endMs)
 
     // ─── Yazma: yalnızca defter ─────────────────────────────────────────────

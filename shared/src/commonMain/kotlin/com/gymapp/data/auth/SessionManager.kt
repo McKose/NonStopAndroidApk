@@ -33,7 +33,7 @@ class SessionManager(
     private val store: SessionStore,
     private val now: () -> Long = { Now.epochMillis() },
     private val refreshMarginMs: Long = DEFAULT_REFRESH_MARGIN_MS,
-) : AccessTokenProvider {
+) : AccessTokenProvider, TenantProvider {
 
     private val mutex = Mutex()
     private val _session = MutableStateFlow<Session?>(null)
@@ -44,13 +44,12 @@ class SessionManager(
     /**
      * Çalışılan salon.
      *
-     * Depo katmanı bu değeri okuyor. `null` dönmesi "giriş yapılmamış" demek ve
-     * bu durumda hiçbir veri okunmamalı: oturum yokken sabit bir kimliğe düşmek,
-     * bir kullanıcının verisini başka bir kullanıcıya göstermenin en kolay yolu
-     * olurdu.
+     * Depo katmanı bu değeri [TenantProvider] üzerinden okuyor. `null` dönmesi
+     * "giriş yapılmamış" demek ve bu durumda hiçbir veri okunmamalı: oturum
+     * yokken sabit bir kimliğe düşmek, bir kullanıcının verisini başka bir
+     * kullanıcıya göstermenin en kolay yolu olurdu.
      */
-    val tenantId: String?
-        get() = _session.value?.tenantId
+    override fun currentTenantId(): String? = _session.value?.tenantId
 
     /** Saklanan oturumu geri yükler; uygulama açılışında bir kez çağrılır. */
     suspend fun restore() {
