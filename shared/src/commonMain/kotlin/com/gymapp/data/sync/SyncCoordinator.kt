@@ -31,8 +31,14 @@ sealed interface SyncState {
     data object Idle : SyncState
     data object Running : SyncState
 
-    /** Kuyruk boşaldı. [pushed] bu turda gönderilen kayıt sayısı. */
-    data class Done(val pushed: Int, val atMs: Long) : SyncState
+    /**
+     * Tur tamamlandı.
+     *
+     * [pushed] gönderilen, [pulled] indirilen kayıt sayısı. İkisi ayrı: "hiçbir
+     * şey göndermedim ama on satır indirdim" ile "hiçbir şey olmadı" kullanıcı
+     * için farklı.
+     */
+    data class Done(val pushed: Int, val pulled: Int, val atMs: Long) : SyncState
 
     /**
      * Tur erken bitti ya da bazı kayıtlar reddedildi.
@@ -40,7 +46,12 @@ sealed interface SyncState {
      * Hata "başarısız" değil "eksik" anlamında: gönderilenler gitti, kalanlar
      * kuyrukta. Kullanıcıya gösterilecek mesaj da bu ayrımı taşımalı.
      */
-    data class Problem(val reason: String, val pushed: Int, val failed: Int) : SyncState
+    data class Problem(
+        val reason: String,
+        val pushed: Int,
+        val pulled: Int,
+        val failed: Int,
+    ) : SyncState
 
     /** Giriş yapılmamış; gönderilecek bir şey aranmıyor bile. */
     data object NoSession : SyncState
@@ -64,6 +75,15 @@ sealed interface SyncState {
  * bir emniyet. Kuyruktan düşürme mantığındaki bir hata sonsuz döngü üretebilirdi
  * ve bu, pili bitiren ama hiçbir belirti vermeyen türden bir hata olurdu.
  *
+ * ### Önce gönderim, sonra indirme
+ * Sıra bilinçli. İndirme, gönderim bekleyen satırları atlıyor (yerel değişiklik
+ * sunucudakinden yenidir); önce gönderilirse o satırlar kuyruktan düşer ve
+ * güncel hâlleriyle inerler. Ters sırada aynı satır bir tur boyunca atlanır ve
+ * indirme bir tur geriden gelirdi.
+ *
+ * Gönderim geçici bir hatayla durduysa indirme hiç denenmiyor: sebep neredeyse
+ * her zaman ağ ve dokuz tablo için dokuz zaman aşımı beklemenin karşılığı yok.
+ *
  * ### Yazma anında neden tetiklenmiyor
  * Kuyruğa alma, satırı değiştiren yazmayla **aynı transaction** içinde yapılıyor.
  * O anda tetiklenen bir tur, henüz işlenmemiş (commit edilmemiş) kaydı göremez;
@@ -72,6 +92,7 @@ sealed interface SyncState {
  */
 class SyncCoordinator(
     private val runner: SyncRunner,
+    private val puller: PullRunner,
     private val tenants: TenantProvider,
     private val scope: CoroutineScope,
     private val now: () -> Long = { Now.epochMillis() },
@@ -133,9 +154,11 @@ class SyncCoordinator(
             if (outcome.stopped) {
                 // Geçici hata: ağ yok ya da sunucu yanıt vermiyor. Kalanlar
                 // kuyrukta; bir sonraki tetiklemede kaldığı yerden devam eder.
+                // İndirme denenmiyor — aynı ağ, aynı sonuç.
                 _state.value = SyncState.Problem(
                     reason = "Bağlantı sorunu — bekleyen değişiklikler gönderilemedi.",
                     pushed = pushed,
+                    pulled = 0,
                     failed = failed,
                 )
                 return
@@ -144,15 +167,7 @@ class SyncCoordinator(
             // Bu turda hiçbir kayıt düşmediyse bir sonraki tur da aynı sonucu
             // verir: ya kuyruk boş ya da kalanlar geri çekilme süresini bekliyor.
             if (outcome.pushed == 0) {
-                _state.value = if (failed > 0) {
-                    SyncState.Problem(
-                        reason = "$failed kayıt sunucu tarafından reddedildi.",
-                        pushed = pushed,
-                        failed = failed,
-                    )
-                } else {
-                    SyncState.Done(pushed, now())
-                }
+                bitir(tenantId, pushed, failed)
                 return
             }
         }
@@ -162,8 +177,32 @@ class SyncCoordinator(
         _state.value = SyncState.Problem(
             reason = "Çok fazla bekleyen değişiklik var; gönderim sürüyor.",
             pushed = pushed,
+            pulled = 0,
             failed = failed,
         )
+    }
+
+    /** Gönderim bittikten sonra indirme ve son durumun bildirilmesi. */
+    private suspend fun bitir(tenantId: String, pushed: Int, failed: Int) {
+        val cekme = puller.pullAll(tenantId)
+
+        _state.value = when {
+            cekme.stopped -> SyncState.Problem(
+                reason = "İndirme tamamlanamadı: ${cekme.reason ?: "-"}",
+                pushed = pushed,
+                pulled = cekme.applied,
+                failed = failed,
+            )
+
+            failed > 0 -> SyncState.Problem(
+                reason = "$failed kayıt sunucu tarafından reddedildi.",
+                pushed = pushed,
+                pulled = cekme.applied,
+                failed = failed,
+            )
+
+            else -> SyncState.Done(pushed, cekme.applied, now())
+        }
     }
 
     private companion object {

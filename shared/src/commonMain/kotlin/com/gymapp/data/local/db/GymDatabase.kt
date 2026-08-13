@@ -24,6 +24,9 @@ import com.gymapp.data.local.entity.*
  *
  * **v2**: gönderim kuyruğu (`sync_outbox`) eklendi — bkz. [MIGRATION_1_2].
  *
+ * **v4**: `sync_pull_state` eklendi — bkz. [MIGRATION_3_4]. Sunucudan çekmenin
+ * nereye kadar ilerlediğini tabloya başına tutuyor.
+ *
  * **v3**: `staff.authUserId` eklendi — bkz. [MIGRATION_2_3]. Giriş yapan
  * Supabase kullanıcısını yerel personel kaydına bağlıyor.
  *
@@ -51,8 +54,10 @@ import com.gymapp.data.local.entity.*
         StockMovementEntity::class,
         // Gönderim kuyruğu: yerel bir tablo, sunucuya kendisi senkronize edilmez.
         SyncOutboxEntity::class,
+        // Çekme su işaretleri: hangi tablodan nereye kadar okunduğu.
+        SyncPullStateEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -69,6 +74,7 @@ abstract class GymDatabase : RoomDatabase() {
     abstract fun ledgerDao(): LedgerDao
     abstract fun stockMovementDao(): StockMovementDao
     abstract fun syncOutboxDao(): SyncOutboxDao
+    abstract fun syncPullStateDao(): SyncPullStateDao
 }
 
 /**

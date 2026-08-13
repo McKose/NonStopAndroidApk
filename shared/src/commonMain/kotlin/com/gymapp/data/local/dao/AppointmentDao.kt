@@ -3,6 +3,7 @@ package com.gymapp.data.local.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Upsert
 import androidx.room.Update
 import com.gymapp.data.local.entity.AppointmentEntity
 import kotlinx.coroutines.flow.Flow
@@ -59,4 +60,17 @@ interface AppointmentDao {
 
     @Query("SELECT * FROM appointments WHERE id = :id")
     suspend fun getById(id: String): AppointmentEntity?
+
+    /**
+     * Sunucudan gelen satırı yazar: yoksa ekler, varsa üzerine yazar.
+     *
+     * Çekme tarafının tek yazma yolu. `@Insert` ile ayrı bir `@Update` yerine
+     * tek çağrı olması bilinçli: hangisinin gerektiğine karar vermek için önce
+     * okumak gerekirdi ve o okuma ile yazma arasında satır değişebilirdi.
+     *
+     * Yerelde gönderim bekleyen satırlar buraya hiç gelmiyor; o ayıklama
+     * `PullEngine` içinde yapılıyor (yerel değişiklik sunucudakinden yenidir).
+     */
+    @Upsert
+    suspend fun upsertFromServer(row: AppointmentEntity)
 }

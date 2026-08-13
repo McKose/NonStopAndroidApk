@@ -37,6 +37,17 @@ class SyncCoordinatorTest {
         }
     }
 
+    /** İstenen sonucu döndüren, çağrıları sayan çekici. */
+    private class SahtePuller(
+        private val sonuc: PullSummary = PullSummary(),
+    ) : PullRunner {
+        var cagriSayisi = 0
+        override suspend fun pullAll(tenantId: String): PullSummary {
+            cagriSayisi++
+            return sonuc
+        }
+    }
+
     // ─── Tur yönetimi ───────────────────────────────────────────────────────
 
     /**
@@ -60,7 +71,7 @@ class SyncCoordinatorTest {
         val durum = koordinator.syncNow()
 
         assertEquals(4, runner.cagriSayisi)
-        assertEquals(SyncState.Done(pushed = 107, atMs = SAAT), durum)
+        assertEquals(SyncState.Done(pushed = 107, pulled = 0, atMs = SAAT), durum)
     }
 
     @Test
@@ -70,7 +81,7 @@ class SyncCoordinatorTest {
         val durum = koordinator(runner).syncNow()
 
         assertEquals(1, runner.cagriSayisi)
-        assertEquals(SyncState.Done(pushed = 0, atMs = SAAT), durum)
+        assertEquals(SyncState.Done(pushed = 0, pulled = 0, atMs = SAAT), durum)
     }
 
     /**
@@ -142,6 +153,7 @@ class SyncCoordinatorTest {
         val runner = SahteRunner(listOf(SyncOutcome()))
         val koordinator = SyncCoordinator(
             runner = runner,
+            puller = SahtePuller(),
             tenants = TenantProvider { null },
             scope = this,
             now = { SAAT },
@@ -158,6 +170,54 @@ class SyncCoordinatorTest {
         koordinator(runner).syncNow()
 
         assertEquals(listOf(tenant), runner.salonlar)
+    }
+
+    // ─── İndirme ────────────────────────────────────────────────────────────
+
+    /**
+     * Gönderim bittikten sonra indirme yapılıyor.
+     *
+     * Sıra önemli: indirme, gönderim bekleyen satırları atlıyor. Önce
+     * gönderilirse o satırlar kuyruktan düşer ve güncel hâlleriyle inerler.
+     */
+    @Test
+    fun `gonderim bitince indirme yapilir`() = runTest {
+        val puller = SahtePuller(PullSummary(applied = 5))
+        val runner = SahteRunner(listOf(SyncOutcome(pushed = 2), SyncOutcome(pushed = 0)))
+
+        val durum = koordinator(runner, puller).syncNow()
+
+        assertEquals(1, puller.cagriSayisi)
+        assertEquals(SyncState.Done(pushed = 2, pulled = 5, atMs = SAAT), durum)
+    }
+
+    /**
+     * Gönderim geçici hatayla durduysa indirme denenmiyor.
+     *
+     * Sebep neredeyse her zaman ağ; dokuz tablo için dokuz zaman aşımı beklemenin
+     * karşılığı yok.
+     */
+    @Test
+    fun `gonderim durduysa indirme denenmez`() = runTest {
+        val puller = SahtePuller()
+        val runner = SahteRunner(listOf(SyncOutcome(pushed = 0, failed = 1, stopped = true)))
+
+        koordinator(runner, puller).syncNow()
+
+        assertEquals(0, puller.cagriSayisi)
+    }
+
+    /** İndirme yarım kaldıysa bu ayrıca bildiriliyor. */
+    @Test
+    fun `yarim kalan indirme sorun olarak bildirilir`() = runTest {
+        val puller = SahtePuller(PullSummary(applied = 3, stopped = true, reason = "ağ yok"))
+        val runner = SahteRunner(listOf(SyncOutcome()))
+
+        val durum = koordinator(runner, puller).syncNow()
+
+        val sorun = assertIs<SyncState.Problem>(durum)
+        assertEquals(3, sorun.pulled)
+        assertTrue(sorun.reason.contains("ağ yok"), "Gerekçe: ${sorun.reason}")
     }
 
     // ─── Tek seferlik koşma ─────────────────────────────────────────────────
@@ -195,9 +255,11 @@ class SyncCoordinatorTest {
 
     private fun kotlinx.coroutines.CoroutineScope.koordinator(
         runner: SyncRunner,
+        puller: PullRunner = SahtePuller(),
         maxRounds: Int = 40,
     ) = SyncCoordinator(
         runner = runner,
+        puller = puller,
         tenants = TenantProvider { tenant },
         scope = this,
         now = { SAAT },

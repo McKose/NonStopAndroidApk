@@ -202,13 +202,33 @@ buna izin vermiyor ve vermesi de istenmez.
 Bağlantı kurulmadan da giriş yapılabilir — yalnızca randevu eşleşmesi kurulamaz.
 Ders vermeyen bir kullanıcı (ör. salon sahibi) için bu zaten doğru sonuç.
 
+## Senkronizasyon nasıl çalışıyor
+
+**Yukarı (cihaz → sunucu).** Her yazma, satırı değiştiren işlemle aynı
+transaction içinde gönderim kuyruğuna kayıt bırakıyor. Kuyruk sırayla
+boşaltılıyor; başarısız kayıt kuyrukta kalıp üstel geri çekilmeyle tekrar
+deneniyor.
+
+**Aşağı (sunucu → cihaz).** Tablo başına bir su işareti tutuluyor: en son hangi
+ana kadar okunduğu. Her turda o andan itibaren değişen satırlar iniyor.
+
+**Çakışma kuralı:** yerelde gönderim bekleyen bir satır varsa sunucudaki hâli
+**atlanıyor**. O satır için henüz yukarı çıkmamış bir değişiklik var demektir;
+üzerine yazmak kullanıcının az önce yaptığı işi geri almak olurdu. Gönderim
+tamamlandıktan sonra bir sonraki turda güncel hâli zaten iniyor.
+
+**Sıra:** önce gönderim, sonra indirme. Ters sırada, bekleyen satırlar bir tur
+boyunca atlanır ve indirme sürekli bir tur geriden gelirdi.
+
+Silmeler de iniyor: silinen satır fiziksel olarak durmuyor, `deleted_at_ms` ile
+işaretleniyor. Süzülseydi bir cihazda silinen üye diğerinde sonsuza kadar
+görünmeye devam ederdi.
+
 ## Henüz yapılmadı
 
 - **iOS tarafında oturum saklama yok.** Android'de oturum Keystore ile
   şifrelenip saklanıyor ve uygulama kapansa da korunuyor; iOS uygulaması
   yazıldığında Keychain karşılığı `SessionStore` arayüzünün arkasına eklenecek.
-- **Sunucudan aşağı çekme yok.** Senkronizasyon tek yönlü: cihazdan sunucuya.
-  Panelden yapılan bir değişiklik cihaza inmiyor.
 - **Arkaplanda gönderim yok.** Tetikleme girişte, uygulama önplandayken dakikada
   bir ve Ayarlar'daki "Sunucuya Eşitle" ile oluyor. Uygulama tamamen kapalıyken
   gönderim yapılmıyor; bunun için bir arka plan işi (WorkManager) gerekiyor.

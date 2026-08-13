@@ -1,19 +1,5 @@
 package com.gymapp.data.sync
 
-import com.gymapp.data.local.entity.AppointmentEntity
-import com.gymapp.data.local.entity.LedgerEntryEntity
-import com.gymapp.data.local.entity.MeasurementEntity
-import com.gymapp.data.local.entity.MemberEntity
-import com.gymapp.data.local.entity.OrderEntity
-import com.gymapp.data.local.entity.PackageEntity
-import com.gymapp.data.local.entity.ProductEntity
-import com.gymapp.data.local.entity.StaffEntity
-import com.gymapp.data.local.entity.StockMovementEntity
-import com.gymapp.domain.DeliveryStatus
-import com.gymapp.domain.LedgerCategory
-import com.gymapp.domain.LedgerType
-import com.gymapp.domain.PaymentMethod
-import com.gymapp.domain.StockMovementReason
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -82,98 +68,32 @@ class RowPayloadColumnsTest {
         )
     }
 
-    // ─── Örnek satırlar ────────────────────────────────────────────────────
-    //
-    // Alanların değeri önemsiz, varlığı önemli: test yalnızca anahtar kümesine
-    // bakıyor. Boş bırakılabilecek alanlar yine de dolduruluyor — eşleme bir
-    // alanı `null` olduğunda atlasaydı, boş örnekle koşan bir test bunu eksik
-    // kolon olarak değil "zaten yoktu" diye geçiştirebilirdi.
+    /**
+     * Çekmede kullanılan zaman kolonu her tabloda gerçekten var mı.
+     *
+     * `SyncTable.deltaColumn` varsayılan olarak `updated_at_ms` ama defter ve
+     * stok hareketleri append-only: o tablolarda böyle bir kolon yok. Varsayılan
+     * olduğu gibi bırakılsaydı sunucu her istekte "böyle bir kolon yok" derdi ve
+     * o iki tablo hiç indirilemezdi — hata da kimsenin bakmadığı bir yerde
+     * kalırdı.
+     */
+    @Test
+    fun `cekmede kullanilan zaman kolonu semada var`() {
+        val tables = parseSchema(migrationFiles())
 
-    private fun samplePayload(table: SyncTable) = when (table) {
-        SyncTable.MEMBERS -> RowPayloads.of(
-            MemberEntity(
-                id = "m1", tenantId = TENANT, fullName = "Ayşe", phone = "+905001112233",
-                email = "a@b.c", birthDateMs = 1, activePackageId = "p1", totalSessions = 10,
-                remainingSessions = 9, startDateMs = 1, endDateMs = 2, installmentCount = 3,
-                packagePriceMinor = 100, discountMinor = 10, pricePaidMinor = 90,
-                paymentStatus = "PAID", paymentDateMs = 1, notes = "not",
-                healthRisks = "yok", riskLevel = "LOW", healthNotes = "yok",
-                createdAtMs = 1, updatedAtMs = 2, deletedAtMs = null,
-            )
-        )
+        for (table in SyncTable.entries) {
+            val columns = tables[table.tableName]
+                ?: fail("Migrasyonda ${table.tableName} tablosu yok")
 
-        SyncTable.PACKAGES -> RowPayloads.of(
-            PackageEntity(
-                id = "p1", tenantId = TENANT, name = "Aylık", validityDays = 30,
-                sessionCount = 12, basePriceMinor = 100_000,
-                createdAtMs = 1, updatedAtMs = 2, deletedAtMs = null,
+            assertTrue(
+                table.deltaColumn in columns,
+                "${table.tableName}: '${table.deltaColumn}' kolonu şemada yok. " +
+                    "Mevcut kolonlar: ${columns.sorted()}",
             )
-        )
-
-        SyncTable.PRODUCTS -> RowPayloads.of(
-            ProductEntity(
-                id = "pr1", tenantId = TENANT, name = "Su", category = "içecek",
-                priceMinor = 1500, imageUrl = "http://x/y.png",
-                createdAtMs = 1, updatedAtMs = 2, deletedAtMs = null,
-            )
-        )
-
-        SyncTable.APPOINTMENTS -> RowPayloads.of(
-            AppointmentEntity(
-                id = "a1", tenantId = TENANT, memberId = "m1", staffId = "s1",
-                startTimeMs = 1, endTimeMs = 2, sessionValueMinor = 5000,
-                settledAtMs = 3, notes = "not",
-                createdAtMs = 1, updatedAtMs = 2, deletedAtMs = null,
-            )
-        )
-
-        SyncTable.STAFF -> RowPayloads.of(
-            StaffEntity(
-                id = "s1", tenantId = TENANT, fullName = "Mehmet", title = "Eğitmen",
-                branch = "Fitness", commissionBasisPoints = 4000, monthlySalaryMinor = 1,
-                phone = "+905001112233", nickname = "mehmet", password = "gizli",
-                authUserId = "458f1383-d7ef-474b-8e16-798bde768654",
-                createdAtMs = 1, updatedAtMs = 2, deletedAtMs = null,
-            )
-        )
-
-        SyncTable.ORDERS -> RowPayloads.of(
-            OrderEntity(
-                id = "o1", tenantId = TENANT, memberId = "m1", totalPriceMinor = 100,
-                discountMinor = 10, finalPriceMinor = 90, paymentMethod = PaymentMethod.CASH,
-                paymentStatus = "PAID", deliveryStatus = DeliveryStatus.POST_DELIVERY,
-                dateMs = 1, notes = "not",
-                createdAtMs = 1, updatedAtMs = 2, deletedAtMs = null,
-            )
-        )
-
-        SyncTable.MEASUREMENTS -> RowPayloads.of(
-            MeasurementEntity(
-                id = "me1", tenantId = TENANT, memberId = "m1", dateMs = 1,
-                height = 170.0, weight = 70.0, shoulder = 1.0, chest = 2.0,
-                waist = 3.0, hips = 4.0, leg = 5.0, arm = 6.0, notes = "not",
-                createdAtMs = 1, updatedAtMs = 2, deletedAtMs = null,
-            )
-        )
-
-        SyncTable.LEDGER_ENTRIES -> RowPayloads.of(
-            LedgerEntryEntity(
-                id = "l1", tenantId = TENANT, type = LedgerType.PAYMENT,
-                category = LedgerCategory.MEMBERSHIP, amountMinor = 100,
-                paymentMethod = PaymentMethod.CARD, memberId = "m1", staffId = "s1",
-                orderId = "o1", appointmentId = "a1", description = "açıklama",
-                occurredAtMs = 1, reversesId = "l0", createdAtMs = 1,
-            )
-        )
-
-        SyncTable.STOCK_MOVEMENTS -> RowPayloads.of(
-            StockMovementEntity(
-                id = "sm1", tenantId = TENANT, productId = "pr1", quantityDelta = -1,
-                reason = StockMovementReason.SALE, orderId = "o1", note = "not",
-                occurredAtMs = 1, createdAtMs = 1,
-            )
-        )
+        }
     }
+
+    private fun samplePayload(table: SyncTable) = SampleRows.payload(table)
 
     // ─── Migrasyon dosyasının ayrıştırılması ───────────────────────────────
 
@@ -324,8 +244,6 @@ class RowPayloadColumnsTest {
     }
 
     private companion object {
-        const val TENANT = "65409c76-0226-4d89-91a2-48c2ab0d1cab"
-
         /** Kolon değil, tablo düzeyi kısıt başlatan sözcükler. */
         val TABLE_CONSTRAINT_KEYWORDS = setOf(
             "unique", "primary", "foreign", "check", "constraint", "exclude", "like",

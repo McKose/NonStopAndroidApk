@@ -6,7 +6,17 @@ import com.gymapp.data.auth.SessionStore
 import com.gymapp.data.auth.SupabaseAuthApi
 import com.gymapp.data.auth.TenantProvider
 import com.gymapp.data.sync.AccessTokenProvider
+import com.gymapp.data.sync.AllTablesPuller
 import com.gymapp.data.sync.DisabledRemoteDataSource
+import com.gymapp.data.sync.DisabledRemoteReader
+import com.gymapp.data.sync.LocalRowWriter
+import com.gymapp.data.sync.PullEngine
+import com.gymapp.data.sync.PullLocalState
+import com.gymapp.data.sync.PullRunner
+import com.gymapp.data.sync.RemoteReader
+import com.gymapp.data.sync.RoomPullLocalState
+import com.gymapp.data.sync.RoomRowWriter
+import com.gymapp.data.sync.SupabaseRemoteReader
 import com.gymapp.data.sync.LocalRowPayloadProvider
 import com.gymapp.data.sync.RemoteDataSource
 import com.gymapp.data.sync.RowPayloadProvider
@@ -90,6 +100,19 @@ fun supabaseModule(
         single { SyncEngine(outboxDao = get(), remote = get()) }
         single<SyncRunner> { get<SyncEngine>() }
 
+        // ─── İndirme ────────────────────────────────────────────────────────
+        single<RemoteReader> {
+            if (config == null) {
+                DisabledRemoteReader()
+            } else {
+                SupabaseRemoteReader(config = config, httpClient = get(), tokens = get())
+            }
+        }
+        single<PullLocalState> { RoomPullLocalState(get()) }
+        single<LocalRowWriter> { RoomRowWriter(get()) }
+        single { PullEngine(reader = get(), writer = get(), state = get()) }
+        single<PullRunner> { AllTablesPuller(get()) }
+
         // Kapsam uygulama ömrü boyunca yaşıyor ve bilinçli olarak iptal
         // edilmiyor: senkronizasyon turu, onu tetikleyen ekran kapansa bile
         // bitmeli. Ekran kapsamına bağlansaydı kullanıcı sayfadan çıktığında
@@ -99,6 +122,7 @@ fun supabaseModule(
         single {
             SyncCoordinator(
                 runner = get(),
+                puller = get(),
                 tenants = get(),
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             )
