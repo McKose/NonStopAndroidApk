@@ -68,6 +68,31 @@ class RowPayloadColumnsTest {
         )
     }
 
+    /**
+     * Çekmede kullanılan zaman kolonu her tabloda gerçekten var mı.
+     *
+     * `SyncTable.deltaColumn` varsayılan olarak `updated_at_ms` ama defter ve
+     * stok hareketleri append-only: o tablolarda böyle bir kolon yok. Varsayılan
+     * olduğu gibi bırakılsaydı sunucu her istekte "böyle bir kolon yok" derdi ve
+     * o iki tablo hiç indirilemezdi — hata da kimsenin bakmadığı bir yerde
+     * kalırdı.
+     */
+    @Test
+    fun `cekmede kullanilan zaman kolonu semada var`() {
+        val tables = parseSchema(migrationFiles())
+
+        for (table in SyncTable.entries) {
+            val columns = tables[table.tableName]
+                ?: fail("Migrasyonda ${table.tableName} tablosu yok")
+
+            assertTrue(
+                table.deltaColumn in columns,
+                "${table.tableName}: '${table.deltaColumn}' kolonu şemada yok. " +
+                    "Mevcut kolonlar: ${columns.sorted()}",
+            )
+        }
+    }
+
     private fun samplePayload(table: SyncTable) = SampleRows.payload(table)
 
     // ─── Migrasyon dosyasının ayrıştırılması ───────────────────────────────
