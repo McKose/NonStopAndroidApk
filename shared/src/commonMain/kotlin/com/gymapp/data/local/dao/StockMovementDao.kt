@@ -14,6 +14,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface StockMovementDao {
 
+    /** Tek kayıt — senkronizasyon gönderiminin okuduğu yer. */
+    @Query("SELECT * FROM stock_movements WHERE id = :id")
+    suspend fun getById(id: String): StockMovementEntity?
+
     @Insert
     suspend fun insert(movement: StockMovementEntity)
 
