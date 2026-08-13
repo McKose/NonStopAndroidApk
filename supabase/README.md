@@ -40,24 +40,102 @@ yazılabileceğini söyler. İkincisi olmasaydı bir istemci başka salonun
    ```
    Dönen `id` değerini not edin — uygulamadaki `tenantId` bu olacak.
 
-4. **Personel hesaplarını açın.** Authentication → Users → Add user. Her personel
-   için bir e-posta ve şifre.
+4. **Personel hesaplarını açın.** Bu adım SQL değil: Authentication → Users →
+   Add user → Create new user. Her personel için bir e-posta ve şifre.
+   **Auto Confirm User** işaretlensin — işaretlenmezse hesap doğrulama e-postası
+   bekler ve giriş `invalid_grant` ile reddedilir.
 
-5. **Kullanıcıları salona bağlayın.** Her kullanıcı için:
+5. **Kullanıcıları salona bağlayın.** UUID kopyalamamak için e-posta ve salon
+   adından çözen biçim:
    ```sql
    insert into public.gym_users (user_id, gym_id, role)
-   values ('<auth.users.id>', '<gyms.id>', 'TRAINER');  -- ya da MANAGER / ADMIN
+   select u.id, g.id, 'ADMIN'          -- ya da MANAGER / TRAINER
+   from auth.users u, public.gyms g
+   where u.email = '<personelin e-postası>'
+     and g.name  = '<salon adı>';
    ```
+   `INSERT 0 1` dönmeli. `INSERT 0 0` dönerse e-posta ya da salon adı tutmamıştır.
+
    Bu adım atlanırsa kullanıcı giriş yapar ama **hiçbir satır göremez** — kural
    "bağlı olduğun salonun satırları" dediği için bağlantısı olmayan kullanıcının
    sonucu boş olur. Beklenen davranış budur.
 
-6. **Uygulama anahtarlarını alın.** Project Settings → API: `Project URL` ve
-   `anon public` anahtarı. Uygulamanın istemci tarafı bunları kullanacak.
-   `service_role` anahtarı uygulamaya **konulmaz** — o anahtar tüm kuralları
-   baypas eder.
+6. **Uçtan uca doğrulayın.** Aşağıdaki bölüm.
 
-## Doğrulama
+## Kurulumun doğrulanması (6. adım)
+
+Bu adım panelde **yapılmaz**. Panelin SQL Editor'ü veritabanına tablo sahibi
+olarak bağlanır; sahip satır bazlı güvenliği baypas eder, orada her sorgu her
+satırı görür. Yani panelde çalışan bir `select` hiçbir şey kanıtlamaz. Sınanması
+gereken şey uygulamanın gireceği kapı: giriş yapmış bir personel kimliğiyle,
+kuralların gerçekten uygulandığı yoldan veri gelip gelmediği.
+
+Tek bir sorgu üç ayrı katmanı aynı anda doğruluyor: kimlik doğrulama, tablo
+yetkileri (`grant`) ve salon yalıtımı kuralları.
+
+**6.1 — Anahtarları alın.** Project Settings → API: `Project URL` ve
+`anon public` anahtarı (yeni arayüzde "Publishable key", aynı şey). Kopyala
+düğmesini kullanın; elle seçilince sonu kesilir ve hata anlaşılmaz olur.
+`service_role` / `secret` anahtarı hiçbir yere yapıştırılmaz — o anahtar tüm
+kuralları baypas eder ve uygulamaya da **konulmaz**.
+
+**6.2 — Giriş yapıp jetonu alın** (PowerShell):
+
+```powershell
+$url    = "https://<proje-ref>.supabase.co"
+$anon   = "<anon anahtarı>"
+$eposta = "<4. adımdaki personelin e-postası>"
+$sifre  = "<o hesabın şifresi>"
+
+$giris = Invoke-RestMethod -Method Post `
+  -Uri "$url/auth/v1/token?grant_type=password" `
+  -Headers @{ apikey = $anon } `
+  -ContentType "application/json" `
+  -Body (@{ email = $eposta; password = $sifre } | ConvertTo-Json)
+
+$jeton = $giris.access_token
+$jeton.Substring(0,16)      # "eyJhbGciOiJIUzI1" benzeri → giriş başarılı
+```
+
+Jeton değişkende tutuluyor: 800 karakterlik bir metni kopyalayıp yapıştırmak
+hataya davetiye. Ömrü **1 saat**; sonra bu adım tekrarlanır.
+
+Burada `invalid_grant` dönerse şifre yanlıştır **ya da** hesap onaylanmamıştır
+(4. adımda "Auto Confirm User" işaretlenmemiş). İkincisi için: Authentication →
+Users → kullanıcı → ⋯ → Confirm email.
+
+**6.3 — Asıl sınav:**
+
+```powershell
+Invoke-RestMethod -Uri "$url/rest/v1/gyms?select=*" `
+  -Headers @{ apikey = $anon; Authorization = "Bearer $jeton" }
+```
+
+Beklenen: **tam olarak bir satır** — kullanıcının bağlı olduğu salon.
+
+| Ne döndü | Anlamı | Ne yapmalı |
+|---|---|---|
+| tek satır | kurulum doğru | — |
+| boş liste | jeton geçerli, tablo erişilebilir, kullanıcı hiçbir salona bağlı değil | 5. adım |
+| `permission denied for table gyms` (`42501`) | `grant`'lar yok, `0002`'nin son bloğu koşmamış | `0002`'yi tekrar uygulayın |
+| `401` / `JWT expired` | jeton yok ya da süresi dolmuş | 6.2'yi tekrarlayın |
+| `relation "public.gyms" does not exist` (`42P01`) | `0001` koşmamış | `0001`'i uygulayın |
+
+Boş liste ile hata arasındaki fark önemli: boş liste bir erişim sorunu
+**değildir**. Kural "bağlı olduğun salonun satırları" dediği için, bağlantısı
+olmayan kullanıcının doğru cevabı boş kümedir.
+
+**6.4 — İki ek kontrol.**
+
+Bir veri tablosu (`/rest/v1/products?select=*`, aynı başlıklarla) **boş** dönmeli
+— hata değil boş. Tablo var, izin var, henüz veri yok demektir.
+
+Aynı sorgu `Authorization` başlığı olmadan, yalnızca `apikey` ile **hata**
+dönmeli. Bu, `anon` anahtarının APK içine gömülebilmesinin dayanağı: anahtar tek
+başına hiçbir veriye ulaşmıyor. Buradan veri gelseydi tasarımda ciddi bir hata
+olurdu.
+
+## Kuralların CI'da doğrulanması
 
 Şema ve erişim kuralları her CI koşusunda gerçek bir PostgreSQL üzerinde
 sınanıyor (`tests/run.sh`). Test iki salon ve iki kullanıcı kurup şunları
