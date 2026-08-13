@@ -1,5 +1,6 @@
 package com.gymapp.data.local
 
+import com.gymapp.data.TEST_TENANT
 import com.gymapp.data.createTestDatabase
 import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.entity.MemberEntity
@@ -114,7 +115,7 @@ class MemberSessionsTest {
         db.memberDao().insertMember(
             MemberEntity(
                 id = id,
-                tenantId = Ids.DEFAULT_TENANT,
+                tenantId = TEST_TENANT,
                 fullName = "Test Üye",
                 // Her test kendi bellek içi veritabanını açıyor, dolayısıyla
                 // numaranın tekil olması yeterli — rastgeleliğe gerek yok.

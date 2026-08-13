@@ -2,16 +2,38 @@ package com.gymapp.presentation.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gymapp.data.auth.AuthResult
+import com.gymapp.data.auth.SessionManager
+import com.gymapp.data.local.dao.StaffDao
 import com.gymapp.data.local.preferences.AppPreferences
-import com.gymapp.data.repository.StaffRepository
-import com.gymapp.domain.StaffRole
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/**
+ * Giriş — kimlik doğrulama Supabase Auth'ta.
+ *
+ * ### Yerel şifre kontrolü kaldırıldı
+ * Önceden kullanıcı adı ve `staff.password` karşılaştırılıyordu, ayrıca ayarlardaki
+ * salon şifresiyle çalışan bir `admin` yolu vardı. İkisi de kaldırıldı çünkü ikisi
+ * de sunucudan bağımsızdı: o yolla açılan oturumun bir salon kimliği olmuyordu ve
+ * o oturumda girilen hiçbir veri sunucuya gönderilemiyordu — üstelik sessizce.
+ * Artık tek kimlik kaynağı var.
+ *
+ * ### İlk giriş internet istiyor
+ * Bilinçli bir bedel: kimlik doğrulama sunucuda yapılıyor. İlk başarılı girişten
+ * sonra oturum cihazda kaldığı için günlük kullanım çevrimdışı sürüyor.
+ *
+ * ### Hata mesajları neden ayrı ayrı
+ * Her başarısızlık türü kullanıcıyı **farklı bir işe** yönlendiriyor. Tek bir
+ * "giriş başarısız" mesajı, sorun aslında sunucudaki eksik bir `gym_users`
+ * satırıyken kullanıcıyı şifresini aramaya gönderirdi; bu gerçek bir kurulumda
+ * yaşandı.
+ */
 class LoginViewModel(
-    private val staffRepository: StaffRepository,
-    private val prefs: AppPreferences
+    private val sessions: SessionManager,
+    private val staffDao: StaffDao,
+    private val prefs: AppPreferences,
 ) : ViewModel() {
 
     private val _error = MutableStateFlow<String?>(null)
@@ -20,32 +42,31 @@ class LoginViewModel(
     private val _isSubmitting = MutableStateFlow(false)
     val isSubmitting = _isSubmitting.asStateFlow()
 
-    fun login(nickname: String, password: String, onLoginSuccess: () -> Unit) {
+    fun login(email: String, password: String, onLoginSuccess: () -> Unit) {
         if (_isSubmitting.value) return // çift tıklama koruması
 
         viewModelScope.launch {
             _isSubmitting.value = true
             _error.value = null // önceki denemenin hatası ekranda kalmasın
             try {
-                // Kullanıcı adı büyük/küçük harf ve boşluğa duyarlı olmamalı.
-                val user = nickname.trim()
+                when (val sonuc = sessions.signIn(email, password)) {
+                    is AuthResult.Success -> {
+                        oturumuKur(sonuc)
+                        onLoginSuccess()
+                    }
 
-                if (user.equals(ADMIN_USER, ignoreCase = true) && password == prefs.salonPassword) {
-                    prefs.currentUserRole = StaffRole.ADMIN
-                    prefs.currentUserId = ADMIN_USER_ID
-                    onLoginSuccess()
-                    return@launch
-                }
+                    is AuthResult.InvalidCredentials -> _error.value =
+                        "E-posta veya şifre hatalı. (${sonuc.reason})"
 
-                val staff = staffRepository.getByNickname(user)
-                // NOT (Faz 4): şifreler hash'lenerek saklanmalı ve karşılaştırma sabit
-                // zamanlı olmalı; kimlik doğrulama Supabase Auth'a taşınacak.
-                if (staff != null && staff.isActive && staff.password == password) {
-                    prefs.currentUserRole = staff.role
-                    prefs.currentUserId = staff.id
-                    onLoginSuccess()
-                } else {
-                    _error.value = "Kullanıcı adı veya şifre hatalı!"
+                    is AuthResult.NoGym -> _error.value =
+                        "Hesabınız bir salona bağlı değil. Yöneticinizin sizi " +
+                            "Supabase panelinden salona eklemesi gerekiyor."
+
+                    is AuthResult.MultipleGyms -> _error.value =
+                        "Hesabınız birden fazla salona bağlı; bu sürüm tek salon " +
+                            "destekliyor. Yöneticinizle görüşün."
+
+                    is AuthResult.Failed -> _error.value = sonuc.reason
                 }
             } finally {
                 _isSubmitting.value = false
@@ -53,13 +74,21 @@ class LoginViewModel(
         }
     }
 
-    private companion object {
-        const val ADMIN_USER = "admin"
-
-        /**
-         * Salon sahibinin kimliği personel tablosunda karşılığı olmayan sabit bir değer;
-         * randevu/hakediş kayıtları bu kimliğe bağlanmaz.
-         */
-        const val ADMIN_USER_ID = "admin"
+    /**
+     * Oturumdan türeyen yerel durumu yazar.
+     *
+     * Rol **sunucudan** geliyor (`gym_users.role`), cihazdaki bir tercihten değil.
+     *
+     * Personel kimliği ise yerel `staff` satırından: randevu ve hakediş kayıtları
+     * `staff.id` değerine bakıyor, oturumdan gelen kimlik ise `auth.users.id`.
+     * Bağlı bir satır yoksa kimlik boş kalıyor ve "bugün benim derslerim" listesi
+     * boş görünüyor — salon sahibi gibi ders vermeyen bir kullanıcı için doğru
+     * sonuç bu. Giriş bu yüzden engellenmiyor.
+     */
+    private suspend fun oturumuKur(sonuc: AuthResult.Success) {
+        val oturum = sonuc.session
+        prefs.currentUserRole = oturum.role
+        prefs.currentUserId =
+            staffDao.findByAuthUserId(oturum.tenantId, oturum.userId)?.id.orEmpty()
     }
 }

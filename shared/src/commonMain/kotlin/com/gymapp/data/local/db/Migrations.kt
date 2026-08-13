@@ -46,5 +46,27 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+/**
+ * v2 → v3: personel satırına Supabase kullanıcı kimliği eklendi.
+ *
+ * Kimlik doğrulama Supabase Auth'a taşınınca giriş yapan kişiden elde edilen tek
+ * kimlik `auth.users.id` oluyor. Uygulamanın buna ihtiyacı var çünkü randevu ve
+ * hakediş kayıtları yerel `staff.id` değerine bakıyor: iki kimlik arasında bir
+ * köprü olmadan "bugün benim derslerim" sorusu yanıtlanamaz.
+ *
+ * Kolon **nullable**: mevcut personel satırlarının henüz bir Supabase hesabı
+ * olmayabilir ve bağlanana kadar uygulamanın çalışması gerekiyor. Zorunlu
+ * yapmak, geçişte var olan her satır için uydurma bir değer yazmak demek olurdu.
+ */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `staff` ADD COLUMN `authUserId` TEXT")
+        connection.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS " +
+                "`index_staff_authUserId` ON `staff` (`authUserId`)"
+        )
+    }
+}
+
 /** Sürüm sırasına göre uygulanacak geçişler. */
-internal val ALL_MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2)
+internal val ALL_MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)

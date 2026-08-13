@@ -2,6 +2,7 @@ package com.gymapp.data
 
 import androidx.room.Room
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import com.gymapp.data.auth.TenantProvider
 import com.gymapp.data.local.db.GymDatabase
 import kotlinx.coroutines.Dispatchers
 
@@ -22,3 +23,16 @@ fun createTestDatabase(): GymDatabase =
         .setDriver(BundledSQLiteDriver())
         .setQueryCoroutineContext(Dispatchers.Default)
         .build()
+
+/**
+ * Testlerde kullanılan salon kimliği.
+ *
+ * Bilinçli olarak uuid biçiminde: sunucu tarafında `tenant_id` `uuid` tipinde ve
+ * testlerin ürettiği veri gerçek olanla aynı şekle sahip olmalı. Eski
+ * `"default"` sabiti tam da bu yüzden yanıltıcıydı — yerelde çalışıyor,
+ * sunucuda reddedilirdi.
+ */
+const val TEST_TENANT: String = "11111111-2222-3333-4444-555555555555"
+
+/** Sabit salon döndüren sağlayıcı; oturum kurmadan depo/kuyruk testi için. */
+val testTenants = TenantProvider { TEST_TENANT }

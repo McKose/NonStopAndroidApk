@@ -1,5 +1,7 @@
 package com.gymapp.data.repository
 
+import com.gymapp.data.auth.TenantProvider
+import com.gymapp.data.auth.requireTenantId
 import com.gymapp.data.local.dao.LedgerDao
 import com.gymapp.data.local.entity.LedgerEntryEntity
 import com.gymapp.data.sync.SyncQueue
@@ -30,6 +32,7 @@ import kotlinx.coroutines.flow.map
 class LedgerRepository(
     private val ledgerDao: LedgerDao,
     private val syncQueue: SyncQueue,
+    private val tenants: TenantProvider,
 ) {
 
     // ─── Yazma ──────────────────────────────────────────────────────────────
@@ -41,7 +44,7 @@ class LedgerRepository(
         description: String,
         category: LedgerCategory = LedgerCategory.MEMBERSHIP,
         occurredAtMs: Long = Now.epochMillis(),
-        tenantId: String = Ids.DEFAULT_TENANT,
+        tenantId: String = tenants.requireTenantId(),
     ): Result<String> = record(
         type = LedgerType.CHARGE,
         category = category,
@@ -61,7 +64,7 @@ class LedgerRepository(
         memberId: String? = null,
         orderId: String? = null,
         occurredAtMs: Long = Now.epochMillis(),
-        tenantId: String = Ids.DEFAULT_TENANT,
+        tenantId: String = tenants.requireTenantId(),
     ): Result<String> = record(
         type = LedgerType.PAYMENT,
         category = category,
@@ -83,7 +86,7 @@ class LedgerRepository(
         staffId: String? = null,
         appointmentId: String? = null,
         occurredAtMs: Long = Now.epochMillis(),
-        tenantId: String = Ids.DEFAULT_TENANT,
+        tenantId: String = tenants.requireTenantId(),
     ): Result<String> = record(
         type = LedgerType.EXPENSE,
         category = category,
@@ -141,7 +144,7 @@ class LedgerRepository(
         memberId: String,
         reason: String,
         occurredAtMs: Long = Now.epochMillis(),
-        tenantId: String = Ids.DEFAULT_TENANT,
+        tenantId: String = tenants.requireTenantId(),
     ): Result<Int> = runCatching {
         val active = ledgerDao.activePaymentsForMember(tenantId, memberId)
         val reversals = active.map { original ->
@@ -199,7 +202,7 @@ class LedgerRepository(
     fun observeBetween(
         startMs: Long,
         endMs: Long,
-        tenantId: String = Ids.DEFAULT_TENANT,
+        tenantId: String = tenants.requireTenantId(),
     ): Flow<List<LedgerEntryEntity>> = ledgerDao.observeBetween(tenantId, startMs, endMs)
 
     /**
@@ -211,7 +214,7 @@ class LedgerRepository(
     fun observeIncome(
         startMs: Long,
         endMs: Long,
-        tenantId: String = Ids.DEFAULT_TENANT,
+        tenantId: String = tenants.requireTenantId(),
     ): Flow<Money> = ledgerDao
         .observeNetTotal(tenantId, LedgerType.PAYMENT.name, startMs, endMs)
         .map { Money(it) }
@@ -219,14 +222,14 @@ class LedgerRepository(
     fun observeExpense(
         startMs: Long,
         endMs: Long,
-        tenantId: String = Ids.DEFAULT_TENANT,
+        tenantId: String = tenants.requireTenantId(),
     ): Flow<Money> = ledgerDao
         .observeNetTotal(tenantId, LedgerType.EXPENSE.name, startMs, endMs)
         .map { Money(it) }
 
     fun observeForMember(
         memberId: String,
-        tenantId: String = Ids.DEFAULT_TENANT,
+        tenantId: String = tenants.requireTenantId(),
     ): Flow<List<LedgerEntryEntity>> = ledgerDao.observeForMember(tenantId, memberId)
 
     /**
@@ -236,13 +239,13 @@ class LedgerRepository(
      */
     suspend fun outstandingBalance(
         memberId: String,
-        tenantId: String = Ids.DEFAULT_TENANT,
+        tenantId: String = tenants.requireTenantId(),
     ): Money = Money(ledgerDao.outstandingBalanceMinor(tenantId, memberId))
 
     /** Üyenin borcu kapandı mı? */
     suspend fun isSettled(
         memberId: String,
-        tenantId: String = Ids.DEFAULT_TENANT,
+        tenantId: String = tenants.requireTenantId(),
     ): Boolean = outstandingBalance(memberId, tenantId).minor <= 0L
 
     // ─── Ortak yazma yolu ───────────────────────────────────────────────────

@@ -18,7 +18,7 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     viewModel: LoginViewModel = koinViewModel()
 ) {
-    var nickname by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val error by viewModel.error.collectAsState()
     val isSubmitting by viewModel.isSubmitting.collectAsState()
@@ -33,10 +33,15 @@ fun LoginScreen(
         
         Spacer(modifier = Modifier.height(48.dp))
         
+        // Kullanıcı adı değil e-posta: kimlik doğrulama Supabase Auth'ta ve orada
+        // hesaplar e-postayla açılıyor. Klavye türü de buna göre; adres yazarken
+        // büyük harfe geçen bir klavye her denemede sessizce yanlış giriş üretirdi.
         OutlinedTextField(
-            value = nickname,
-            onValueChange = { nickname = it },
-            label = { Text("Kullanıcı Adı") },
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("E-posta") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -46,6 +51,7 @@ fun LoginScreen(
             value = password,
             onValueChange = { password = it },
             label = { Text("Şifre") },
+            singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             modifier = Modifier.fillMaxWidth()
@@ -59,8 +65,8 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
-            onClick = { viewModel.login(nickname, password, onLoginSuccess) },
-            enabled = !isSubmitting && nickname.isNotBlank() && password.isNotBlank(),
+            onClick = { viewModel.login(email, password, onLoginSuccess) },
+            enabled = !isSubmitting && email.isNotBlank() && password.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             contentPadding = PaddingValues(16.dp)

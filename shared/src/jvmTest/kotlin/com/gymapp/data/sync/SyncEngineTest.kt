@@ -1,5 +1,7 @@
 package com.gymapp.data.sync
 
+import com.gymapp.data.TEST_TENANT
+import com.gymapp.data.testTenants
 import com.gymapp.data.createTestDatabase
 import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.entity.SyncOutboxEntity
@@ -40,7 +42,7 @@ class SyncEngineTest {
     @BeforeTest
     fun setUp() {
         db = createTestDatabase()
-        queue = SyncQueue(db.syncOutboxDao())
+        queue = SyncQueue(db.syncOutboxDao(), testTenants)
     }
 
     @AfterTest
@@ -57,7 +59,7 @@ class SyncEngineTest {
         val outcome = engine(remote).syncOnce()
 
         assertEquals(SyncOutcome(pushed = 2), outcome)
-        assertEquals(0, db.syncOutboxDao().pendingCount(Ids.DEFAULT_TENANT))
+        assertEquals(0, db.syncOutboxDao().pendingCount(TEST_TENANT))
     }
 
     /**
@@ -94,7 +96,7 @@ class SyncEngineTest {
         assertTrue(outcome.stopped)
         assertEquals(1, outcome.failed)
         assertEquals(1, remote.calls.size, "İlk hatadan sonra denenmemeli")
-        assertEquals(2, db.syncOutboxDao().pendingCount(Ids.DEFAULT_TENANT))
+        assertEquals(2, db.syncOutboxDao().pendingCount(TEST_TENANT))
     }
 
     /**
@@ -117,7 +119,7 @@ class SyncEngineTest {
         assertFalse(outcome.stopped)
 
         // Bozuk kayıt silinmedi: sessizce kaybolması hem veri hem teşhis kaybı olurdu.
-        val remaining = db.syncOutboxDao().peek(Ids.DEFAULT_TENANT, 10).single()
+        val remaining = db.syncOutboxDao().peek(TEST_TENANT, 10).single()
         assertEquals("bozuk", remaining.entityId)
         assertEquals(1, remaining.attemptCount)
         assertEquals("sunucu reddetti", remaining.lastError)
@@ -166,7 +168,7 @@ class SyncEngineTest {
         enqueue("a", atMs = 1_000)
         val remote = FakeRemote { _, id ->
             // Gönderim sürerken satır tekrar değişti: kayıt yenilendi.
-            val current = db.syncOutboxDao().peek(Ids.DEFAULT_TENANT, 1).single()
+            val current = db.syncOutboxDao().peek(TEST_TENANT, 1).single()
             db.syncOutboxDao().removeIfUnchanged(current.id, current.enqueuedAtMs)
             enqueue(id, atMs = 9_000)
             PushResult.Success
@@ -176,7 +178,7 @@ class SyncEngineTest {
 
         assertEquals(0, outcome.pushed, "Eski kayıt düşürülmemeli")
         assertEquals(1, outcome.skipped)
-        assertEquals(1, db.syncOutboxDao().pendingCount(Ids.DEFAULT_TENANT))
+        assertEquals(1, db.syncOutboxDao().pendingCount(TEST_TENANT))
     }
 
     /** Tanınmayan tablo kalıcı hata sayılır; kayıt silinmez. */
@@ -185,7 +187,7 @@ class SyncEngineTest {
         db.syncOutboxDao().enqueue(
             SyncOutboxEntity(
                 id = Ids.new(),
-                tenantId = Ids.DEFAULT_TENANT,
+                tenantId = TEST_TENANT,
                 entityTable = "artik_olmayan_tablo",
                 entityId = "x",
                 enqueuedAtMs = 1_000,
@@ -197,7 +199,7 @@ class SyncEngineTest {
 
         assertEquals(0, remote.calls.size, "Uzak uca hiç gidilmemeli")
         assertEquals(1, outcome.failed)
-        assertEquals(1, db.syncOutboxDao().pendingCount(Ids.DEFAULT_TENANT))
+        assertEquals(1, db.syncOutboxDao().pendingCount(TEST_TENANT))
     }
 
     @Test
@@ -212,8 +214,8 @@ class SyncEngineTest {
     private fun engine(
         remote: RemoteDataSource,
         now: () -> Long = { 10_000L },
-    ) = SyncEngine(db.syncOutboxDao(), remote, now = now)
+    ) = SyncEngine(db.syncOutboxDao(), remote, testTenants, now = now)
 
     private suspend fun enqueue(entityId: String, atMs: Long) =
-        queue.enqueue(SyncTable.PACKAGES, entityId, Ids.DEFAULT_TENANT, atMs)
+        queue.enqueue(SyncTable.PACKAGES, entityId, TEST_TENANT, atMs)
 }

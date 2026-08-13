@@ -1,6 +1,7 @@
 package com.gymapp.data.auth
 
 import com.gymapp.data.sync.SupabaseConfig
+import com.gymapp.domain.StaffRole
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -46,7 +47,7 @@ class SupabaseAuthApiTest {
         jetonDurumu: HttpStatusCode = HttpStatusCode.OK,
         jetonGovdesi: String = gecerliJetonYaniti,
         salonDurumu: HttpStatusCode = HttpStatusCode.OK,
-        salonGovdesi: String = """[{"gym_id":"salon-1"}]""",
+        salonGovdesi: String = """[{"gym_id":"salon-1","role":"MANAGER"}]""",
         simdi: Long = 1_000_000L,
         yakala: ((HttpRequestData) -> Unit)? = null,
     ): SupabaseAuthApi {
@@ -74,6 +75,30 @@ class SupabaseAuthApiTest {
         assertEquals("kullanici-1", oturum.userId)
         assertEquals("personel@ornek.com", oturum.email)
         assertEquals("salon-1", oturum.tenantId)
+        assertEquals(StaffRole.MANAGER, oturum.role)
+    }
+
+    /**
+     * Tanınmayan rol **en dar** yetkiye düşüyor.
+     *
+     * Ters kurgu — bilinmeyeni yönetici saymak — sunucudaki tek harflik bir
+     * yazım hatasının herkese yönetici yetkisi vermesi demek olurdu.
+     */
+    @Test
+    fun `taninmayan rol en dar yetkiye duser`() = runTest {
+        val sonuc = api(salonGovdesi = """[{"gym_id":"salon-1","role":"SUPERADMIN"}]""")
+            .signIn("personel@ornek.com", "sifre")
+
+        assertEquals(StaffRole.TRAINER, assertIs<AuthResult.Success>(sonuc).session.role)
+    }
+
+    /** Rol alanı hiç gelmezse de en dar yetki. */
+    @Test
+    fun `rol alani yoksa en dar yetkiye duser`() = runTest {
+        val sonuc = api(salonGovdesi = """[{"gym_id":"salon-1"}]""")
+            .signIn("personel@ornek.com", "sifre")
+
+        assertEquals(StaffRole.TRAINER, assertIs<AuthResult.Success>(sonuc).session.role)
     }
 
     /**
@@ -164,7 +189,7 @@ class SupabaseAuthApiTest {
      */
     @Test
     fun `birden fazla salonda calisan kullanici icin secim gerekir`() = runTest {
-        val sonuc = api(salonGovdesi = """[{"gym_id":"salon-1"},{"gym_id":"salon-2"}]""")
+        val sonuc = api(salonGovdesi = """[{"gym_id":"salon-1","role":"ADMIN"},{"gym_id":"salon-2","role":"TRAINER"}]""")
             .signIn("personel@ornek.com", "sifre")
 
         val cok = assertIs<AuthResult.MultipleGyms>(sonuc)

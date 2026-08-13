@@ -72,6 +72,7 @@ internal object RowPayloads {
         put("monthly_salary_minor", row.monthlySalaryMinor)
         put("phone", row.phone)
         put("nickname", row.nickname)
+        put("auth_user_id", row.authUserId)
         put("is_active", row.isActive)
         put("created_at_ms", row.createdAtMs)
         put("updated_at_ms", row.updatedAtMs)

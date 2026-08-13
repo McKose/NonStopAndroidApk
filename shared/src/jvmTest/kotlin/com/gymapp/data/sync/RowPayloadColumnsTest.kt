@@ -46,7 +46,7 @@ class RowPayloadColumnsTest {
 
     @Test
     fun `gonderilen anahtarlar migrasyondaki kolonlarla birebir ayni`() {
-        val tables = parseCreateTables(migrationSql())
+        val tables = parseSchema(migrationFiles())
 
         for (table in SyncTable.entries) {
             val columns = tables[table.tableName]
@@ -132,6 +132,7 @@ class RowPayloadColumnsTest {
                 id = "s1", tenantId = TENANT, fullName = "Mehmet", title = "Eğitmen",
                 branch = "Fitness", commissionBasisPoints = 4000, monthlySalaryMinor = 1,
                 phone = "+905001112233", nickname = "mehmet", password = "gizli",
+                authUserId = "458f1383-d7ef-474b-8e16-798bde768654",
                 createdAtMs = 1, updatedAtMs = 2, deletedAtMs = null,
             )
         )
@@ -177,45 +178,79 @@ class RowPayloadColumnsTest {
     // ─── Migrasyon dosyasının ayrıştırılması ───────────────────────────────
 
     /**
-     * Migrasyon dosyasını bulur.
+     * Migrasyon dosyalarını sırayla bulur.
+     *
+     * Tek bir dosya değil **hepsi** okunuyor: şema zamanla `alter table` ile de
+     * değişiyor ve yalnızca `0002`'ye bakan bir test, sonradan eklenen bir kolonu
+     * "sunucuda yok" sayardı. Dosya adları sıfır dolgulu olduğu için sözlük sırası
+     * uygulama sırasıyla aynı.
      *
      * Çalışma dizinine güvenilmiyor: Gradle test görevi modül dizininde koşuyor
      * ama bu bir garanti değil ve IDE'den koşturulduğunda değişebiliyor. Yukarı
      * doğru yürüyerek aramak her iki durumda da çalışıyor.
      */
-    private fun migrationSql(): String {
+    private fun migrationFiles(): List<File> {
         var dir: File? = File(".").absoluteFile
         while (dir != null) {
-            val candidate = File(dir, "supabase/migrations/0002_data_tables.sql")
-            if (candidate.isFile) return candidate.readText()
+            val migrations = File(dir, "supabase/migrations")
+            if (migrations.isDirectory) {
+                val files = migrations.listFiles { f -> f.extension == "sql" }
+                    ?.sortedBy { it.name }
+                    .orEmpty()
+                if (files.isEmpty()) fail("supabase/migrations altında .sql yok: $migrations")
+                return files
+            }
             dir = dir.parentFile
         }
-        fail("0002_data_tables.sql bulunamadı (arama başlangıcı: ${File(".").absolutePath})")
+        fail("supabase/migrations bulunamadı (arama başlangıcı: ${File(".").absolutePath})")
     }
 
     /**
-     * `create table ... ( ... )` bloklarından kolon adlarını çıkarır.
+     * Migrasyonları sırayla uygulayıp son şemadaki kolonları çıkarır.
      *
-     * Elle ayrıştırmanın nedeni bağımlılık eklememek; kapsam da dar — yalnızca bu
-     * dosyadaki desen. Yine de iki tuzağa dikkat edilmiş durumda:
+     * Gerçek bir SQL çözümleyicisi değil; kapsam bu depodaki iki desenle sınırlı:
+     * `create table ... ( ... )` ve `alter table ... add column ...`. Yeni bir
+     * desen (kolon silme, yeniden adlandırma) girdiğinde bu ayrıştırıcı da
+     * genişletilmeli — sessizce yanlış sonuç vermesin diye tanımadığı `alter`
+     * biçimlerini yok saymak yerine hiç eşleştirmiyor.
+     *
+     * İki tuzağa dikkat edilmiş durumda:
      *  - **Yorumlar önce temizleniyor**, ama metin sabitlerinin içine bakmadan
      *    değil: `--` bir dizgenin içinde geçseydi satırın kalanını yutardı. Aynı
      *    hata bu projede bir kez yapıldı, tekrarlanmıyor.
      *  - **Virgülle bölme parantez derinliğine saygılı**: `check (x in ('A','B'))`
      *    içindeki virgüller kolon ayıracı değil.
      */
-    private fun parseCreateTables(sql: String): Map<String, List<String>> {
-        val clean = stripComments(sql)
-        val result = mutableMapOf<String, List<String>>()
+    private fun parseSchema(files: List<File>): Map<String, List<String>> {
+        val result = mutableMapOf<String, MutableList<String>>()
 
-        val header = Regex("""create\s+table\s+(?:if\s+not\s+exists\s+)?public\.(\w+)\s*\(""",
-            RegexOption.IGNORE_CASE)
+        val createHeader = Regex(
+            """create\s+table\s+(?:if\s+not\s+exists\s+)?public\.(\w+)\s*\(""",
+            RegexOption.IGNORE_CASE,
+        )
+        val addColumn = Regex(
+            """alter\s+table\s+(?:only\s+)?public\.(\w+)\s+add\s+column\s+""" +
+                """(?:if\s+not\s+exists\s+)?(\w+)""",
+            RegexOption.IGNORE_CASE,
+        )
 
-        for (match in header.findAll(clean)) {
-            val open = match.range.last                 // '(' konumu
-            val close = matchingParen(clean, open)
-            val body = clean.substring(open + 1, close)
-            result[match.groupValues[1]] = columnNames(body)
+        for (file in files) {
+            val clean = stripComments(file.readText())
+
+            for (match in createHeader.findAll(clean)) {
+                val open = match.range.last              // '(' konumu
+                val body = clean.substring(open + 1, matchingParen(clean, open))
+                // `if not exists` yüzünden aynı tablo iki kez görülebilir
+                // (run.sh migrasyonları bilerek iki kez uyguluyor); ilk tanım
+                // geçerli sayılıyor.
+                result.getOrPut(match.groupValues[1]) { columnNames(body).toMutableList() }
+            }
+
+            for (match in addColumn.findAll(clean)) {
+                val columns = result[match.groupValues[1]] ?: continue
+                val name = match.groupValues[2].lowercase()
+                if (name !in columns) columns += name
+            }
         }
         return result
     }

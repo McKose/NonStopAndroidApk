@@ -18,8 +18,24 @@ run() {
 }
 
 run "$here/00_auth_stub.sql"
-run "$root/migrations/0001_tenancy.sql"
-run "$root/migrations/0002_data_tables.sql"
+
+# Migrasyonlar tek tek sayılmıyor, dizinden okunuyor.
+#
+# Elle sayıldığında yeni bir dosya eklenip listeye yazılmayı unutabiliyor ve o
+# migrasyon **hiç sınanmamış** oluyor — üstelik testler yeşil kalıyor. Dosya
+# adları sıfır dolgulu olduğu için sözlük sırası uygulama sırasıyla aynı.
+shopt -s nullglob
+migrasyonlar=("$root"/migrations/*.sql)
+if [ ${#migrasyonlar[@]} -eq 0 ]; then
+    echo "HATA: migrations/ altında hiç .sql yok — yol yanlış olabilir." >&2
+    exit 1
+fi
+
+hepsini_uygula() {
+    for m in "${migrasyonlar[@]}"; do run "$m"; done
+}
+
+hepsini_uygula
 
 # Migrasyonlar İKİNCİ kez uygulanıyor: tekrar çalıştırılabilir olmaları şart.
 #
@@ -29,8 +45,7 @@ run "$root/migrations/0002_data_tables.sql"
 # `if not exists` biçimi yok ve "varsa sil" adımı unutulmuştu. Kullanıcı bunu
 # gerçek kurulumda yakaladı, testler yakalamamıştı — çünkü test her şeyi bir
 # kez çalıştırıyordu.
-run "$root/migrations/0001_tenancy.sql"
-run "$root/migrations/0002_data_tables.sql"
+hepsini_uygula
 
 run "$here/10_rls_test.sql"
 

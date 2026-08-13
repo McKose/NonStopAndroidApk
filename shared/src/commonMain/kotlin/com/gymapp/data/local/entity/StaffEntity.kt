@@ -24,6 +24,7 @@ import com.gymapp.domain.StaffRole
     tableName = "staff",
     indices = [
         Index(value = ["tenantId", "nickname"], unique = true),
+        Index(value = ["authUserId"], unique = true),
         Index(value = ["updatedAtMs"]),
     ]
 )
@@ -52,7 +53,25 @@ data class StaffEntity(
 
     val nickname: String,
 
-    /** NOT (Faz 4): kimlik doğrulama sunucuya taşınınca bu kolon tamamen kalkacak. */
+    /**
+     * Bu personelin Supabase Auth kullanıcı kimliği (`auth.users.id`).
+     *
+     * Giriş yapan kişiyi yerel personel kaydına bağlayan tek şey bu. Randevu ve
+     * hakediş kayıtları `staff.id` değerine bakıyor; oturumdan gelen kimlik ise
+     * `auth.users.id`. Köprü olmadan "bugün benim derslerim" sorusu
+     * yanıtlanamaz.
+     *
+     * `null` = bu personelin henüz bir Supabase hesabı bağlanmamış. Uygulama
+     * çalışmaya devam eder, yalnızca o kişi giriş yapamaz.
+     */
+    val authUserId: String? = null,
+
+    /**
+     * NOT: kimlik doğrulama Supabase Auth'a taşındı ve bu kolon artık **hiçbir
+     * yerde okunmuyor**. Sunucuya da gönderilmiyor (sunucudaki `staff` tablosunda
+     * karşılığı yok). Şemadan kaldırılması ayrı bir geçiş; veri kaybı riski
+     * olmadan silinebilmesi için önce tüm sürümlerin güncellenmiş olması gerekiyor.
+     */
     val password: String = "",
 
     val isActive: Boolean = true,

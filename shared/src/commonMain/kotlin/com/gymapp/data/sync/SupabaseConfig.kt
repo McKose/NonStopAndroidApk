@@ -25,6 +25,23 @@ data class SupabaseConfig(
 
     /** PostgREST uç noktası: Supabase'in veri API'si bu yol altında. */
     fun tableEndpoint(table: SyncTable): String = "$url/rest/v1/${table.tableName}"
+
+    companion object {
+        /**
+         * Ayar verilmemişse `null` döndürür — istisna fırlatmaz.
+         *
+         * Değerler kuruluma özgü ve depoya işlenmiyor; projeyi ilk kez klonlayan
+         * birinde boş oluyorlar. Kurucunun `require`'ı o durumda derlemeyi değil
+         * **uygulamayı açılışta** düşürürdü ve mesaj da yığın izinde kalırdı.
+         * Bunun yerine eksiklik burada sessizce `null`a çevriliyor ve çağıran
+         * taraf kullanıcıya ne yapması gerektiğini söyleyen bir uç bağlıyor.
+         */
+        fun orNull(url: String, anonKey: String): SupabaseConfig? {
+            val temizUrl = url.trim().removeSuffix("/")
+            if (temizUrl.isBlank() || anonKey.isBlank()) return null
+            return SupabaseConfig(temizUrl, anonKey.trim())
+        }
+    }
 }
 
 /**

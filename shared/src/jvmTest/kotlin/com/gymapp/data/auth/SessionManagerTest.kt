@@ -1,5 +1,6 @@
 package com.gymapp.data.auth
 
+import com.gymapp.domain.StaffRole
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
@@ -30,6 +31,7 @@ class SessionManagerTest {
         userId = "kullanici-1",
         email = "personel@ornek.com",
         tenantId = "salon-1",
+        role = StaffRole.TRAINER,
     )
 
     private class SahteAuthApi(
@@ -70,7 +72,7 @@ class SessionManagerTest {
         assertIs<AuthResult.Success>(yonetici.signIn("personel@ornek.com", "sifre"))
 
         assertEquals(hedef, yonetici.session.value)
-        assertEquals("salon-1", yonetici.tenantId)
+        assertEquals("salon-1", yonetici.currentTenantId())
         assertEquals(hedef, store.load(), "Oturum saklanmalı ki uygulama açılışında geri yüklensin")
     }
 
@@ -116,7 +118,7 @@ class SessionManagerTest {
         yonetici.restore()
 
         assertNotNull(yonetici.session.value)
-        assertEquals("salon-1", yonetici.tenantId)
+        assertEquals("salon-1", yonetici.currentTenantId())
     }
 
     // ─── Jeton yenileme ─────────────────────────────────────────────────────

@@ -1,5 +1,7 @@
 package com.gymapp.data.sync
 
+import com.gymapp.data.auth.TenantProvider
+import com.gymapp.data.auth.requireTenantId
 import com.gymapp.data.local.dao.SyncOutboxDao
 import com.gymapp.data.local.entity.SyncOutboxEntity
 import com.gymapp.domain.Ids
@@ -26,13 +28,14 @@ import kotlinx.coroutines.flow.Flow
  */
 class SyncQueue(
     private val outboxDao: SyncOutboxDao,
+    private val tenants: TenantProvider,
 ) {
 
     /** Tek bir satırı kuyruğa alır. */
     suspend fun enqueue(
         table: SyncTable,
         entityId: String,
-        tenantId: String = Ids.DEFAULT_TENANT,
+        tenantId: String = tenants.requireTenantId(),
         nowMs: Long = Now.epochMillis(),
     ) {
         outboxDao.enqueue(
@@ -50,16 +53,16 @@ class SyncQueue(
     suspend fun enqueueAll(
         table: SyncTable,
         entityIds: Collection<String>,
-        tenantId: String = Ids.DEFAULT_TENANT,
+        tenantId: String = tenants.requireTenantId(),
         nowMs: Long = Now.epochMillis(),
     ) {
         entityIds.forEach { enqueue(table, it, tenantId, nowMs) }
     }
 
     /** Bekleyen değişiklik sayısı; arayüzde "senkronize edilmedi" göstergesi için. */
-    fun observePendingCount(tenantId: String = Ids.DEFAULT_TENANT): Flow<Int> =
+    fun observePendingCount(tenantId: String = tenants.requireTenantId()): Flow<Int> =
         outboxDao.observePendingCount(tenantId)
 
-    suspend fun pendingCount(tenantId: String = Ids.DEFAULT_TENANT): Int =
+    suspend fun pendingCount(tenantId: String = tenants.requireTenantId()): Int =
         outboxDao.pendingCount(tenantId)
 }

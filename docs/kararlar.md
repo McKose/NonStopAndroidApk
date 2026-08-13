@@ -113,3 +113,57 @@ okunur; `toDoubleOrNull` doğrudan kullanılmaz.
 **Neden:** `toDoubleOrNull` yalnızca noktayı kabul ediyor, uygulamanın klavyesi
 ise Türkçe. `?: 0.0` deseniyle birleşince virgülle yazılan her değer sessizce
 sıfır oluyordu — ölçüler, iskontolar, maaşlar.
+
+## Kimlik doğrulama: tek kaynak Supabase Auth
+
+**Karar:** Uygulamaya giriş yalnızca Supabase Auth ile yapılır. Personel e-posta
+ve şifresiyle girer. Yerel `staff.password` karşılaştırması ve ayarlardaki salon
+şifresiyle çalışan `admin` yolu kaldırıldı.
+
+**Neden:** İkisi de sunucudan bağımsızdı. O yolla açılan oturumun bir salon
+kimliği olmuyordu, dolayısıyla o oturumda girilen hiçbir veri sunucuya
+gönderilemiyordu — üstelik sessizce: uygulama normal çalışmaya devam ediyor,
+kuyruk doluyor, kimse fark etmiyor. İki kimlik kaynağı tutmak "hangisiyle
+girdim" sorusunu her hata teşhisinin başına koyardı.
+
+**Bedeli:** İlk giriş internet istiyor. Kabul edildi; ilk başarılı girişten sonra
+oturum cihazda kalıyor ve günlük kullanım çevrimdışı sürüyor.
+
+**Sonuç:** Salon sahibi de kendi Supabase hesabıyla giriyor (ADMIN rolüyle).
+
+## Yetki sunucudan gelir
+
+**Karar:** Kullanıcının rolü `gym_users.role` değerinden okunur, cihazdaki bir
+tercihten değil. Tanınmayan bir rol geldiğinde **en dar** yetkiye düşülür.
+
+**Neden:** Cihazda tutulan yetki, uygulama verisine erişebilen biri tarafından
+değiştirilebilir. Sunucudaki değer ise erişim kurallarının dayanağıyla aynı
+yerde duruyor. En dar yetkiye düşmek de bilinçli: bir yazım hatasının yönetici
+yetkisi vermesi, yetki vermemesinden çok daha pahalı.
+
+## Salon kimliği oturumdan gelir
+
+**Karar:** `tenantId` sabit değil; `TenantProvider` üzerinden oturumdan okunuyor
+ve sunucudaki `gyms.id` ile aynı değer. Oturum yokken veri işlemi hata veriyor.
+
+**Neden:** Eski `"default"` sabiti yerelde çalışıyor gibi görünüyordu ama sunucu
+tarafında `tenant_id` `uuid` tipinde ve `"default"` geçerli bir uuid değil —
+o satırlar hiçbir zaman senkronize olamazdı. Sessiz bir varsayılana düşmek
+yerine hata vermek, giriş yapılmadan veri ekranı açılmasının bir programlama
+hatası olduğunu görünür kılıyor.
+
+## Personel ↔ hesap bağlantısı ayrı bir alan
+
+**Karar:** `staff.authUserId` kolonu, personel kaydını Supabase hesabına bağlar.
+`gym_users` ile birleştirilmedi.
+
+**Neden:** İkisi farklı sorulara yanıt veriyor. `gym_users` "bu kullanıcı hangi
+salona bağlı ve hangi rolde" diyor ve **erişim kurallarının** dayanağı;
+`staff.authUserId` ise "bu personel satırı hangi hesaba ait" diyor ve yalnızca
+uygulama içi ilişkilendirme için. Birleştirmek, erişim kurallarını uygulamanın
+veri tablolarından birine bağlamak olurdu.
+
+Bağlantı olmadan kişi giriş yapabilir ama randevulardaki `staffId` ile eşleşme
+kurulamaz, dolayısıyla "bugün benim derslerim" boş görünür. Giriş bu yüzden
+engellenmiyor: salon sahibi gibi ders vermeyen bir kullanıcı için doğru sonuç
+zaten boş liste.

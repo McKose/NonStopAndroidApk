@@ -2,6 +2,7 @@ package com.gymapp.data.auth
 
 import com.gymapp.data.sync.SupabaseConfig
 import com.gymapp.domain.Now
+import com.gymapp.domain.StaffRole
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -101,6 +102,7 @@ class SupabaseAuthApi(
                     userId = userId,
                     email = user.string("email").orEmpty(),
                     tenantId = gym.gymId,
+                    role = gym.role,
                 )
             )
 
@@ -121,7 +123,7 @@ class SupabaseAuthApi(
      */
     private suspend fun resolveGym(accessToken: String): GymLookup {
         val response = try {
-            httpClient.get("${config.url}/rest/v1/gym_users?select=gym_id") {
+            httpClient.get("${config.url}/rest/v1/gym_users?select=gym_id,role") {
                 header("apikey", config.anonKey)
                 header("Authorization", "Bearer $accessToken")
             }
@@ -134,23 +136,31 @@ class SupabaseAuthApi(
 
         if (status !in 200..299) return GymLookup.Error(failureFor(status, text))
 
-        val ids = runCatching {
-            Json.parseToJsonElement(text).jsonArray.mapNotNull { it.jsonObject.string("gym_id") }
+        val rows = runCatching {
+            Json.parseToJsonElement(text).jsonArray.mapNotNull { element ->
+                val row = element.jsonObject
+                val gymId = row.string("gym_id") ?: return@mapNotNull null
+                // Tanınmayan rol en dar yetkiye düşüyor: bir yazım hatasının
+                // yönetici yetkisi vermesi, yetki vermemesinden çok daha kötü.
+                val role = runCatching { StaffRole.valueOf(row.string("role").orEmpty()) }
+                    .getOrDefault(StaffRole.TRAINER)
+                gymId to role
+            }
         }.getOrElse {
             return GymLookup.Error(
                 AuthResult.Failed("Salon bilgisi okunamadı: ${text.take(200)}", retryable = false)
             )
         }
 
-        return when (ids.size) {
+        return when (rows.size) {
             0 -> GymLookup.None
-            1 -> GymLookup.Found(ids.single())
-            else -> GymLookup.Many(ids)
+            1 -> GymLookup.Found(rows.single().first, rows.single().second)
+            else -> GymLookup.Many(rows.map { it.first })
         }
     }
 
     private sealed interface GymLookup {
-        data class Found(val gymId: String) : GymLookup
+        data class Found(val gymId: String, val role: StaffRole) : GymLookup
         data object None : GymLookup
         data class Many(val gymIds: List<String>) : GymLookup
         data class Error(val result: AuthResult) : GymLookup

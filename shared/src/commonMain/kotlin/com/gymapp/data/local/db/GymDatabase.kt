@@ -24,6 +24,9 @@ import com.gymapp.data.local.entity.*
  *
  * **v2**: gönderim kuyruğu (`sync_outbox`) eklendi — bkz. [MIGRATION_1_2].
  *
+ * **v3**: `staff.authUserId` eklendi — bkz. [MIGRATION_2_3]. Giriş yapan
+ * Supabase kullanıcısını yerel personel kaydına bağlıyor.
+ *
  * Tüm tablolar ortak biçimde:
  *  - **UUID birincil anahtar** — `autoGenerate` `Long` anahtarlar çok cihazlı
  *    senkronizasyonda çakışır (iki cihaz çevrimdışıyken aynı `id`'yi üretir).
@@ -49,7 +52,7 @@ import com.gymapp.data.local.entity.*
         // Gönderim kuyruğu: yerel bir tablo, sunucuya kendisi senkronize edilmez.
         SyncOutboxEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

@@ -92,6 +92,47 @@ begin
 end
 $$;
 
+-- ─── Personel ↔ hesap bağlantısı ───────────────────────────────────────────
+-- `staff.auth_user_id` giriş yapan kişiyi personel satırına bağlıyor. Bir hesabın
+-- yalnızca tek bir personele bağlanabilmesi şart: iki satır aynı hesabı
+-- gösterseydi giriş yapanın hangisi olduğu belirsizleşir, randevular ve
+-- hakedişler sessizce yanlış kişiye yazılırdı.
+do $$
+begin
+    insert into public.staff (id, tenant_id, full_name, title, role, branch,
+                              commission_basis_points, monthly_salary_minor,
+                              phone, nickname, auth_user_id,
+                              created_at_ms, updated_at_ms)
+    values ('st-a', 'aaaaaaaa-0000-0000-0000-000000000001', 'A Eğitmen', 'Eğitmen',
+            'TRAINER', 'Fitness', 4000, 0, '+905001112233', 'aegitmen',
+            '11111111-1111-1111-1111-111111111111', 1, 1);
+
+    -- Aynı hesabı ikinci bir personele bağlamak reddedilmeli.
+    begin
+        insert into public.staff (id, tenant_id, full_name, title, role, branch,
+                                  commission_basis_points, monthly_salary_minor,
+                                  phone, nickname, auth_user_id,
+                                  created_at_ms, updated_at_ms)
+        values ('st-a2', 'aaaaaaaa-0000-0000-0000-000000000001', 'A İkiz', 'Eğitmen',
+                'TRAINER', 'Fitness', 4000, 0, '+905001112244', 'aikiz',
+                '11111111-1111-1111-1111-111111111111', 1, 1);
+        raise exception 'Aynı hesap iki personele bağlanabildi';
+    exception
+        when unique_violation then null;  -- beklenen
+    end;
+
+    -- Hesabı bağlanmamış personel sayısı sınırlı olmamalı: tekillik kısmi.
+    insert into public.staff (id, tenant_id, full_name, title, role, branch,
+                              commission_basis_points, monthly_salary_minor,
+                              phone, nickname, auth_user_id,
+                              created_at_ms, updated_at_ms)
+    values ('st-b1', 'aaaaaaaa-0000-0000-0000-000000000001', 'Bağsız 1', 'Eğitmen',
+            'TRAINER', 'Fitness', 0, 0, '+905001112255', 'bagsiz1', null, 1, 1),
+           ('st-b2', 'aaaaaaaa-0000-0000-0000-000000000001', 'Bağsız 2', 'Eğitmen',
+            'TRAINER', 'Fitness', 0, 0, '+905001112266', 'bagsiz2', null, 1, 1);
+end
+$$;
+
 reset role;
 
 -- ─── Sahip gözüyle son durum ───────────────────────────────────────────────

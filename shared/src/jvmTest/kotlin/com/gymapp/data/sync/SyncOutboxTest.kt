@@ -1,5 +1,7 @@
 package com.gymapp.data.sync
 
+import com.gymapp.data.TEST_TENANT
+import com.gymapp.data.testTenants
 import com.gymapp.data.createTestDatabase
 import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.db.inTransaction
@@ -33,8 +35,8 @@ class SyncOutboxTest {
     @BeforeTest
     fun setUp() {
         db = createTestDatabase()
-        queue = SyncQueue(db.syncOutboxDao())
-        packages = PackageRepository(db, db.packageDao(), queue)
+        queue = SyncQueue(db.syncOutboxDao(), testTenants)
+        packages = PackageRepository(db, db.packageDao(), queue, testTenants)
     }
 
     @AfterTest
@@ -46,7 +48,7 @@ class SyncOutboxTest {
     fun `yazma satiri kuyruga alir`() = runTest {
         val id = savePackage()
 
-        val pending = db.syncOutboxDao().peek(Ids.DEFAULT_TENANT, limit = 10)
+        val pending = db.syncOutboxDao().peek(TEST_TENANT, limit = 10)
         assertEquals(1, pending.size)
         assertEquals(SyncTable.PACKAGES.tableName, pending.first().entityTable)
         assertEquals(id, pending.first().entityId)
@@ -60,11 +62,11 @@ class SyncOutboxTest {
     @Test
     fun `ayni satirin ikinci degisikligi yeni kayit acmaz`() = runTest {
         val id = savePackage()
-        val first = db.syncOutboxDao().peek(Ids.DEFAULT_TENANT, limit = 10).single()
+        val first = db.syncOutboxDao().peek(TEST_TENANT, limit = 10).single()
 
         savePackage(packageId = id, name = "Güncellenmiş")
 
-        val pending = db.syncOutboxDao().peek(Ids.DEFAULT_TENANT, limit = 10)
+        val pending = db.syncOutboxDao().peek(TEST_TENANT, limit = 10)
         assertEquals(1, pending.size, "Aynı satır için tek bekleyen kayıt olmalı")
         assertEquals(first.id, pending.single().id, "İlk kayıt korunmalı")
         assertEquals(first.enqueuedAtMs, pending.single().enqueuedAtMs)
@@ -76,7 +78,7 @@ class SyncOutboxTest {
         savePackage(name = "A")
         savePackage(name = "B")
 
-        assertEquals(2, db.syncOutboxDao().peek(Ids.DEFAULT_TENANT, limit = 10).size)
+        assertEquals(2, db.syncOutboxDao().peek(TEST_TENANT, limit = 10).size)
     }
 
     /**
@@ -89,12 +91,12 @@ class SyncOutboxTest {
     fun `silme kuyruga girer`() = runTest {
         val id = savePackage()
         // Kaydetmenin bıraktığı kaydı düşür ki silmenin kendi kaydını görelim.
-        val afterSave = db.syncOutboxDao().peek(Ids.DEFAULT_TENANT, limit = 10).single()
+        val afterSave = db.syncOutboxDao().peek(TEST_TENANT, limit = 10).single()
         db.syncOutboxDao().removeIfUnchanged(afterSave.id, afterSave.enqueuedAtMs)
 
         packages.deletePackage(id)
 
-        val pending = db.syncOutboxDao().peek(Ids.DEFAULT_TENANT, limit = 10)
+        val pending = db.syncOutboxDao().peek(TEST_TENANT, limit = 10)
         assertEquals(1, pending.size)
         assertEquals(id, pending.single().entityId)
     }
@@ -122,7 +124,7 @@ class SyncOutboxTest {
                 db.packageDao().insertPackage(
                     PackageEntity(
                         id = id,
-                        tenantId = Ids.DEFAULT_TENANT,
+                        tenantId = TEST_TENANT,
                         name = "Yarıda kalan",
                         type = TrainingType.FITNESS,
                         category = PackageCategory.INDIVIDUAL,
@@ -133,7 +135,7 @@ class SyncOutboxTest {
                         updatedAtMs = nowMs,
                     )
                 )
-                queue.enqueue(SyncTable.PACKAGES, id, Ids.DEFAULT_TENANT, nowMs)
+                queue.enqueue(SyncTable.PACKAGES, id, TEST_TENANT, nowMs)
 
                 throw IllegalStateException("kasıtlı hata")
             }
@@ -142,7 +144,7 @@ class SyncOutboxTest {
         assertNull(db.packageDao().getPackageById(id), "Satır geri alınmalı")
         assertEquals(
             0,
-            db.syncOutboxDao().peek(Ids.DEFAULT_TENANT, limit = 10).size,
+            db.syncOutboxDao().peek(TEST_TENANT, limit = 10).size,
             "Kuyruk kaydı da geri alınmalı",
         )
     }
@@ -150,12 +152,12 @@ class SyncOutboxTest {
     @Test
     fun `basarili gonderim kaydi kuyruktan dusurur`() = runTest {
         savePackage()
-        val entry = db.syncOutboxDao().peek(Ids.DEFAULT_TENANT, limit = 10).single()
+        val entry = db.syncOutboxDao().peek(TEST_TENANT, limit = 10).single()
 
         val removed = db.syncOutboxDao().removeIfUnchanged(entry.id, entry.enqueuedAtMs)
 
         assertEquals(1, removed)
-        assertEquals(0, db.syncOutboxDao().pendingCount(Ids.DEFAULT_TENANT))
+        assertEquals(0, db.syncOutboxDao().pendingCount(TEST_TENANT))
     }
 
     /**
@@ -167,12 +169,12 @@ class SyncOutboxTest {
     @Test
     fun `gonderim penceresinde degisen kayit dusmez`() = runTest {
         savePackage()
-        val entry = db.syncOutboxDao().peek(Ids.DEFAULT_TENANT, limit = 10).single()
+        val entry = db.syncOutboxDao().peek(TEST_TENANT, limit = 10).single()
 
         val removed = db.syncOutboxDao().removeIfUnchanged(entry.id, entry.enqueuedAtMs + 1)
 
         assertEquals(0, removed, "enqueuedAtMs eşleşmiyorsa silme olmamalı")
-        assertNotNull(db.syncOutboxDao().peek(Ids.DEFAULT_TENANT, limit = 10).singleOrNull())
+        assertNotNull(db.syncOutboxDao().peek(TEST_TENANT, limit = 10).singleOrNull())
     }
 
     private suspend fun savePackage(

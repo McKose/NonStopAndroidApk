@@ -4,16 +4,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.gymapp.data.auth.SessionManager
 import com.gymapp.data.local.preferences.AppPreferences
+import kotlinx.coroutines.launch
 
 class SettingsViewModel(
-    private val prefs: AppPreferences
+    private val prefs: AppPreferences,
+    private val sessions: SessionManager,
 ) : ViewModel() {
 
     var commissionRate by mutableStateOf(prefs.commissionRate)
     var multiSportCommission by mutableStateOf(prefs.multiSportCommission)
     var salonName by mutableStateOf(prefs.salonName)
-    var salonPassword by mutableStateOf(prefs.salonPassword)
 
     fun updateCommissionRate(value: Float) {
         commissionRate = value
@@ -30,13 +33,19 @@ class SettingsViewModel(
         prefs.salonName = value
     }
 
-    fun updateSalonPassword(value: String) {
-        salonPassword = value
-        prefs.salonPassword = value
-    }
-
+    /**
+     * Çıkış — oturum hem sunucu tarafında hem cihazda kapatılıyor.
+     *
+     * `prefs.clearSession()` tek başına yetmez: o yalnızca rol ve personel
+     * kimliğini siliyor, jeton ve salon kimliği [SessionManager]'da duruyordu.
+     * Yarım bir çıkış, giriş ekranına dönmüş ama hâlâ veri gönderebilen bir
+     * uygulama demek olurdu.
+     */
     fun logout(onLogout: () -> Unit) {
-        prefs.clearSession()
-        onLogout()
+        viewModelScope.launch {
+            sessions.signOut()
+            prefs.clearSession()
+            onLogout()
+        }
     }
 }

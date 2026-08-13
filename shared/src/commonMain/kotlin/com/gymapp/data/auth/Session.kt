@@ -1,5 +1,7 @@
 package com.gymapp.data.auth
 
+import com.gymapp.domain.StaffRole
+
 /**
  * Giriş yapmış kullanıcının oturumu.
  *
@@ -29,6 +31,20 @@ data class Session(
 
     /** Kullanıcının bağlı olduğu salon; uygulamadaki `tenantId` bu değerdir. */
     val tenantId: String,
+
+    /**
+     * Kullanıcının bu salondaki yetkisi — `gym_users.role` değeri.
+     *
+     * Sunucudan geliyor, cihazdaki bir tercihten değil. Yetki cihazda tutulsaydı
+     * uygulama verisini silen ya da düzenleyen biri kendini yönetici yapabilirdi;
+     * sunucu tarafında ise aynı değer erişim kurallarının dayanağıyla aynı yerde
+     * duruyor.
+     *
+     * Tanınmayan bir değer geldiğinde **en dar** yetkiye düşülüyor
+     * ([StaffRole.TRAINER]): bilinmeyen bir rolü yönetici saymak, bir yazım
+     * hatasının yetki vermesi demek olurdu.
+     */
+    val role: StaffRole,
 )
 
 /**
@@ -74,6 +90,37 @@ sealed interface AuthResult {
      */
     data class Failed(val reason: String, val retryable: Boolean) : AuthResult
 }
+
+/**
+ * Çalışılan salon.
+ *
+ * Depo katmanının oturum hakkında bilmesi gereken **tek** şey bu, o yüzden
+ * [SessionManager]'ın tamamı yerine bu dar arayüz enjekte ediliyor: bir depo
+ * giriş yaptıramaz, çıkış yaptıramaz, jetona erişemez.
+ *
+ * `null` dönmesi "giriş yapılmamış" demek. Sabit bir değere düşmek yerine `null`
+ * olması bilinçli: varsayılan bir kiracı kimliği, oturum yokken yazılan satırların
+ * hiçbir salona ait olmaması ve sunucuya hiç gidememesi anlamına gelirdi — üstelik
+ * sessizce.
+ */
+fun interface TenantProvider {
+    fun currentTenantId(): String?
+}
+
+/**
+ * Salon kimliğini zorunlu okur.
+ *
+ * Oturum yokken veri okumak ya da yazmak bir **programlama hatası**: giriş
+ * ekranından geçmeden hiçbir veri ekranı açılmıyor. Bu yüzden sessiz bir
+ * varsayılana düşmek yerine hata veriyor.
+ *
+ * Alternatifin bedeli somut: sabit bir kimliğe düşülseydi oturum yokken yazılan
+ * satırlar geçerli bir salona ait olmaz, sunucu tarafında `tenant_id` bir uuid
+ * olmadığı için reddedilir ve kuyrukta sonsuza kadar beklerdi. Kullanıcı bu
+ * arada uygulamayı normal kullanmaya devam ederdi.
+ */
+fun TenantProvider.requireTenantId(): String =
+    currentTenantId() ?: error("Oturum yok: veri işlemleri giriş yapılmadan çağrılamaz.")
 
 /** Kimlik doğrulama ucu. Uygulaması [SupabaseAuthApi]. */
 interface AuthApi {

@@ -21,9 +21,9 @@ class AppPreferences(
         get() = prefs.getString("salon_name", "NonStop Gym") ?: "NonStop Gym"
         set(value) = prefs.edit().putString("salon_name", value).apply()
 
-    var salonPassword: String
-        get() = prefs.getString("salon_password", "1234") ?: "1234"
-        set(value) = prefs.edit().putString("salon_password", value).apply()
+    // KALDIRILDI: `salonPassword`. Giriş Supabase Auth'a taşındı; bu tercih
+    // hiçbir yerde okunmuyordu ve varsayılanı "1234" idi. Okunmayan bir şifre
+    // alanını tutmak, ileride birinin ona güvenmesi riskini canlı tutardı.
 
     /**
      * Oturumdaki kullanıcının yetki seviyesi.

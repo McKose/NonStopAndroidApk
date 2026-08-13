@@ -28,7 +28,6 @@ fun SettingsScreen(
 ) {
     var showCommissionDialog by remember { mutableStateOf(false) }
     var showSalonInfoDialog by remember { mutableStateOf(false) }
-    var showPasswordDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -79,12 +78,11 @@ fun SettingsScreen(
                 onClick = { showSalonInfoDialog = true }
             )
             
-            SettingsItem(
-                title = "Giriş Şifresi",
-                subtitle = "Uygulama giriş şifresini güncelle",
-                icon = Icons.Default.Key,
-                onClick = { showPasswordDialog = true }
-            )
+            // KALDIRILDI: "Giriş Şifresi". Giriş artık Supabase Auth ile
+            // yapılıyor ve şifre panelden/hesap sahibinden değişiyor; buradaki
+            // alan hiçbir yerde okunmayan bir tercihi yazıyordu. Çalışıyormuş
+            // gibi görünen ama hiçbir etkisi olmayan bir ayar, olmamasından
+            // daha kötü.
 
             SettingsItem(
                 title = "Çıkış Yap",
@@ -154,30 +152,6 @@ fun SettingsScreen(
             }
         }
 
-        if (showPasswordDialog) {
-            ConfigDialog(
-                title = "Şifre Değiştir",
-                onDismiss = { showPasswordDialog = false }
-            ) {
-                var passText by remember { mutableStateOf(viewModel.salonPassword) }
-                OutlinedTextField(
-                    value = passText,
-                    onValueChange = { passText = it },
-                    label = { Text("Yeni Şifre") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = {
-                        viewModel.updateSalonPassword(passText)
-                        showPasswordDialog = false
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Güncelle")
-                }
-            }
-        }
     }
 }
 
