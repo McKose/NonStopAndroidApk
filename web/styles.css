@@ -17,8 +17,18 @@
   --uyari: #9a6700;
 }
 
+/* Koyu tema üç ayrı durumda doğru çözülmeli:
+ *
+ *  1. Kullanıcı "sistem" bırakmışsa yalnızca `prefers-color-scheme` var,
+ *  2. gömülü bir görüntüleyici (önizleme sayfası gibi) kökte `data-theme`
+ *     damgalıyor,
+ *  3. ikisi çelişebilir — kullanıcı açık seçmişken işletim sistemi koyu olabilir.
+ *
+ * Bu yüzden medya sorgusu `data-theme="light"` ile geçersiz kılınabiliyor ve
+ * damga ayrıca ele alınıyor. Yalnızca medya sorgusuna dayansaydı, elle koyu
+ * seçen bir kullanıcıda sayfa açık kalırdı. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --zemin: #0f1216;
     --yuzey: #171b21;
     --kenar: #2a3038;
@@ -29,6 +39,18 @@
     --iyi: #4ac26b;
     --uyari: #d9a441;
   }
+}
+
+:root[data-theme="dark"] {
+  --zemin: #0f1216;
+  --yuzey: #171b21;
+  --kenar: #2a3038;
+  --metin: #e6e9ee;
+  --soluk: #9aa4b2;
+  --vurgu: #4c8dff;
+  --hata: #ff6b6b;
+  --iyi: #4ac26b;
+  --uyari: #d9a441;
 }
 
 * { box-sizing: border-box; }
@@ -64,7 +86,8 @@ input {
   border: 1px solid var(--kenar);
   border-radius: 8px;
 }
-input:focus-visible { outline: 2px solid var(--vurgu); outline-offset: 1px; }
+input:focus-visible,
+button:focus-visible { outline: 2px solid var(--vurgu); outline-offset: 2px; }
 
 button {
   padding: 10px 16px;
@@ -108,7 +131,9 @@ button.ikincil { background: transparent; color: var(--soluk); border: 1px solid
 /* Geniş tablolar sayfayı yatay kaydırmıyor, kendi içinde kayıyor. */
 #icerik { overflow-x: auto; }
 
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+/* Para ve sayı sütunlarında rakamlar aynı genişlikte olsun: göz, hizalanmış
+ * rakamlarda büyüklük farkını okumadan görüyor. */
+table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
 th, td { padding: 10px 12px; text-align: start; border-bottom: 1px solid var(--kenar); white-space: nowrap; }
 th { color: var(--soluk); font-weight: 500; }
 tbody tr:hover { background: var(--yuzey); }
@@ -147,5 +172,23 @@ code { font-size: 13px; }
   border: 1px solid var(--kenar);
   border-radius: 12px;
 }
-.kutu strong { display: block; margin-top: 4px; font-size: 22px; }
+.kutu strong { display: block; margin-top: 4px; font-size: 22px; font-variant-numeric: tabular-nums; }
 h2 { font-size: 16px; margin: 0 0 10px; }
+
+/* Yalnızca tek dosyalık önizlemede görünür (bkz. onizleme.mjs); panelin
+ * kendisinde bu öğe yok. */
+.onizleme-not {
+  max-width: 860px;
+  margin: 0 auto 20px;
+  padding: 10px 14px;
+  color: var(--soluk);
+  background: var(--yuzey);
+  border: 1px solid var(--kenar);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.onizleme-not strong { color: var(--metin); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

@@ -77,8 +77,38 @@ jobs:
       - name: Uygulama birim testleri
         run: ./gradlew --no-daemon :app:testDebugUnitTest
 
+      # Sunucu ayarları depoya işlenmiyor; CI'da depo gizli anahtarlarından
+      # (Settings → Secrets → Actions) okunuyor. Yoksa derleme yine geçiyor ve
+      # APK "sunucu ayarları eksik" ekranıyla açılıyor — düşürmek, ayarları
+      # olmayan birinin hiçbir şeyi denemesini engellerdi.
+      - name: Sunucu ayarlarını yaz (varsa)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            printf 'supabase.url=%s\nsupabase.anonKey=%s\n' \
+              "$SUPABASE_URL" "$SUPABASE_ANON_KEY" >> local.properties
+            echo "Sunucu ayarları yazıldı; APK doğrudan projeye bağlanacak."
+          else
+            echo "UYARI: SUPABASE_URL / SUPABASE_ANON_KEY tanımlı değil."
+            echo "APK derlenecek ama giriş ekranında 'sunucu ayarları eksik' diyecek."
+            echo "Eklemek için: depo Settings -> Secrets and variables -> Actions."
+          fi
+
       - name: Debug APK derle
         run: ./gradlew --no-daemon :app:assembleDebug
+
+      # Kurulabilir APK. Android Studio kurmadan denemenin tek yolu bu: Actions
+      # sekmesinden koşuyu açıp aşağıdaki dosyayı indirmek yeterli.
+      - name: Debug APK'yı yayınla
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nonstop-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+          if-no-files-found: warn
 
       # Test raporu, hata durumunda hangi assert'in patladığını görebilmek için.
       - name: Test raporlarını yükle
