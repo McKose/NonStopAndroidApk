@@ -9,11 +9,15 @@
 import { SupabaseClient } from "./supabase.js";
 import { tutarYaz, tarihYaz, uyelikDurumu, durumEtiketi, silinmemisler } from "./domain.js";
 import { ayBasi, uyeDagilimi, yaklasanBitisler, defterToplami } from "./ozet.js";
+import { demoIstemcisi, demoMu } from "./demo.js";
 
 const $ = (id) => document.getElementById(id);
 
+// `?demo` ile açıldığında sunucuya hiç gidilmiyor: ekranı değerlendirmek için
+// Supabase ayarı, hesap ve internet gerekmesin. Demo istemcisi gerçeğiyle aynı
+// yüzeyi taşıyor, dolayısıyla aşağıdaki kodun hangisiyle çalıştığından haberi yok.
 const ayar = window.NONSTOP_CONFIG;
-const istemci = new SupabaseClient(ayar?.url, ayar?.anonKey);
+const istemci = demoMu() ? demoIstemcisi() : new SupabaseClient(ayar?.url, ayar?.anonKey);
 
 let aktifSekme = "ozet";
 

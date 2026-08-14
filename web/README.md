@@ -42,7 +42,23 @@ veriye erişemez. **`service_role` anahtarı buraya asla konmaz:** o anahtar bü
 erişim kurallarını baypas eder ve panelde görünür olması tüm verinin herkese açık
 olması demektir.
 
-## Yerelde denemek
+## Kurulumsuz denemek
+
+Ekranlara bakmak için Supabase ayarı, hesap ve internet gerekmiyor: adrese
+`?demo` ekleyin.
+
+```bash
+cd web
+python3 -m http.server 8000
+```
+
+Sonra `http://localhost:8000/?demo` — giriş ekranında herhangi bir e-posta ve
+şifre kabul edilir.
+
+Demo verisi gerçek sunucu biçiminin aynısı ve sapmaması testle bağlı: sapsaydı
+demoda düzgün görünen bir ekran gerçek veride bozuk çıkabilirdi.
+
+## Yerelde denemek (gerçek veriyle)
 
 `file://` üzerinden açmayın — tarayıcı ES modüllerini o protokolde yüklemiyor.
 Herhangi bir statik sunucu yeter:
