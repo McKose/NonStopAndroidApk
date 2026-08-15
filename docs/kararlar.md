@@ -98,6 +98,34 @@ göndermek demek.
 satır" der. Gönderilecek verinin şekli sunucu ve kimlik doğrulama seçimine bağlı;
 sınır oradan geçince motor o karar verilmeden yazılabildi.
 
+## İndirme: okunamayan satır su işaretini kilitler
+
+**Karar:** Sunucudan gelen bir satır yerel biçime çevrilemiyorsa, o tablonun su
+işareti o satırın zaman damgasını **aşmıyor** ve indirme orada duruyor.
+
+**Neden:** İlk kurulumda su işareti okunamayan satırı da geçiyordu. Satır bir kez
+sayılıyor, sonra bir daha hiç istenmiyordu — sorgu "su işaretinden yenisini ver"
+dediği için o satır sonsuza kadar isteğin dışında kalıyordu. Uygulamanın sonraki
+sürümü onu okuyabilir hâle gelse bile sunucudaki kayıt cihaza inmiyordu. Üstelik
+sayı hiçbir yerde gösterilmiyordu: ekranda "12 kayıt indirildi" yazıyor, düşen üç
+satırdan hiç söz edilmiyordu. Yani hem kayıp hem sessizdi.
+
+**Bedeli:** O tablo, satır okunabilir hâle gelene kadar olduğu yerde duruyor;
+arkasındaki satırlar da inmiyor. Bu bilinçli bir takas: hata artık gürültülü,
+ekranda sebebiyle görünüyor ve düzeltilmeyi bekliyor. Alternatifi bir satırı
+sessizce kaybedip her şeyin yolunda göründüğü bir kurulumdu.
+
+**Sınır en küçük damga, ilk görülen değil.** Sayfa damga sırasında geliyor ama
+buna güvenilmiyor: sıra bozuksa ikisi farklı olur ve aradaki satırlar sessizce
+atlanırdı.
+
+**Duruş sebebi iki ayrı kararı belirliyor** (`PullStop`): kalan tablolar denensin
+mi, ve bir süre sonra kendiliğinden tekrar denensin mi. Ağ yoksa kalan sekiz
+tabloyu denemek sekiz gereksiz zaman aşımı; ama okunamayan bir üye satırı o
+tabloya özgü ve randevuların inmesini engellememeli. Aynı şekilde ağ geri gelir,
+bozuk satır gelmez — ikincisini arka planda on beş dakikada bir denemek yalnızca
+pil harcar.
+
 ## Para: kuruş cinsinden tam sayı
 
 **Karar:** Parasal tutarlar `Double` değil, kuruş cinsinden `Long` (`Money`).
