@@ -10,6 +10,7 @@ import { SupabaseClient } from "./supabase.js";
 import { tutarYaz, tarihYaz, uyelikDurumu, durumEtiketi, silinmemisler } from "./domain.js";
 import { ayBasi, uyeDagilimi, yaklasanBitisler, defterToplami } from "./ozet.js";
 import { demoIstemcisi, demoMu } from "./demo.js";
+import { suz } from "./suzme.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,6 +21,15 @@ const ayar = window.NONSTOP_CONFIG;
 const istemci = demoMu() ? demoIstemcisi() : new SupabaseClient(ayar?.url, ayar?.anonKey);
 
 let aktifSekme = "ozet";
+
+/**
+ * Sunucudan gelen ham satırlar, açık olan sekme için.
+ *
+ * Süzme bunun üzerinde yapılıyor; her tuş vuruşunda sunucuya gidilmiyor.
+ * Salonun ölçeğinde (birkaç yüz üye) bu anında sonuç veriyor. Sekme
+ * değiştiğinde tazeleniyor, dolayısıyla bayat veri birikmiyor.
+ */
+let acikSatirlar = [];
 
 // ─── Görünüm geçişleri ──────────────────────────────────────────────────────
 
@@ -98,12 +108,34 @@ $("sekmeler").addEventListener("click", (olay) => {
   sekmeYukle(aktifSekme);
 });
 
+// `ara`: arama kutusunun hangi kolonlarda baktığı. Bilinçli olarak dar
+// tutuluyor — her kolonda aramak, "notlar" gibi uzun alanlar yüzünden alakasız
+// eşleşmeler üretirdi.
+//
+// `tarihAlani`: tarih aralığının süzdüğü kolon. Tablo başına farklı ve anlamı
+// da farklı: randevuda "ne zaman yapıldı", defterde "ne zaman gerçekleşti",
+// üyede "ne zaman bitiyor".
 const SEKMELER = {
   ozet: { ozel: ozetYukle },
-  uyeler: { tablo: "gym_members", order: "full_name.asc", ciz: uyeleriCiz },
-  paketler: { tablo: "gym_packages", order: "name.asc", ciz: paketleriCiz },
-  randevular: { tablo: "appointments", order: "start_time_ms.desc", ciz: randevulariCiz },
-  finans: { tablo: "ledger_entries", order: "occurred_at_ms.desc", ciz: finansiCiz },
+  uyeler: {
+    tablo: "gym_members", order: "full_name.asc", ciz: uyeleriCiz,
+    ara: ["full_name", "phone", "email"],
+    tarihAlani: "end_date_ms", tarihEtiketi: "Üyelik bitişi",
+  },
+  paketler: {
+    tablo: "gym_packages", order: "name.asc", ciz: paketleriCiz,
+    ara: ["name", "type", "category"],
+  },
+  randevular: {
+    tablo: "appointments", order: "start_time_ms.desc", ciz: randevulariCiz,
+    ara: ["training_type", "state", "notes"],
+    tarihAlani: "start_time_ms", tarihEtiketi: "Randevu tarihi",
+  },
+  finans: {
+    tablo: "ledger_entries", order: "occurred_at_ms.desc", ciz: finansiCiz,
+    ara: ["description", "type", "category", "payment_method"],
+    tarihAlani: "occurred_at_ms", tarihEtiketi: "İşlem tarihi",
+  },
 };
 
 async function sekmeYukle(ad) {
@@ -131,12 +163,130 @@ async function sekmeYukle(ad) {
   // yazmamalı.
   if (ad !== aktifSekme) return;
 
-  const satirlar = silinmemisler(sonuc.satirlar);
-  if (satirlar.length === 0) {
+  acikSatirlar = silinmemisler(sonuc.satirlar);
+  if (acikSatirlar.length === 0) {
     $("icerik").innerHTML = `<p class="alt">Kayıt yok.</p>`;
     return;
   }
-  $("icerik").appendChild(tanim.ciz(satirlar));
+
+  const suzgec = suzgecCubugu(tanim, () => tabloyuTazele(tanim, suzgec));
+  $("icerik").appendChild(suzgec.kok);
+  $("icerik").appendChild(suzgec.sonucKabi);
+  tabloyuTazele(tanim, suzgec);
+}
+
+/**
+ * Süzgeç değerlerini uygulayıp tabloyu yeniden çizer.
+ *
+ * Yalnızca sonuç kabı yenileniyor, süzgeç çubuğu değil: çubuk da yeniden
+ * çizilseydi arama kutusu her tuşta odağı kaybederdi.
+ */
+function tabloyuTazele(tanim, suzgec) {
+  const suzulen = suz(acikSatirlar, {
+    sorgu: suzgec.sorgu(),
+    alanlar: tanim.ara ?? [],
+    tarihAlani: tanim.tarihAlani ?? null,
+    baslangic: suzgec.baslangic(),
+    bitis: suzgec.bitis(),
+  });
+
+  suzgec.sayac.textContent = suzulen.length === acikSatirlar.length
+    ? `${acikSatirlar.length} kayıt`
+    : `${suzulen.length} / ${acikSatirlar.length} kayıt`;
+
+  suzgec.sonucKabi.innerHTML = "";
+  if (suzulen.length === 0) {
+    const bos = document.createElement("p");
+    bos.className = "alt";
+    // "Kayıt yok"tan farklı bir cümle: veri var ama süzgeç eliyor. Aynı
+    // mesajı kullanmak, kullanıcıya verisinin kaybolduğunu düşündürürdü.
+    bos.textContent = "Süzgece uyan kayıt yok.";
+    suzgec.sonucKabi.appendChild(bos);
+    return;
+  }
+  suzgec.sonucKabi.appendChild(tanim.ciz(suzulen));
+}
+
+/** Arama kutusu, tarih aralığı ve sayaçtan oluşan çubuk. */
+function suzgecCubugu(tanim, degisti) {
+  const kok = document.createElement("div");
+  kok.className = "suzgec";
+
+  const arama = document.createElement("input");
+  arama.type = "search";
+  arama.className = "suzgec-arama";
+  arama.placeholder = "Ara…";
+  // `search` türü tarayıcının temizleme düğmesini getiriyor; `input` olayı o
+  // düğmeyle temizlemede de tetikleniyor, `change` tetiklenmezdi.
+  arama.addEventListener("input", degisti);
+  arama.setAttribute("aria-label", "Listede ara");
+  kok.appendChild(arama);
+
+  let bas = null;
+  let bit = null;
+  if (tanim.tarihAlani) {
+    const grup = document.createElement("div");
+    grup.className = "suzgec-tarih";
+
+    const etiket = document.createElement("span");
+    etiket.className = "alt";
+    etiket.textContent = `${tanim.tarihEtiketi}:`;
+    grup.appendChild(etiket);
+
+    bas = tarihKutusu(`${tanim.tarihEtiketi} başlangıcı`, degisti);
+    bit = tarihKutusu(`${tanim.tarihEtiketi} bitişi`, degisti);
+    grup.append(bas, arasiMetni(), bit);
+    kok.appendChild(grup);
+  }
+
+  const temizle = document.createElement("button");
+  temizle.type = "button";
+  // Kendi sınıfı da var: `ikincil` görünüm sınıfı ve sayfada başka
+  // düğmeler de (ör. Çıkış) taşıyor. Süzgeci temizleme düğmesini seçmek
+  // isteyen kodun ona denk gelmesi gerekiyor.
+  temizle.className = "ikincil suzgec-temizle";
+  temizle.textContent = "Temizle";
+  temizle.addEventListener("click", () => {
+    arama.value = "";
+    if (bas) bas.value = "";
+    if (bit) bit.value = "";
+    degisti();
+  });
+  kok.appendChild(temizle);
+
+  const sayac = document.createElement("span");
+  sayac.className = "alt suzgec-sayac";
+  kok.appendChild(sayac);
+
+  return {
+    kok,
+    sayac,
+    sonucKabi: suzgecSonucKabi(),
+    sorgu: () => arama.value,
+    baslangic: () => (bas ? bas.value : null),
+    bitis: () => (bit ? bit.value : null),
+  };
+}
+
+function suzgecSonucKabi() {
+  const kap = document.createElement("div");
+  kap.className = "suzgec-sonuc";
+  return kap;
+}
+
+function tarihKutusu(etiket, degisti) {
+  const kutu = document.createElement("input");
+  kutu.type = "date";
+  kutu.setAttribute("aria-label", etiket);
+  kutu.addEventListener("input", degisti);
+  return kutu;
+}
+
+function arasiMetni() {
+  const s = document.createElement("span");
+  s.className = "alt";
+  s.textContent = "–";
+  return s;
 }
 
 // ─── Özet ───────────────────────────────────────────────────────────────────

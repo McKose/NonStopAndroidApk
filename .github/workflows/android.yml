@@ -157,8 +157,15 @@ jobs:
       # `npm install` yok ve olmamalı: panelin bağımlılığı yok ve öyle kalmalı.
       # Bir paket eklendiği anda derleme adımı gerekir ve panel artık "dosyaları
       # kopyala, çalışsın" olmaktan çıkar.
+      # Saat dilimi BİLİNÇLİ olarak UTC değil. Panel `<input type="date">`
+      # değerlerini YEREL güne çeviriyor; koşucular UTC olduğu için yerel ve
+      # UTC hesap birbirinin aynısı çıkıyor ve aradaki farkı bozan bir hata
+      # testlerden geçerdi — ama salonun makinesinde (UTC+3) gece yarısı ile
+      # 03:00 arasındaki kayıtlar aralığın dışında kalırdı.
       - name: Panel testleri
         run: node --test web/*.test.js
+        env:
+          TZ: Europe/Istanbul
 
   # Sunucu şeması ve erişim kuralları. Ubuntu koşucusu, 1x ücret.
   #
