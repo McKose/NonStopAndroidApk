@@ -212,7 +212,24 @@ class SyncCoordinator(
                 pushed = pushed,
                 pulled = cekme.applied,
                 failed = failed,
-                retryable = true,
+                // Sebebe bağlı. Önceden koşulsuz `true` idi: okunamayan bir satır
+                // yüzünden duran indirme, arka planda on beş dakikada bir aynı
+                // satıra takılıp aynı sonucu alıyordu.
+                retryable = cekme.retryable,
+            )
+
+            // Buraya düşmek, indirme tamamlandığı hâlde bazı satırların
+            // okunamadığı anlamına gelir. Motor okunamayan satırda duruyor,
+            // yani normalde üstteki dal yakalar; bu dal o değişmez bozulursa
+            // sayının sessizce kaybolmasını engelliyor. Önceden `unreadable`
+            // hiçbir yerde okunmuyordu: kullanıcı "12 kayıt indirildi" görüyor,
+            // düşen üç satırdan haberi olmuyordu.
+            cekme.unreadable > 0 -> SyncState.Problem(
+                reason = "${cekme.unreadable} satır okunamadı; sunucudaki hâli inmedi.",
+                pushed = pushed,
+                pulled = cekme.applied,
+                failed = failed,
+                retryable = false,
             )
 
             failed > 0 -> SyncState.Problem(

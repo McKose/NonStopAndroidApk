@@ -219,7 +219,7 @@ class SyncCoordinatorTest {
     /** İndirme yarım kaldıysa bu ayrıca bildiriliyor. */
     @Test
     fun `yarim kalan indirme sorun olarak bildirilir`() = runTest {
-        val puller = SahtePuller(PullSummary(applied = 3, stopped = true, reason = "ağ yok"))
+        val puller = SahtePuller(PullSummary(applied = 3, reason = "ağ yok", retryable = true))
         val runner = SahteRunner(listOf(SyncOutcome()))
 
         val durum = koordinator(runner, puller).syncNow()
@@ -228,6 +228,51 @@ class SyncCoordinatorTest {
         assertEquals(3, sorun.pulled)
         assertTrue(sorun.reason.contains("ağ yok"), "Gerekçe: ${sorun.reason}")
         assertTrue(sorun.retryable, "Yarım kalan indirme tekrar denenebilir olmalı")
+    }
+
+    /**
+     * Duruş sebebi tekrar denenmeyecek türdense arka plan işi de tekrar denemiyor.
+     *
+     * Önceden bu karar koşulsuz `true` idi: okunamayan bir satır yüzünden duran
+     * indirme, arka planda on beş dakikada bir aynı satıra takılıp aynı sonucu
+     * alıyordu. Satır kendiliğinden düzelmiyor — kod düzeltmesi gerekiyor.
+     */
+    @Test
+    fun `tekrar denenmeyecek indirme durusu tekrar denenmez`() = runTest {
+        val puller = SahtePuller(
+            PullSummary(applied = 1, unreadable = 2, reason = "members — 2 satır okunamadı", retryable = false)
+        )
+        val runner = SahteRunner(listOf(SyncOutcome()))
+
+        val durum = koordinator(runner, puller).syncNow()
+
+        val sorun = assertIs<SyncState.Problem>(durum)
+        assertFalse(sorun.retryable, "Bozuk satır için arka planda tekrarlamanın karşılığı yok")
+    }
+
+    /**
+     * Okunamayan satır sayısı kullanıcıya ulaşıyor.
+     *
+     * Bu sayı motorda hesaplanıyordu ama koordinatörde okunmadan atılıyordu:
+     * ekranda "3 kayıt indirildi" yazıyor, düşen satırlardan hiçbir yerde söz
+     * edilmiyordu. Sunucudaki veri eksik inmişken turun "tamamlandı" görünmesi,
+     * bu projede kaçınılan sessiz başarısızlığın ta kendisi.
+     *
+     * Motor okunamayan satırda durduğu için normalde duruş gerekçesi bu bilgiyi
+     * zaten taşıyor; bu iddia, o değişmez bozulursa sayının yine de görünmesini
+     * güvenceye alıyor.
+     */
+    @Test
+    fun `okunamayan satir sayisi bildiriliyor`() = runTest {
+        val puller = SahtePuller(PullSummary(applied = 3, unreadable = 2))
+        val runner = SahteRunner(listOf(SyncOutcome()))
+
+        val durum = koordinator(runner, puller).syncNow()
+
+        val sorun = assertIs<SyncState.Problem>(durum)
+        assertTrue(sorun.reason.contains("2"), "Sayı görünmeli: ${sorun.reason}")
+        assertTrue(sorun.reason.contains("okunamadı"), "Gerekçe: ${sorun.reason}")
+        assertEquals(3, sorun.pulled, "İnenler yine de sayılmalı")
     }
 
     // ─── Tek seferlik koşma ─────────────────────────────────────────────────

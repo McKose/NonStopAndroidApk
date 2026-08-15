@@ -98,6 +98,67 @@ göndermek demek.
 satır" der. Gönderilecek verinin şekli sunucu ve kimlik doğrulama seçimine bağlı;
 sınır oradan geçince motor o karar verilmeden yazılabildi.
 
+## İndirme: okunamayan satır su işaretini kilitler
+
+**Karar:** Sunucudan gelen bir satır yerel biçime çevrilemiyorsa, o tablonun su
+işareti o satırın zaman damgasını **aşmıyor** ve indirme orada duruyor.
+
+**Neden:** İlk kurulumda su işareti okunamayan satırı da geçiyordu. Satır bir kez
+sayılıyor, sonra bir daha hiç istenmiyordu — sorgu "su işaretinden yenisini ver"
+dediği için o satır sonsuza kadar isteğin dışında kalıyordu. Uygulamanın sonraki
+sürümü onu okuyabilir hâle gelse bile sunucudaki kayıt cihaza inmiyordu. Üstelik
+sayı hiçbir yerde gösterilmiyordu: ekranda "12 kayıt indirildi" yazıyor, düşen üç
+satırdan hiç söz edilmiyordu. Yani hem kayıp hem sessizdi.
+
+**Bedeli:** O tablo, satır okunabilir hâle gelene kadar olduğu yerde duruyor;
+arkasındaki satırlar da inmiyor. Bu bilinçli bir takas: hata artık gürültülü,
+ekranda sebebiyle görünüyor ve düzeltilmeyi bekliyor. Alternatifi bir satırı
+sessizce kaybedip her şeyin yolunda göründüğü bir kurulumdu.
+
+**Sınır en küçük damga, ilk görülen değil.** Sayfa damga sırasında geliyor ama
+buna güvenilmiyor: sıra bozuksa ikisi farklı olur ve aradaki satırlar sessizce
+atlanırdı.
+
+**Duruş sebebi iki ayrı kararı belirliyor** (`PullStop`): kalan tablolar denensin
+mi, ve bir süre sonra kendiliğinden tekrar denensin mi. Ağ yoksa kalan sekiz
+tabloyu denemek sekiz gereksiz zaman aşımı; ama okunamayan bir üye satırı o
+tabloya özgü ve randevuların inmesini engellememeli. Aynı şekilde ağ geri gelir,
+bozuk satır gelmez — ikincisini arka planda on beş dakikada bir denemek yalnızca
+pil harcar.
+
+## Yenilemede kalan seanslar: kararı kullanıcı verir
+
+**Karar:** Paket yenilenirken kalan seansların devredilip devredilmeyeceğini
+antrenör seçiyor (`SessionCarryOver`: `CARRY` / `DISCARD`). Uygulamanın gömülü
+bir politikası yok.
+
+**Neden:** Önceki hâlde yenileme kalan seansları **koşulsuz siliyordu** ve bu,
+aynı işlemin tarih yarısıyla çelişiyordu: üyeliği bitmemiş birinin kalan günleri
+devrediyor (`baseDate = currentEndDate`), kalan seansları siliniyordu. Tek bir
+işlemin iki yarısı birbirine zıt davranıyordu. Hangi yarının doğru olduğu ise
+uygulamanın bilebileceği bir şey değil — salon politikasına, hatta aynı salonda
+üyeden üyeye değişiyor.
+
+**Varsayılan yok.** `renewPackage`'ın `carryOver` parametresinin varsayılan
+değeri **bilinçli olarak yok**: varsayılan verilseydi yeni bir çağrı yeri onu
+sessizce miras alır ve kullanıcıya hiç sorulmadan bir politika uygulanırdı.
+Formda başlangıç seçimi `CARRY` — üye o seansların parasını ödemiş — ama seçim
+ekranda açıkça duruyor.
+
+**`totalSessions` de aynı değeri alıyor.** Ayrışmaları sessiz bir hata olurdu:
+seans iadesi (`MemberDao.incrementSession`) tavan olarak `totalSessions`'a
+bakıyor; tavan devredenleri saymazsa iptal edilen bir randevunun hakkı geri
+verilemezdi.
+
+**Sınırsız paketler:** Yeni paket sınırsızsa sonuç yine sınırsız — devredileni
+"sınırsız"a eklemenin karşılığı yok ve bir sayı üretmek sınırsız paketi sessizce
+sınırlı hâle getirirdi. Eski paket sınırsızsa devredecek **sayılabilir** hak yok;
+sıfır sayılıyor, alternatifi uydurulmuş bir sayıydı.
+
+**Soru her zaman sorulmuyor.** Seçim yalnızca yenilemede ve kalan seans sıfırdan
+büyükken görünüyor: diğer hâllerde iki şık da aynı sonucu verir ve kullanıcıya
+anlamsız bir karar dayatmak olurdu.
+
 ## Para: kuruş cinsinden tam sayı
 
 **Karar:** Parasal tutarlar `Double` değil, kuruş cinsinden `Long` (`Money`).

@@ -6,6 +6,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -152,8 +153,123 @@ class PullEngineTest {
         assertEquals(30L, state.suIsareti)
     }
 
+    // ─── Okunamayan satır ───────────────────────────────────────────────────
+
+    /**
+     * Su işareti okunamayan satırı **aşmıyor**.
+     *
+     * Bu testin sınadığı şey sessiz ve geri dönüşsüz bir veri kaybı. İlk yazımda
+     * su işareti okunamayan satırı da geçiyordu: satır bir kez sayılıyor, sonra
+     * bir daha hiç istenmiyordu. Uygulamanın sonraki sürümü o satırı okuyabilir
+     * hâle gelse bile sunucudaki kayıt cihaza inmiyordu — kullanıcının eksik
+     * olduğunu fark edemeyeceği bir üye.
+     *
+     * Beklenen değer bozuk satırın damgasının **kendisi**, bir eksiği değil:
+     * sorgu `>=` olduğu için o satır bir sonraki turda yine geliyor. Arkasındaki
+     * `c` satırı okunabilmiş olmasına rağmen su işaretini 30'a taşımıyor —
+     * taşısaydı bozuk satır isteğin dışında kalırdı.
+     */
     @Test
-    fun `okunamayan satir sayilir ve turu durdurmaz`() = runTest {
+    fun `su isareti okunamayan satiri asmiyor`() = runTest {
+        val reader = SahteReader(
+            listOf(FetchResult.Rows(listOf(satir("a", 10), satir("bozuk", 20), satir("c", 30))))
+        )
+        val writer = SahteWriter(okunamayanlar = setOf("bozuk"))
+        val state = SahteState()
+
+        val sonuc = PullEngine(reader, writer, state, pageSize = 10)
+            .pullTable(tenant, SyncTable.MEMBERS)
+
+        assertEquals(1, sonuc.unreadable)
+        assertEquals(
+            20L, state.suIsareti,
+            "Su işareti bozuk satırın damgasını aşmamalı; aşarsa satır bir daha istenmez",
+        )
+    }
+
+    /**
+     * Sınır, bozuk satırların **en küçük** damgası — ilk görülen değil.
+     *
+     * Sayfa damga sırasında geliyor ama motor buna güvenmiyor. Güvenseydi
+     * "gördüğüm ilk bozuk satır" ile "en küçük damgalı bozuk satır" farklı olur
+     * ve aradaki satırlar sessizce atlanırdı.
+     *
+     * Kurgu bu ayrımı zorluyor: iki bozuk satır var ve **önce gelen daha büyük
+     * damgalı**. Tek bozuk satırla bu test hiçbir şey ayırt etmezdi — ilk görülen
+     * zaten en küçük olurdu.
+     */
+    @Test
+    fun `sinir en kucuk bozuk damga, ilk gorulen degil`() = runTest {
+        val reader = SahteReader(
+            listOf(
+                FetchResult.Rows(
+                    listOf(satir("bozuk-uzak", 30), satir("a", 10), satir("bozuk-yakin", 5))
+                )
+            )
+        )
+        val writer = SahteWriter(okunamayanlar = setOf("bozuk-uzak", "bozuk-yakin"))
+        val state = SahteState()
+
+        val sonuc = PullEngine(reader, writer, state, pageSize = 10)
+            .pullTable(tenant, SyncTable.MEMBERS)
+
+        assertEquals(2, sonuc.unreadable)
+        assertEquals(
+            5L, state.suIsareti,
+            "İlk görülen bozuk damga (30) alınsaydı su işareti 10'a çıkar ve 5'teki satır kaybolurdu",
+        )
+    }
+
+    /** Damgası da okunamayan satırda su işareti hiç ilerlemiyor. */
+    @Test
+    fun `damgasi okunamayan satirda su isareti hic ilerlemiyor`() = runTest {
+        val damgasiz = buildJsonObject { put("id", "bozuk") }
+        val reader = SahteReader(listOf(FetchResult.Rows(listOf(satir("a", 50), damgasiz))))
+        val writer = SahteWriter(okunamayanlar = setOf("bozuk"))
+        val state = SahteState(suIsareti = 40)
+
+        PullEngine(reader, writer, state, pageSize = 10).pullTable(tenant, SyncTable.MEMBERS)
+
+        assertEquals(40L, state.suIsareti, "Satırın nereye düştüğü bilinmiyorsa ilerlenemez")
+    }
+
+    /**
+     * Bozuk satır bir sonraki turda **yeniden isteniyor**.
+     *
+     * Asıl iddia bu: su işaretinin nerede durduğu değil, satırın geri
+     * gelebilmesi. Uygulama düzeltildiğinde veri kendiliğinden iniyor.
+     */
+    @Test
+    fun `bozuk satir sonraki turda yeniden isteniyor`() = runTest {
+        val sayfa = FetchResult.Rows(listOf(satir("a", 10), satir("bozuk", 20)))
+        val state = SahteState()
+
+        // İlk tur: satır okunamıyor.
+        val ilkReader = SahteReader(listOf(sayfa))
+        PullEngine(ilkReader, SahteWriter(okunamayanlar = setOf("bozuk")), state, pageSize = 10)
+            .pullTable(tenant, SyncTable.MEMBERS)
+
+        // İkinci tur: uygulama artık okuyabiliyor.
+        val ikinciReader = SahteReader(listOf(sayfa))
+        val duzelmisWriter = SahteWriter()
+        val sonuc = PullEngine(ikinciReader, duzelmisWriter, state, pageSize = 10)
+            .pullTable(tenant, SyncTable.MEMBERS)
+
+        assertTrue(ikinciReader.istenenSince.first() <= 20L, "Bozuk satır isteğe dahil olmalı")
+        assertTrue("bozuk" in duzelmisWriter.yazilanlar, "Satır ikinci turda inmeliydi")
+        assertEquals(0, sonuc.unreadable)
+        assertEquals(20L, state.suIsareti, "Engel kalkınca su işareti ilerlemeli")
+    }
+
+    /**
+     * Bozuk satır **yalnızca kendi tablosunu** durduruyor.
+     *
+     * Tekrar denemenin de anlamı yok: satır kendiliğinden düzelmiyor, kod
+     * düzeltmesi gerekiyor. Arka planda on beş dakikada bir aynı satıra takılmak
+     * yalnızca pil harcardı.
+     */
+    @Test
+    fun `okunamayan satir tabloyu durdurur ve tekrar denenmez`() = runTest {
         val reader = SahteReader(listOf(FetchResult.Rows(listOf(satir("a", 10), satir("bozuk", 20)))))
         val writer = SahteWriter(okunamayanlar = setOf("bozuk"))
 
@@ -162,7 +278,9 @@ class PullEngineTest {
 
         assertEquals(1, sonuc.applied)
         assertEquals(1, sonuc.unreadable)
-        assertTrue(!sonuc.stopped, "Tek bozuk satır turu durdurmamalı")
+        assertEquals(PullStop.BLOCKED, sonuc.stop)
+        assertFalse(PullStop.BLOCKED.retryable, "Bozuk satır kendiliğinden düzelmiyor")
+        assertTrue(PullStop.BLOCKED.tryOtherTables, "Diğer tablolarla ilgisi yok")
     }
 
     // ─── Sayfalama ──────────────────────────────────────────────────────────
@@ -200,7 +318,7 @@ class PullEngineTest {
         val sonuc = PullEngine(reader, SahteWriter(), state, pageSize = 2)
             .pullTable(tenant, SyncTable.MEMBERS)
 
-        assertTrue(sonuc.stopped)
+        assertEquals(PullStop.BLOCKED, sonuc.stop)
         assertEquals(1, reader.cagriSayisi, "İkinci kez istenmemeli")
         assertTrue(sonuc.reason!!.contains("Aynı zaman damgalı"), "Gerekçe: ${sonuc.reason}")
     }
@@ -220,7 +338,10 @@ class PullEngineTest {
             .pullTable(tenant, SyncTable.MEMBERS)
 
         assertEquals(4, sonuc.applied)
-        assertTrue(sonuc.stopped)
+        // Ağ ya da bozuk satır değil: ilerleme oldu, yalnızca bitmedi. Bir
+        // sonraki tetikleme kaldığı yerden devam etmeli.
+        assertEquals(PullStop.INCOMPLETE, sonuc.stop)
+        assertTrue(PullStop.INCOMPLETE.retryable)
         assertEquals(4, reader.n)
     }
 
@@ -233,7 +354,9 @@ class PullEngineTest {
 
         val sonuc = PullEngine(reader, SahteWriter(), state).pullTable(tenant, SyncTable.MEMBERS)
 
-        assertTrue(sonuc.stopped)
+        assertEquals(PullStop.CONNECTION, sonuc.stop)
+        assertTrue(PullStop.CONNECTION.retryable, "Ağ geri gelir")
+        assertFalse(PullStop.CONNECTION.tryOtherTables, "Aynı ağ, aynı sonuç")
         assertEquals("ağ yok", sonuc.reason)
         assertEquals(42L, state.suIsareti)
         assertTrue(state.kaydedilenler.isEmpty(), "Hiçbir şey okunmadıysa su işareti yazılmamalı")
@@ -245,7 +368,8 @@ class PullEngineTest {
 
         val sonuc = PullEngine(reader, SahteWriter(), SahteState()).pullTable(tenant, SyncTable.MEMBERS)
 
-        assertTrue(sonuc.stopped)
+        assertEquals(PullStop.REJECTED, sonuc.stop)
+        assertFalse(PullStop.REJECTED.retryable, "Yetki hatası tekrar denemekle düzelmez")
         assertEquals("erişim reddedildi", sonuc.reason)
     }
 

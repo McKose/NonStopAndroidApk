@@ -17,6 +17,7 @@ import org.koin.androidx.compose.koinViewModel
 import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.SessionCarryOver
 import com.gymapp.domain.labelTr
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -146,6 +147,51 @@ fun RegisterMemberScreen(
                         )
                     }
                 }
+            }
+
+            // ─── Kalan seanslar ────────────────────────────────────────────
+            //
+            // Yalnızca yenilemede ve devredecek SAYILABİLİR bir hak varken
+            // görünüyor. Sınırsız pakette (`null`) devredecek bir sayı yok,
+            // sıfır kalan seansta ise seçimin iki şıkkı da aynı sonucu verir —
+            // ikisinde de kullanıcıya sorulacak bir şey olmadığı için soru hiç
+            // sorulmuyor. Her zaman göstermek, çoğu yenilemede anlamsız bir
+            // karar dayatmak olurdu.
+            val kalanSeans = formState.currentRemainingSessions
+            if (formState.isRenewal && kalanSeans != null && kalanSeans > 0) {
+                SectionTitle("Kalan Seanslar")
+
+                Text(
+                    text = "Üyenin $kalanSeans seansı kullanılmadı.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    SessionCarryOver.entries.forEach { secim ->
+                        FilterChip(
+                            selected = formState.carryOver == secim,
+                            onClick = { viewModel.onCarryOverChange(secim) },
+                            label = { Text(secim.labelTr()) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                // Seçimin sonucu sayıyla yazılıyor: "Devret" ile "İptal et"
+                // arasındaki farkın ne olduğu, seçim yapılmadan önce görünsün.
+                val yeniPaketSeans = formState.selectedPackage?.sessionCount
+                Text(
+                    text = when {
+                        yeniPaketSeans == null -> "Seçilen paket sınırsız; kalan seanslar devredilemez."
+                        formState.carryOver == SessionCarryOver.CARRY ->
+                            "Yeni toplam: ${yeniPaketSeans + kalanSeans} seans."
+                        else -> "Yeni toplam: $yeniPaketSeans seans."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
 
             OutlinedTextField(

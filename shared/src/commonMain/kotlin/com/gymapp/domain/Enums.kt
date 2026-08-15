@@ -58,6 +58,24 @@ enum class LedgerCategory {
 enum class StockMovementReason { PURCHASE, SALE, CORRECTION, RETURN }
 
 /**
+ * Paket yenilenirken kalan seansların ne olacağı.
+ *
+ * Bu bir **kullanıcı kararı**, uygulamanın varsayımı değil: salonun politikası
+ * salona göre değişiyor ve aynı salonda üyeden üyeye de değişebiliyor. Antrenör
+ * yenileme ekranında ikisinden birini seçiyor.
+ *
+ * Enum, `Boolean` yerine tercih edildi: `renewPackage(..., true)` çağrısında
+ * `true`'nun neyi seçtiği çağrı yerinde okunmuyor.
+ */
+enum class SessionCarryOver {
+    /** Kalan seanslar yeni paketin üstüne eklenir. */
+    CARRY,
+
+    /** Kalan seanslar silinir; üye yeni paketin seansıyla başlar. */
+    DISCARD,
+}
+
+/**
  * Paket seans kotası.
  *
  * `-1` sihirli sayısı yerine nullable alan kullanılır: `null` = sınırsız (abonman).
@@ -68,6 +86,40 @@ object SessionQuota {
     fun isUnlimited(sessionCount: Int?): Boolean = sessionCount == null
 
     fun hasSessionsLeft(remaining: Int?): Boolean = remaining == null || remaining > 0
+
+    /**
+     * Yenilemeden sonraki seans kotası.
+     *
+     * Kararı **kullanıcı veriyor** ([SessionCarryOver]); burada yalnızca aritmetik
+     * var. Önceden karar diye bir şey yoktu: yenileme kalan seansları koşulsuz
+     * siliyordu. Üstelik tarih tarafı tam tersini yapıyordu — üyeliği bitmemiş
+     * birinin kalan günleri devrediyor, kalan seansları siliniyordu. İki yarısı
+     * birbiriyle çelişen tek bir işlemdi.
+     *
+     * Dönen değer hem `remainingSessions` hem `totalSessions` için kullanılıyor.
+     * İkisinin ayrışması sessiz bir hata olurdu: seans iadesi
+     * (`MemberDao.incrementSession`) tavan olarak `totalSessions`'a bakıyor, yani
+     * tavan devreden seansları saymazsa iptal edilen bir randevunun hakkı geri
+     * verilemezdi.
+     *
+     * @param newPackageSessions Yeni paketin seans sayısı; `null` sınırsız.
+     * @param currentRemaining Üyenin şu anki kalan seansı; `null` sınırsız.
+     */
+    fun onRenewal(
+        newPackageSessions: Int?,
+        currentRemaining: Int?,
+        carryOver: SessionCarryOver,
+    ): Int? {
+        // Yeni paket sınırsızsa sayılacak bir kota yok; devir de anlamsız.
+        if (newPackageSessions == null) return null
+        if (carryOver == SessionCarryOver.DISCARD) return newPackageSessions
+
+        // Eski paket sınırsızsa (`null`) devredecek SAYILABİLİR bir hak yok.
+        // "Sınırsız"ı bir sayıya çevirmenin doğru karşılığı olmadığı için sıfır
+        // sayılıyor; alternatifi uydurulmuş bir sayı olurdu.
+        val devreden = (currentRemaining ?: 0).coerceAtLeast(0)
+        return newPackageSessions + devreden
+    }
 
     // Seans düşümü ve iadesi bilinçli olarak **burada değil**: ikisi de
     // `MemberDao.decrementSession` / `incrementSession` içinde tek bir atomik
@@ -110,6 +162,11 @@ fun PaymentMethod.labelTr(): String = when (this) {
     PaymentMethod.CASH -> "Nakit"
     PaymentMethod.CARD -> "Kart"
     PaymentMethod.MULTISPORT -> "MultiSpor"
+}
+
+fun SessionCarryOver.labelTr(): String = when (this) {
+    SessionCarryOver.CARRY -> "Devret"
+    SessionCarryOver.DISCARD -> "İptal et"
 }
 
 fun AppointmentState.labelTr(): String = when (this) {
