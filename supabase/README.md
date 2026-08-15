@@ -32,6 +32,7 @@ yazılabileceğini söyler. İkincisi olmasaydı bir istemci başka salonun
    - `migrations/0001_tenancy.sql`
    - `migrations/0002_data_tables.sql`
    - `migrations/0003_staff_auth_link.sql`
+   - `migrations/0004_role_based_access.sql`
 
    Hepsi tekrar çalıştırılabilir: emin değilseniz yeniden koşturun, zarar vermez.
 
@@ -62,6 +63,11 @@ yazılabileceğini söyler. İkincisi olmasaydı bir istemci başka salonun
    Bu adım atlanırsa kullanıcı giriş yapar ama **hiçbir satır göremez** — kural
    "bağlı olduğun salonun satırları" dediği için bağlantısı olmayan kullanıcının
    sonucu boş olur. Beklenen davranış budur.
+
+   **Rol seçimi önemli** (0004'ten sonra): rol yalnızca bilgi değil, ne
+   yazabileceğini belirliyor. Kendi hesabınıza `ADMIN` verin — `MANAGER`
+   verirseniz personel ekleyemez, `TRAINER` verirseniz fiyat da
+   değiştiremezsiniz. Ayrıntı için "Kim neyi yazabilir" bölümüne bakın.
 
 6. **Uçtan uca doğrulayın.** Aşağıdaki bölüm.
 
@@ -141,24 +147,42 @@ olurdu.
 ## Kuralların CI'da doğrulanması
 
 Şema ve erişim kuralları her CI koşusunda gerçek bir PostgreSQL üzerinde
-sınanıyor (`tests/run.sh`). Test iki salon ve iki kullanıcı kurup şunları
-doğruluyor:
+sınanıyor (`tests/run.sh`). Migrasyonlar **iki kez** uygulanıyor: tekrar
+çalıştırılabilir olmaları şart, çünkü kurulum sırasında yarıda kalan bir dosya
+yeniden koşturulacak.
+
+`10_rls_test.sql` — salonlar arası yalıtım:
 
 - kullanıcı yalnızca kendi salonunun satırlarını görüyor,
 - başka salona yazma **reddediliyor**,
-- başka salonun satırını silme hiçbir satırı etkilemiyor,
+- silme hiç kimseye açık değil,
 - kendi salonuna yazma çalışıyor (kural fazla kısıtlayıcı da olmamalı).
 
-Testin dişli olduğu ayrıca sınandı: politikadan `with check` kaldırıldığında test
-sıfırdan farklı kodla düşüyor. Yalıtım kuralları sessizce bozulabilecek türden
-olduğu için bu önemli — uygulama çalışmaya devam eder, diğer testler geçer, veri
-sızar.
+`20_role_test.sql` — salon içi rol ayrımı. Her rol için hem izin verilen hem
+reddedilen yol ayrı ayrı kanıtlanıyor; yalnızca reddi sınamak "her şeyi reddet"
+diye yazılmış bozuk bir kuralı da geçirirdi.
+
+**Testlerin dişli olduğu tek tek sınandı.** Kural dosyasına altı ayrı bozma
+uygulandı ve her birinde takım düştü: eski tek parçalı kuralın bırakılması,
+`staff`'ın herkese açılması, `products`'ın herkese açılması, `DELETE` yetkisinin
+bırakılması, güncellemede `with check`'in kaldırılması ve rol süzgecinin
+kaldırılması.
+
+Bunlardan biri ilk yazımda **yakalanmıyordu**: `with check` kaldırıldığında
+testler geçmeye devam ediyordu, çünkü iddia tek salonlu bir kullanıcıyla
+yazılmıştı ve satır taşıma zaten okuma kuralına takılıyordu — yani testin
+düşmesinin sebebi sınamak istediği kural değildi. İddia, iki salonda farklı role
+sahip bir kullanıcıyla yeniden yazıldı; ayırt edici olan bu.
 
 Yerelde koşturmak için:
 
 ```bash
 PGURL="postgres://postgres:postgres@localhost:5432/postgres" ./supabase/tests/run.sh
 ```
+
+Yeni bir test dosyası eklemek için `tests/` altına `NN_ad.sql` koymak yeterli:
+`run.sh` dosyaları dizinden okuyor. Elle sayılan bir listede yeni dosyayı
+eklemeyi unutmak, o testin **hiç koşmaması** ama takımın yeşil kalması demekti.
 
 ## Uygulamayı bu projeye bağlama
 
@@ -202,6 +226,48 @@ buna izin vermiyor ve vermesi de istenmez.
 Bağlantı kurulmadan da giriş yapılabilir — yalnızca randevu eşleşmesi kurulamaz.
 Ders vermeyen bir kullanıcı (ör. salon sahibi) için bu zaten doğru sonuç.
 
+## Kim neyi yazabilir
+
+Salona bağlı olmak artık tek başına yetmiyor; `gym_users.role` ne
+yazabileceğinizi de belirliyor (migrasyon `0004`).
+
+| Tablo | Okuma | Yazma (ekleme + güncelleme) |
+|---|---|---|
+| `staff` — personel, maaş, hakediş | salona bağlı herkes | **yalnızca ADMIN** |
+| `gym_packages`, `products` — fiyat listesi | salona bağlı herkes | **ADMIN, MANAGER** |
+| `gym_members`, `appointments`, `orders`, `measurements`, `ledger_entries`, `stock_movements` — günlük iş | salona bağlı herkes | ADMIN, MANAGER, TRAINER |
+
+**Okuma bilinçli olarak bölünmedi.** Bir eğitmenin randevu yazabilmesi için üye
+listesini, satış yapabilmesi için fiyatı görmesi zaten gerekiyor. Okumayı role
+göre daraltmak ekranları boş gösterirdi.
+
+**Silme hiçbir role açık değil.** Uygulama zaten hiç `DELETE` göndermiyor:
+silme mezar taşıyla yapılıyor (`deleted_at_ms` doldurulur), yani sunucuya giden
+şey bir güncelleme. Yetkiyi tamamen geri almak bu yüzden hiçbir şeye mal olmuyor
+ama kalıcı veri kaybını imkânsız kılıyor — ele geçirilmiş bir jetonla bile satır
+silinemez, en fazla mezar taşı konur ve mezar taşı geri alınabilir.
+
+### Yetkisiz yazma denenirse ne oluyor
+
+Sunucu `403` döner, uygulama bunu **kalıcı hata** sayar ve kayıt gönderim
+kuyruğunda işaretli kalır — sonsuza kadar tekrar denenmez. Ayarlar ekranındaki
+senkronizasyon durumu "reddedildi" der.
+
+`403`'ün iki sebebi olabilir ve ayırt etmenin yolu sunucunun döndürdüğü
+gövdedir:
+
+| Sebep | Çözüm |
+|---|---|
+| Kullanıcı `gym_users`'a hiç eklenmemiş | Kurulum 5. adımı çalıştırın |
+| Eklenmiş ama rolü bu tabloya yetmiyor | Rolü yükseltin ya da işlemi yetkili hesapla yapın |
+
+Rolü değiştirmek için:
+```sql
+update public.gym_users
+   set role = 'ADMIN'
+ where user_id = (select id from auth.users where email = '<e-posta>');
+```
+
 ## Senkronizasyon nasıl çalışıyor
 
 **Yukarı (cihaz → sunucu).** Her yazma, satırı değiştiren işlemle aynı
@@ -232,8 +298,5 @@ görünmeye devam ederdi.
 - **Arkaplanda gönderim yok.** Tetikleme girişte, uygulama önplandayken dakikada
   bir ve Ayarlar'daki "Sunucuya Eşitle" ile oluyor. Uygulama tamamen kapalıyken
   gönderim yapılmıyor; bunun için bir arka plan işi (WorkManager) gerekiyor.
-- **Role dayalı ince yetkilendirme.** `gym_users.role` artık oturuma taşınıyor ve
-  uygulama içi yetkiyi belirliyor, ama **sunucu kuralları** hâlâ rolü ayırt
-  etmiyor: salona bağlı olan yazabiliyor.
 - **`staff.password` kolonu duruyor** ama hiçbir yerde okunmuyor ve sunucuya
   gönderilmiyor. Şemadan kaldırılması ayrı bir geçiş.

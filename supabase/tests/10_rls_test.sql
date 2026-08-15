@@ -74,11 +74,20 @@ begin
         when insufficient_privilege then null;  -- beklenen
     end;
 
-    -- 3) Başka salonun satırını silmek hiçbir satırı etkilememeli.
-    delete from public.products where id = 'p-b';
-    if found then
-        raise exception 'GÜVENLİK AÇIĞI: başka salonun satırı silinebildi';
-    end if;
+    -- 3) Silme kimseye açık değil (bkz. 0004).
+    --
+    -- Bu iddia eskiden "başka salonun satırı silinemez" diyordu ve silmenin
+    -- kendi salonunda serbest olduğunu varsayıyordu. 0004 yetkiyi tamamen geri
+    -- aldı: uygulama hiç DELETE göndermiyor, silme mezar taşıyla yapılıyor.
+    -- Kendi salonundaki satır seçildi bilinçli olarak — başka salonunki zaten
+    -- görünmediği için kural olmasa bile 0 satır etkilenir ve test yanıltıcı
+    -- biçimde geçerdi.
+    begin
+        delete from public.products where id = 'p-a';
+        raise exception 'GÜVENLİK AÇIĞI: silme engellenmedi';
+    exception
+        when insufficient_privilege then null;  -- beklenen
+    end;
 
     -- 4) Kendi salonuna yazabilmeli — kural fazla kısıtlayıcı da olmamalı.
     insert into public.products (id, tenant_id, name, category, price_minor,
