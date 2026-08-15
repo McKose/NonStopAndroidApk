@@ -96,20 +96,18 @@ class RowRoundTripTest {
     }
 
     /**
-     * Personel, şifre **hariç** korunur.
+     * Personel gidiş-dönüşte korunuyor.
      *
-     * Şifre sunucuya hiç gitmiyor, dolayısıyla geri de gelmiyor. Bu testin
-     * değeri kuralı okuma tarafından da bağlaması: biri ileride şifreyi
-     * gönderime eklerse burada dönen satır artık boş şifreli olmaz ve test
-     * düşer.
+     * Eskiden bu test "şifre hariç" diyordu: `staff` tablosunda düz metin bir
+     * şifre kolonu vardı ve sunucuya gönderilmiyordu. Kolon v5'te tamamen
+     * kaldırıldı (bkz. `MIGRATION_4_5`), dolayısıyla artık istisna yok.
      */
     @Test
-    fun `personel sifre haric gidis donuste korunur`() {
+    fun `personel gidis donuste korunur`() {
         val geri = RowParsers.staff(jsonOf(RowPayloads.of(SampleRows.staff)))
 
         assertNotNull(geri)
-        assertEquals("", geri.password, "Şifre sunucudan gelmemeli")
-        assertEquals(SampleRows.staff.copy(password = ""), geri)
+        assertEquals(SampleRows.staff, geri)
     }
 
     /**

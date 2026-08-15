@@ -316,5 +316,8 @@ görünmeye devam ederdi.
 - **iOS tarafında oturum saklama yok.** Android'de oturum Keystore ile
   şifrelenip saklanıyor ve uygulama kapansa da korunuyor; iOS uygulaması
   yazıldığında Keychain karşılığı `SessionStore` arayüzünün arkasına eklenecek.
-- **`staff.password` kolonu duruyor** ama hiçbir yerde okunmuyor ve sunucuya
-  gönderilmiyor. Şemadan kaldırılması ayrı bir geçiş.
+- **Room şema dosyaları depoda değil.** `shared/schemas/*.json` yalnızca CI
+  yapıtı olarak üretiliyor. Depoya alındığında Room'un `MigrationTestHelper`'ı
+  kullanılabilir hâle gelir ve geçişler, gerçek eski şemadan veritabanı kurularak
+  uçtan uca sınanabilir. Şimdilik geçişler `MigrationsTest` içinde doğrudan SQL
+  üzerinden doğrulanıyor.

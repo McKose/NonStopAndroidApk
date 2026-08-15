@@ -65,7 +65,6 @@ class PersonnelViewModel(
         phone: String,
         nickname: String,
         role: StaffRole,
-        password: String? = null,
         authUserId: String? = null,
         isActive: Boolean = true,
     ) {
@@ -89,7 +88,6 @@ class PersonnelViewModel(
                 monthlySalary = Money.ofMajor(salary),
                 phone = phone,
                 nickname = nickname,
-                password = password?.takeIf { it.isNotBlank() },
                 authUserId = authUserId?.takeIf { it.isNotBlank() },
                 isActive = isActive,
             ).fold(

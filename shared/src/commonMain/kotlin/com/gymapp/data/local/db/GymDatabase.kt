@@ -20,7 +20,11 @@ import com.gymapp.data.local.entity.*
  * **Buradan sonrası katı migration disiplini**: her şema değişikliği bir sürüm
  * artışı ve elle yazılmış bir [androidx.room.migration.Migration] gerektirir.
  * `exportSchema = true` olduğu için her sürümün anlık görüntüsü `shared/schemas`
- * altında depoya işlenir ve geçişler test edilebilir.
+ * altına yazılıyor. DİKKAT: bu dizin şu an depoya **işlenmiyor**, yalnızca CI
+ * yapıtı olarak yayımlanıyor. Dolayısıyla Room'un `MigrationTestHelper`'ı
+ * (eski sürümün şemasından veritabanı kurup geçişi koşturan araç) henüz
+ * kullanılamıyor; geçişler `MigrationsTest` içinde doğrudan SQL üzerinden
+ * sınanıyor. Şemalar depoya alındığında tam kapsamlı geçiş testi mümkün olacak.
  *
  * **v2**: gönderim kuyruğu (`sync_outbox`) eklendi — bkz. [MIGRATION_1_2].
  *
@@ -29,6 +33,9 @@ import com.gymapp.data.local.entity.*
  *
  * **v3**: `staff.authUserId` eklendi — bkz. [MIGRATION_2_3]. Giriş yapan
  * Supabase kullanıcısını yerel personel kaydına bağlıyor.
+ *
+ * **v5**: `staff.password` kaldırıldı — bkz. [MIGRATION_4_5]. Düz metin şifre
+ * tutan, hiçbir yerde okunmayan ve kullanıcıyı yanıltan bir kolondu.
  *
  * Tüm tablolar ortak biçimde:
  *  - **UUID birincil anahtar** — `autoGenerate` `Long` anahtarlar çok cihazlı
@@ -57,7 +64,7 @@ import com.gymapp.data.local.entity.*
         // Çekme su işaretleri: hangi tablodan nereye kadar okunduğu.
         SyncPullStateEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

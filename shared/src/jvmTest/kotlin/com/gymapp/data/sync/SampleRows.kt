@@ -72,7 +72,7 @@ internal object SampleRows {
         id = "s1", tenantId = TENANT, fullName = "Mehmet", title = "Eğitmen",
         role = StaffRole.MANAGER, branch = "Fitness", commissionBasisPoints = 4000,
         monthlySalaryMinor = 1, phone = "+905001112233", nickname = "mehmet",
-        authUserId = "458f1383-d7ef-474b-8e16-798bde768654", password = "gizli",
+        authUserId = "458f1383-d7ef-474b-8e16-798bde768654",
         isActive = false, createdAtMs = 1, updatedAtMs = 2, deletedAtMs = 3,
     )
 

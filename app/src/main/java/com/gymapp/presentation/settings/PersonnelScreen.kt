@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.StaffEntity
@@ -116,7 +115,6 @@ fun PersonnelScreen(
                     phone = form.phone,
                     nickname = form.nickname,
                     role = form.role,
-                    password = form.password,
                     authUserId = form.authUserId,
                 )
             }
@@ -154,7 +152,6 @@ private data class StaffForm(
     val phone: String,
     val nickname: String,
     val role: StaffRole,
-    val password: String?,
     val authUserId: String?,
 )
 
@@ -243,7 +240,6 @@ private fun StaffDialog(
     }
     var phone by remember { mutableStateOf(staff?.phone ?: "") }
     var nickname by remember { mutableStateOf(staff?.nickname ?: "") }
-    var password by remember { mutableStateOf("") }
     var authUserId by remember { mutableStateOf(staff?.authUserId ?: "") }
     var role by remember { mutableStateOf(staff?.role ?: StaffRole.TRAINER) }
     var roleExpanded by remember { mutableStateOf(false) }
@@ -304,16 +300,6 @@ private fun StaffDialog(
                         }
                     }
                 }
-
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text(if (staff == null) "Şifre (boşsa varsayılan)" else "Yeni Şifre (boşsa değişmez)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    // Şifre omuz üstünden okunabiliyordu.
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-                )
 
                 OutlinedTextField(
                     value = title,
@@ -384,7 +370,6 @@ private fun StaffDialog(
                             phone = phone.trim(),
                             nickname = nickname.trim(),
                             role = role,
-                            password = password.takeIf { it.isNotBlank() },
                             authUserId = authUserId.trim().takeIf { it.isNotBlank() },
                         )
                     )

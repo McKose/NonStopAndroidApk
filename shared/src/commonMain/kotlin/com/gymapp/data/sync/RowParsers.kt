@@ -125,12 +125,7 @@ internal object RowParsers {
         )
     }.getOrNull()
 
-    /**
-     * Personel.
-     *
-     * `password` sunucuda yok; okurken de üretilmiyor. Varsayılan boş metin
-     * kalıyor — alan artık hiçbir yerde okunmuyor.
-     */
+    /** Personel. */
     fun staff(row: JsonObject): StaffEntity? = runCatching {
         StaffEntity(
             id = row.str("id") ?: return null,
