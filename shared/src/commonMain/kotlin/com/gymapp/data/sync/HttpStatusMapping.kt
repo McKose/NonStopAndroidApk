@@ -22,9 +22,15 @@ internal fun pushResultForStatus(status: Int, body: String?): PushResult {
         // için gereken zamanı zaten tanıyor.
         status == 401 -> PushResult.Retryable("Oturum geçersiz (401)")
 
-        // Erişim kuralları reddetti: kullanıcı bu satırın salonuna bağlı değil.
-        // Aynı istek aynı sonucu verecek; kayıt kuyrukta kalıp işaretlensin ki
-        // "bu kullanıcı gym_users'a eklenmemiş" teşhis edilebilsin.
+        // Erişim kuralları reddetti. İki sebebi var ve ikisi de kalıcı:
+        //  - kullanıcı bu satırın salonuna hiç bağlı değil (`gym_users`'a
+        //    eklenmemiş),
+        //  - bağlı ama ROLÜ bu tabloya yazmaya yetmiyor (bkz. migrasyon 0004:
+        //    personel kaydını yalnızca ADMIN, fiyat listesini ADMIN ile MANAGER
+        //    yazabilir).
+        // Aynı istek aynı sonucu verecek; kayıt kuyrukta kalıp işaretleniyor ki
+        // sebep teşhis edilebilsin. Sunucunun gövdesi de mesaja ekleniyor —
+        // ikisini ayırt etmenin tek yolu o.
         status == 403 -> PushResult.Permanent("Erişim reddedildi (403)${detay.ekle()}")
 
         // İstek zaman aşımına uğradı ya da hız sınırına takıldı; ikisi de geçer.

@@ -3,7 +3,9 @@ package com.gymapp.presentation.packages
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.entity.PackageEntity
+import com.gymapp.data.local.preferences.AppPreferences
 import com.gymapp.data.repository.PackageRepository
+import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.Money
 import com.gymapp.domain.PackageCategory
 import com.gymapp.domain.TrainingType
@@ -22,8 +24,20 @@ sealed interface PackageEvent {
 }
 
 class PackageViewModel(
-    private val repository: PackageRepository
+    private val repository: PackageRepository,
+    prefs: AppPreferences,
 ) : ViewModel() {
+
+    /**
+     * Bu kullanıcı paket (fiyat listesi) yazabilir mi?
+     *
+     * Sunucu kuralı fiyat listesini salon sahibi ve yöneticiye açıyor
+     * (migrasyon `0004`); eğitmenin paket fiyatını değiştirmesi için sebep yok,
+     * satış yapabilmesi için de gerekmiyor. Buradaki kontrol, yetkisiz
+     * kullanıcının işi yapıp sonucu ancak senkronizasyon turunda 403 olarak
+     * öğrenmesini önlüyor.
+     */
+    val canWrite: Boolean = SyncTable.PACKAGES.isWritableBy(prefs.currentUserRole)
 
     val packages: StateFlow<List<PackageEntity>> = repository.getAllPackages()
         .stateIn(
@@ -52,6 +66,13 @@ class PackageViewModel(
         validityDays: Int,
         sessionCount: Int?,
     ) {
+        // Ekranda düğme gizleniyor ama kontrol burada da var: gizlenmiş bir
+        // düğme kural değil, yalnızca görüntü.
+        if (!canWrite) {
+            viewModelScope.launch { _events.send(PackageEvent.Failed(YETKI_YOK)) }
+            return
+        }
+
         viewModelScope.launch {
             repository.savePackage(
                 packageId = packageId,
@@ -69,10 +90,18 @@ class PackageViewModel(
     }
 
     fun deletePackage(packageId: String) {
+        if (!canWrite) {
+            viewModelScope.launch { _events.send(PackageEvent.Failed(YETKI_YOK)) }
+            return
+        }
         viewModelScope.launch {
             repository.deletePackage(packageId)
         }
     }
 
     suspend fun getPackageById(id: String): PackageEntity? = repository.getPackageById(id)
+
+    private companion object {
+        const val YETKI_YOK = "Paketleri yalnızca salon sahibi ve yönetici değiştirebilir."
+    }
 }

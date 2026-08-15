@@ -29,6 +29,7 @@ import com.gymapp.domain.Money
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Rate
 import com.gymapp.domain.StaffRole
+import com.gymapp.presentation.common.ReadOnlyNotice
 import com.gymapp.domain.labelTr
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,6 +40,7 @@ fun PersonnelScreen(
 ) {
     val staffList by viewModel.staffList.collectAsState(initial = emptyList())
     val snackbarHostState = remember { SnackbarHostState() }
+    val canWrite = viewModel.canWrite
 
     /** `null` = diyalog kapalı; `StaffEntity?` içeren değer = düzenleme (veya yeni kayıt). */
     var editing by remember { mutableStateOf<StaffFormTarget?>(null) }
@@ -66,8 +68,11 @@ fun PersonnelScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { editing = StaffFormTarget(null) }) {
-                Icon(Icons.Default.Add, contentDescription = "Personel Ekle")
+            // Yetkisi olmayanda düğme hiç çizilmiyor; sebebi aşağıdaki şeritte.
+            if (canWrite) {
+                FloatingActionButton(onClick = { editing = StaffFormTarget(null) }) {
+                    Icon(Icons.Default.Add, contentDescription = "Personel Ekle")
+                }
             }
         }
     ) { padding ->
@@ -76,11 +81,21 @@ fun PersonnelScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (!canWrite) {
+                item {
+                    ReadOnlyNotice(
+                        "Personel listesini görüntüleyebilirsiniz. Değiştirmek " +
+                            "salon sahibi yetkisi gerektiriyor."
+                    )
+                }
+            }
             items(staffList, key = { it.id }) { staff ->
                 PersonnelItem(
                     staff = staff,
-                    onClick = { editing = StaffFormTarget(staff) },
-                    onDelete = { pendingDelete = staff },
+                    // Yetki yoksa satır düzenleme diyaloğunu açmıyor ve silme
+                    // simgesi çizilmiyor.
+                    onClick = { if (canWrite) editing = StaffFormTarget(staff) },
+                    onDelete = if (canWrite) ({ pendingDelete = staff }) else null,
                 )
             }
         }
@@ -144,7 +159,7 @@ private data class StaffForm(
 )
 
 @Composable
-private fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit, onDelete: () -> Unit) {
+private fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit, onDelete: (() -> Unit)?) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -197,7 +212,7 @@ private fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit, onDelete: () 
                 )
             }
 
-            IconButton(onClick = onDelete) {
+            if (onDelete != null) IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = "Sil", tint = Color.Red)
             }
         }

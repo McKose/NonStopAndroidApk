@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.ProductEntity
+import com.gymapp.data.local.preferences.AppPreferences
 import com.gymapp.data.repository.MemberRepository
 import com.gymapp.data.repository.ProductRepository
+import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.DeliveryStatus
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
@@ -51,8 +53,19 @@ private data class MarketForm(
 
 class MarketViewModel(
     private val repository: ProductRepository,
-    private val memberRepository: MemberRepository
+    private val memberRepository: MemberRepository,
+    prefs: AppPreferences,
 ) : ViewModel() {
+
+    /**
+     * Bu kullanıcı ürün tanımı (fiyat listesi) yazabilir mi?
+     *
+     * Yalnızca **ürün tanımını** kapsıyor; satış değil. Sunucu kuralı da aynı
+     * ayrımı yapıyor: `products` salon sahibi ve yöneticiye açık, `orders` ile
+     * `stock_movements` üç role de. Eğitmen satış yapabilmeli — satış zaten
+     * işinin kendisi — ama ürünün fiyatını değiştirememeli.
+     */
+    val canManageProducts: Boolean = SyncTable.PRODUCTS.isWritableBy(prefs.currentUserRole)
 
     private val _form = MutableStateFlow(MarketForm())
 
@@ -168,6 +181,13 @@ class MarketViewModel(
         price: Double,
         stock: Int,
     ) {
+        // Ekranda düğme gizleniyor ama kontrol burada da var: gizlenmiş bir
+        // düğme kural değil, yalnızca görüntü.
+        if (!canManageProducts) {
+            viewModelScope.launch { _events.send(MarketEvent.Failed(YETKI_YOK)) }
+            return
+        }
+
         viewModelScope.launch {
             repository.saveProduct(
                 productId = productId,
@@ -180,8 +200,16 @@ class MarketViewModel(
     }
 
     fun deleteProduct(productId: String) {
+        if (!canManageProducts) {
+            viewModelScope.launch { _events.send(MarketEvent.Failed(YETKI_YOK)) }
+            return
+        }
         viewModelScope.launch {
             repository.deleteProduct(productId)
         }
+    }
+
+    private companion object {
+        const val YETKI_YOK = "Ürün tanımlarını yalnızca salon sahibi ve yönetici değiştirebilir."
     }
 }

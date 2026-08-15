@@ -71,8 +71,13 @@ fun MarketScreen(
                     IconButton(onClick = onNavigateToOrders) {
                         Icon(Icons.Default.History, contentDescription = "Sipariş Geçmişi")
                     }
-                    IconButton(onClick = { showAddDialog = true }) {
-                        Icon(Icons.Default.AddBusiness, contentDescription = "Ürün Yönetimi")
+                    // Ürün tanımı yetkisi olmayanda bu giriş hiç çizilmiyor.
+                    // Satış (sepet, ödeme) etkilenmiyor: eğitmen satış
+                    // yapabilmeli, ürünün fiyatını değiştirememeli.
+                    if (viewModel.canManageProducts) {
+                        IconButton(onClick = { showAddDialog = true }) {
+                            Icon(Icons.Default.AddBusiness, contentDescription = "Ürün Yönetimi")
+                        }
                     }
                 }
             )
@@ -94,7 +99,8 @@ fun MarketScreen(
                         onAdd = { viewModel.addToCart(product) },
                         onRemove = { viewModel.removeFromCart(product.id) },
                         onEdit = { productToEdit = product },
-                        onDelete = { viewModel.deleteProduct(product.id) }
+                        onDelete = { viewModel.deleteProduct(product.id) },
+                        canManage = viewModel.canManageProducts,
                     )
                 }
             }
@@ -330,7 +336,14 @@ fun ProductGridItem(
     onAdd: () -> Unit,
     onRemove: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    /**
+     * Ürün tanımı düzenlenebilir mi?
+     *
+     * `false` ise uzun basma menüsü hiç açılmıyor. Menüyü açıp içindeki
+     * seçenekleri gizlemek de olurdu ama boş bir menü "bozuk" görünürdü.
+     */
+    canManage: Boolean,
 ) {
     val isLowStock = onHand < LOW_STOCK_THRESHOLD
     var showMenu by remember { mutableStateOf(false) }
@@ -343,7 +356,7 @@ fun ProductGridItem(
             .height(160.dp)
             .combinedClickable(
                 onClick = onAdd,
-                onLongClick = { showMenu = true }
+                onLongClick = { if (canManage) showMenu = true }
             )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
