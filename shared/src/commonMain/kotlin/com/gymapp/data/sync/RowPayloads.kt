@@ -56,10 +56,10 @@ internal object RowPayloads {
     /**
      * Personel.
      *
-     * `password` alanı **bilinçli olarak gönderilmiyor** ve sunucu tablosunda
-     * karşılığı da yok. Kimlik doğrulama Supabase Auth'a ait; düz metin şifreleri
-     * sunucuya kopyalamak çözmeye çalıştığımız sorunu büyütmek olurdu. Bu
-     * atlamanın kaza sonucu geri gelmemesi için ayrıca test edilmiş durumda.
+     * Şifre alanı yok ve olmamalı. Bir dönem yerel şemada düz metin bir
+     * `password` kolonu vardı; sunucuya hiç gönderilmiyordu ve v5'te tamamen
+     * kaldırıldı. `RowPayloadColumnsTest` şifre benzeri bir alanın gönderime
+     * kaza sonucu geri gelmediğini ayrıca sınıyor.
      */
     fun of(row: StaffEntity): JsonObject = buildJsonObject {
         put("id", row.id)

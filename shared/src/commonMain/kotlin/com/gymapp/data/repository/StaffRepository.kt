@@ -66,7 +66,6 @@ class StaffRepository(
         monthlySalary: Money,
         phone: String,
         nickname: String,
-        password: String? = null,
         authUserId: String? = null,
         isActive: Boolean = true,
     ): Result<String> = runCatching {
@@ -135,8 +134,6 @@ class StaffRepository(
                             phone = normalizedPhone,
                             nickname = normalizedNickname,
                             authUserId = normalizedAuthUserId,
-                            // NOT: artık okunmuyor; kimlik doğrulama Supabase Auth'ta.
-                            password = password ?: DEFAULT_PASSWORD,
                             isActive = isActive,
                             createdAtMs = nowMs,
                             updatedAtMs = nowMs,
@@ -158,7 +155,6 @@ class StaffRepository(
                             // düzenleme ekranında alanı silmek, kişinin hesap
                             // bağlantısını farkında olmadan koparmamalı.
                             authUserId = normalizedAuthUserId ?: existing.authUserId,
-                            password = password ?: existing.password,
                             isActive = isActive,
                             updatedAtMs = nowMs,
                         )
@@ -189,7 +185,5 @@ class StaffRepository(
     private companion object {
         /** 8-4-4-4-12 onaltılık; Supabase kullanıcı kimliklerinin biçimi. */
         val UUID_REGEX = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
-
-        const val DEFAULT_PASSWORD = "123"
     }
 }

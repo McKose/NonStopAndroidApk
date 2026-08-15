@@ -90,6 +90,34 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+/**
+ * v4 → v5: `staff.password` kolonu kaldırıldı.
+ *
+ * Kolon düz metin şifre tutuyordu ve kimlik doğrulama Supabase Auth'a
+ * taşındığından beri **hiçbir yerde okunmuyordu**. Daha kötüsü, personel
+ * ekranındaki alan hâlâ doldurulabiliyordu: salon sahibi personele şifre
+ * belirlediğini sanıyor, o şifreyle hiç kimse giriş yapamıyordu. Yani kolon
+ * yalnızca ölü değil, yanıltıcıydı.
+ *
+ * `DROP COLUMN` bilinçli — tabloyu yeniden kurup kopyalamak yerine.
+ * Yeniden kurma deseni Room'un beklediği şemayı elle yeniden üretmeyi
+ * gerektiriyor (kolon sırası, tipler, indeks adları); bir harf sapması
+ * cihazda "Migration didn't properly handle" ile açılışta çökme demek.
+ * `DROP COLUMN` ise kalan her şeyi Room'un kurduğu hâliyle bırakıyor,
+ * dolayısıyla sonuç tam olarak "v4 eksi bu kolon" oluyor.
+ *
+ * SQLite 3.35 gerektiriyor; gömülü sürücü kullanıldığı için sürüm cihazdan
+ * cihaza değişmiyor (bkz. `DatabaseFactory`) — sistem SQLite'ı kullanılsaydı
+ * eski cihazlarda bu ifade çalışmazdı.
+ *
+ * Veri kaybı yok: silinen tek şey zaten kullanılmayan şifre alanı.
+ */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `staff` DROP COLUMN `password`")
+    }
+}
+
 /** Sürüm sırasına göre uygulanacak geçişler. */
 internal val ALL_MIGRATIONS: Array<Migration> =
-    arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+    arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)

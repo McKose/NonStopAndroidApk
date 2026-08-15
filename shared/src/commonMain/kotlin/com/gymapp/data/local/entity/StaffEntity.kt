@@ -66,14 +66,6 @@ data class StaffEntity(
      */
     val authUserId: String? = null,
 
-    /**
-     * NOT: kimlik doğrulama Supabase Auth'a taşındı ve bu kolon artık **hiçbir
-     * yerde okunmuyor**. Sunucuya da gönderilmiyor (sunucudaki `staff` tablosunda
-     * karşılığı yok). Şemadan kaldırılması ayrı bir geçiş; veri kaybı riski
-     * olmadan silinebilmesi için önce tüm sürümlerin güncellenmiş olması gerekiyor.
-     */
-    val password: String = "",
-
     val isActive: Boolean = true,
 
     val createdAtMs: Long,
