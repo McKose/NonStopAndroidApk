@@ -247,6 +247,21 @@ silme mezar taşıyla yapılıyor (`deleted_at_ms` doldurulur), yani sunucuya gi
 ama kalıcı veri kaybını imkânsız kılıyor — ele geçirilmiş bir jetonla bile satır
 silinemez, en fazla mezar taşı konur ve mezar taşı geri alınabilir.
 
+### Uygulama da aynı kuralı biliyor
+
+Kural iki yerde yazılı ve bu bilinçli:
+
+- **Sunucu** kuralı *zorunlu tutuyor*. Tek yetkili o; uygulama yanlış olsa bile
+  sunucu yazmayı reddeder.
+- **Uygulama** aynı kuralın bir kopyasını taşıyor (`SyncTable.writableBy`) ve
+  yetkisi olmayan kullanıcıya ekleme/silme düğmelerini hiç göstermiyor. Kopya
+  olmasaydı eğitmen fiyatı değiştirir, kayıt kuyruğa girer ve sonucu ancak
+  senkronizasyon turunda 403 olarak öğrenirdi.
+
+İkisinin ayrışması sessiz bir hata olurdu, bu yüzden `SyncTableRolesTest`
+migrasyon dosyasını okuyup uygulamadaki tabloyla karşılaştırıyor: biri değişip
+diğeri değişmezse CI düşüyor. **Migrasyon kaynak sayılıyor**, uygulama değil.
+
 ### Yetkisiz yazma denenirse ne oluyor
 
 Sunucu `403` döner, uygulama bunu **kalıcı hata** sayar ve kayıt gönderim

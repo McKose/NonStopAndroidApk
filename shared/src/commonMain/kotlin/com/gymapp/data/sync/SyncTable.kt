@@ -1,5 +1,7 @@
 package com.gymapp.data.sync
 
+import com.gymapp.domain.StaffRole
+
 /**
  * Senkronize edilen tablolar.
  *
@@ -33,6 +35,45 @@ enum class SyncTable(
     MEASUREMENTS("measurements"),
     LEDGER_ENTRIES("ledger_entries", deltaColumn = "created_at_ms"),
     STOCK_MOVEMENTS("stock_movements", deltaColumn = "created_at_ms");
+
+    /**
+     * Bu tabloya yazabilen roller.
+     *
+     * **Sunucudaki kuralın kopyası, kaynağı değil.** Gerçek kural
+     * `supabase/migrations/0004_role_based_access.sql` içinde ve tek yetkili o:
+     * burası yanlış olsa bile sunucu yazmayı reddeder. Buradaki kopyanın işi,
+     * kullanıcıya reddedileceği bir işi hiç yaptırmamak — yoksa kullanıcı fiyatı
+     * değiştirir, kayıt kuyruğa girer ve ancak senkronizasyon turunda kalıcı
+     * 403 olarak geri döner.
+     *
+     * İkisinin ayrışması sessiz bir hata olurdu: uygulama düğmeyi açık bırakır,
+     * kullanıcı işini yapar, kayıt kuyrukta ölür. Bu yüzden [SyncTableRolesTest]
+     * migrasyon dosyasını okuyup buradaki değerlerle karşılaştırıyor — biri
+     * değişip diğeri değişmezse test düşüyor.
+     *
+     * Kurucu parametresi değil hesaplanan özellik: enum sabitleri, dosya
+     * düzeyindeki `val`lardan ve companion'dan ÖNCE ilkleniyor. Ortak bir küme
+     * sabiti kurucuya verilseydi, sabitin ilklenme sırası platforma göre değişir
+     * ve en kötü ihtimalle boş küme okunurdu — yani "hiç kimse yazamaz".
+     */
+    val writableBy: Set<StaffRole>
+        get() = when (this) {
+            // Personel satırı maaş ve hakediş oranı taşıyor, ayrıca hangi hesaba
+            // bağlı olduğunu. Salon sahibinin işi.
+            STAFF -> setOf(StaffRole.ADMIN)
+
+            // Fiyat listesi. Eğitmenin değiştirmesi için sebep yok; satış
+            // yapabilmesi için de gerekmiyor, satış `orders` tarafında.
+            PACKAGES, PRODUCTS -> setOf(StaffRole.ADMIN, StaffRole.MANAGER)
+
+            // Günlük iş: üçü de yapabilmeli, yoksa uygulama işe yaramaz.
+            MEMBERS, APPOINTMENTS, ORDERS, MEASUREMENTS,
+            LEDGER_ENTRIES, STOCK_MOVEMENTS ->
+                setOf(StaffRole.ADMIN, StaffRole.MANAGER, StaffRole.TRAINER)
+        }
+
+    /** Bu rol bu tabloya yazabilir mi? */
+    fun isWritableBy(role: StaffRole): Boolean = role in writableBy
 
     companion object {
         private val byTableName = entries.associateBy { it.tableName }

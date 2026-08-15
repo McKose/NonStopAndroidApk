@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.PackageEntity
+import com.gymapp.presentation.common.ReadOnlyNotice
 import com.gymapp.domain.Money
 import com.gymapp.domain.labelTr
 
@@ -25,6 +26,7 @@ fun PackageListScreen(
     viewModel: PackageViewModel = koinViewModel()
 ) {
     val packages by viewModel.packages.collectAsState()
+    val canWrite = viewModel.canWrite
 
     Scaffold(
         topBar = {
@@ -38,8 +40,14 @@ fun PackageListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { onNavigateToAdd(null) }) {
-                Icon(Icons.Default.Add, contentDescription = "Paket Ekle")
+            // Yetkisi olmayanda düğme hiç çizilmiyor. Pasif (disabled) bırakmak
+            // da bir seçenekti; gizlemek tercih edildi çünkü ekranın altındaki
+            // şerit sebebi zaten söylüyor ve pasif bir düğme "belki açılır"
+            // izlenimi verirdi.
+            if (canWrite) {
+                FloatingActionButton(onClick = { onNavigateToAdd(null) }) {
+                    Icon(Icons.Default.Add, contentDescription = "Paket Ekle")
+                }
             }
         }
     ) { padding ->
@@ -53,11 +61,21 @@ fun PackageListScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (!canWrite) {
+                    item {
+                        ReadOnlyNotice(
+                            "Paketleri görüntüleyebilirsiniz. Değiştirmek salon " +
+                                "sahibi ve yönetici yetkisi gerektiriyor."
+                        )
+                    }
+                }
                 items(packages) { pkg ->
                     PackageItem(
-                        pkg = pkg, 
-                        onDelete = { viewModel.deletePackage(pkg.id) },
-                        onClick = { onNavigateToAdd(pkg.id) }
+                        pkg = pkg,
+                        // Yetki yoksa satır düzenleme ekranını açmıyor ve silme
+                        // simgesi çizilmiyor.
+                        onDelete = if (canWrite) ({ viewModel.deletePackage(pkg.id) }) else null,
+                        onClick = { if (canWrite) onNavigateToAdd(pkg.id) }
                     )
                 }
             }
@@ -66,7 +84,7 @@ fun PackageListScreen(
 }
 
 @Composable
-fun PackageItem(pkg: PackageEntity, onDelete: () -> Unit, onClick: () -> Unit) {
+fun PackageItem(pkg: PackageEntity, onDelete: (() -> Unit)?, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick
@@ -94,8 +112,10 @@ fun PackageItem(pkg: PackageEntity, onDelete: () -> Unit, onClick: () -> Unit) {
                     color = Color.Gray
                 )
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Sil", tint = Color.Red)
+            if (onDelete != null) {
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Sil", tint = Color.Red)
+                }
             }
         }
     }

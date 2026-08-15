@@ -3,7 +3,9 @@ package com.gymapp.presentation.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.entity.StaffEntity
+import com.gymapp.data.local.preferences.AppPreferences
 import com.gymapp.data.repository.StaffRepository
+import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.Money
 import com.gymapp.domain.Rate
 import com.gymapp.domain.StaffRole
@@ -19,10 +21,25 @@ sealed interface PersonnelEvent {
 }
 
 class PersonnelViewModel(
-    private val repository: StaffRepository
+    private val repository: StaffRepository,
+    prefs: AppPreferences,
 ) : ViewModel() {
 
     val staffList: Flow<List<StaffEntity>> = repository.getAllStaff()
+
+    /**
+     * Bu kullanıcı personel kaydı yazabilir mi?
+     *
+     * Sunucudaki kural personel tablosunu yalnızca salon sahibine açıyor
+     * (migrasyon `0004`). Burada da kontrol edilmesinin sebebi, yetkisiz
+     * kullanıcının işi **yapıp** sonucu ancak senkronizasyon turunda öğrenmesini
+     * önlemek: kayıt yerelde başarılı görünür, kuyruğa girer ve sunucudan kalıcı
+     * 403 ile döner. Yani kayıp değil ama kullanıcı açısından sessiz.
+     *
+     * Rol oturum açılırken sunucudan geliyor (`gym_users.role`), cihazda
+     * belirlenmiyor.
+     */
+    val canWrite: Boolean = SyncTable.STAFF.isWritableBy(prefs.currentUserRole)
 
     private val _events = Channel<PersonnelEvent>(Channel.BUFFERED)
     val events: Flow<PersonnelEvent> = _events.receiveAsFlow()
@@ -52,6 +69,15 @@ class PersonnelViewModel(
         authUserId: String? = null,
         isActive: Boolean = true,
     ) {
+        // Ekranda düğme gizleniyor ama kontrol burada da var: gizlenmiş bir
+        // düğme kural değil, yalnızca görüntü. Yeni bir çağrı yolu eklendiğinde
+        // (ör. derin bağlantı, toplu içe aktarma) yalnızca ekrana bakan bir
+        // koruma sessizce atlanırdı.
+        if (!canWrite) {
+            viewModelScope.launch { _events.send(PersonnelEvent.Failed(YETKI_YOK)) }
+            return
+        }
+
         viewModelScope.launch {
             repository.saveStaff(
                 staffId = staffId,
@@ -76,8 +102,16 @@ class PersonnelViewModel(
     }
 
     fun deleteStaff(staffId: String) {
+        if (!canWrite) {
+            viewModelScope.launch { _events.send(PersonnelEvent.Failed(YETKI_YOK)) }
+            return
+        }
         viewModelScope.launch {
             repository.deleteStaff(staffId)
         }
+    }
+
+    private companion object {
+        const val YETKI_YOK = "Personel kaydını yalnızca salon sahibi değiştirebilir."
     }
 }
