@@ -20,6 +20,8 @@ import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Pricing
+import com.gymapp.domain.SessionCarryOver
+import com.gymapp.domain.SessionQuota
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -164,6 +166,14 @@ class MemberRepository(
         }
     }
 
+    /**
+     * Paketi yeniler.
+     *
+     * [carryOver] bilinçli olarak **varsayılansız**: kalan seansların devredilip
+     * devredilmeyeceği salon politikasına ve üyeye göre değişen bir karar ve
+     * kararı kullanıcı veriyor. Varsayılan verilseydi yeni bir çağrı yeri onu
+     * sessizce miras alır, kullanıcıya hiç sorulmadan bir politika uygulanırdı.
+     */
     suspend fun renewPackage(
         memberId: String,
         selectedPackage: PackageEntity,
@@ -172,6 +182,7 @@ class MemberRepository(
         discount: Double,
         paymentStatus: String,
         paymentDateMs: Long?,
+        carryOver: SessionCarryOver,
     ): Result<Unit> = runCatching {
         database.inTransaction {
             val member = memberDao.getMemberById(memberId)
@@ -189,14 +200,24 @@ class MemberRepository(
             val safeDiscount = Money.ofMajor(discount).coerceNonNegative().coerceAtMost(basePrice)
             val finalPrice = Pricing.finalPrice(basePrice, safeDiscount, paymentType, safeInstallment)
 
+            // Kalan seansların devredip devretmeyeceği kullanıcının kararı.
+            // `totalSessions` ile `remainingSessions` aynı değeri alıyor: tavan
+            // devredenleri saymazsa iptal edilen randevunun hakkı iade edilemez
+            // (bkz. `MemberDao.incrementSession`).
+            val yeniKota = SessionQuota.onRenewal(
+                newPackageSessions = selectedPackage.sessionCount,
+                currentRemaining = member.remainingSessions,
+                carryOver = carryOver,
+            )
+
             // Üye satırındaki tutarlar yeni paketle değişiyor, ancak önceki paketin ödenmemiş
             // bakiyesi kaybolmuyor: defterdeki eski tahakkuk yerinde duruyor ve yeni tahakkuk
             // üzerine ekleniyor, dolayısıyla toplam borç doğru.
             memberDao.updateMember(
                 member.copy(
                     activePackageId = selectedPackage.id,
-                    totalSessions = selectedPackage.sessionCount,
-                    remainingSessions = selectedPackage.sessionCount,
+                    totalSessions = yeniKota,
+                    remainingSessions = yeniKota,
                     startDateMs = baseDate,
                     endDateMs = endDateMs,
                     status = MemberManualStatus.ACTIVE,

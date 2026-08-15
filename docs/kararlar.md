@@ -126,6 +126,39 @@ tabloya özgü ve randevuların inmesini engellememeli. Aynı şekilde ağ geri 
 bozuk satır gelmez — ikincisini arka planda on beş dakikada bir denemek yalnızca
 pil harcar.
 
+## Yenilemede kalan seanslar: kararı kullanıcı verir
+
+**Karar:** Paket yenilenirken kalan seansların devredilip devredilmeyeceğini
+antrenör seçiyor (`SessionCarryOver`: `CARRY` / `DISCARD`). Uygulamanın gömülü
+bir politikası yok.
+
+**Neden:** Önceki hâlde yenileme kalan seansları **koşulsuz siliyordu** ve bu,
+aynı işlemin tarih yarısıyla çelişiyordu: üyeliği bitmemiş birinin kalan günleri
+devrediyor (`baseDate = currentEndDate`), kalan seansları siliniyordu. Tek bir
+işlemin iki yarısı birbirine zıt davranıyordu. Hangi yarının doğru olduğu ise
+uygulamanın bilebileceği bir şey değil — salon politikasına, hatta aynı salonda
+üyeden üyeye değişiyor.
+
+**Varsayılan yok.** `renewPackage`'ın `carryOver` parametresinin varsayılan
+değeri **bilinçli olarak yok**: varsayılan verilseydi yeni bir çağrı yeri onu
+sessizce miras alır ve kullanıcıya hiç sorulmadan bir politika uygulanırdı.
+Formda başlangıç seçimi `CARRY` — üye o seansların parasını ödemiş — ama seçim
+ekranda açıkça duruyor.
+
+**`totalSessions` de aynı değeri alıyor.** Ayrışmaları sessiz bir hata olurdu:
+seans iadesi (`MemberDao.incrementSession`) tavan olarak `totalSessions`'a
+bakıyor; tavan devredenleri saymazsa iptal edilen bir randevunun hakkı geri
+verilemezdi.
+
+**Sınırsız paketler:** Yeni paket sınırsızsa sonuç yine sınırsız — devredileni
+"sınırsız"a eklemenin karşılığı yok ve bir sayı üretmek sınırsız paketi sessizce
+sınırlı hâle getirirdi. Eski paket sınırsızsa devredecek **sayılabilir** hak yok;
+sıfır sayılıyor, alternatifi uydurulmuş bir sayıydı.
+
+**Soru her zaman sorulmuyor.** Seçim yalnızca yenilemede ve kalan seans sıfırdan
+büyükken görünüyor: diğer hâllerde iki şık da aynı sonucu verir ve kullanıcıya
+anlamsız bir karar dayatmak olurdu.
+
 ## Para: kuruş cinsinden tam sayı
 
 **Karar:** Parasal tutarlar `Double` değil, kuruş cinsinden `Long` (`Money`).

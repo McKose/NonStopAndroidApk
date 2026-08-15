@@ -30,12 +30,19 @@ import kotlin.test.fail
  * (O ilk hâlin gerçekten doğru olduğu sonradan karşılaştırılarak teyit edildi,
  * ama doğruluğu şansa bağlıydı.)
  *
+ * ### Hedef şema da artık depoda
+ * Geçişin sonucu `4.json`'dan türetilen bir beklentiyle değil, doğrudan
+ * `5.json` ile karşılaştırılıyor. Fark önemli: türetilen beklenti yalnızca
+ * geçişin *benim kafamdaki* sonucu ürettiğini gösterir. Room'un v5'te gerçekte
+ * ne beklediğini ise ancak hedef şema söyleyebilir — uyuşmazsa uygulama
+ * açılışta "Migration didn't properly handle" diye çöker ve bu, cihazdaki
+ * veriyle birlikte gelen, geri dönüşü olmayan bir hatadır.
+ *
  * ### Neyi hâlâ kapsamıyor
- * Room'un kendi şema doğrulamasını. Onun için `MigrationTestHelper` gerekiyor
- * ve o araç hem başlangıç hem HEDEF sürümün şema dosyasını istiyor; hedef
- * sürümünki henüz depoda değil, derleme sırasında üretiliyor. Bu geçişte açık
- * küçük tutuldu: tablo yeniden kurulmuyor, tek bir `DROP COLUMN` yapılıyor,
- * dolayısıyla sonuç tam olarak "eski şema eksi bir kolon".
+ * Room'un `MigrationTestHelper` aracını. Şema dosyalarının ikisi de artık
+ * mevcut, yani o kapı açık; bu testin kapsamadığı tek şey Room'un kendi
+ * doğrulama koduyla aynı yoldan geçmek. Buradaki iddialar aynı soruları
+ * (kolonlar, sıraları, indeksler, veri) doğrudan SQLite'a sorarak yanıtlıyor.
  */
 class MigrationsTest {
 
@@ -71,24 +78,36 @@ class MigrationsTest {
 
         MIGRATION_4_5.migrate(baglanti)
 
-        // 1) Kolon listesi: şemadan türetiliyor, elle sayılmıyor. Böylece
-        //    tabloya yeni bir kolon eklendiğinde bu test kendiliğinden güncel
-        //    kalıyor.
+        // 1) Sonuç, HEDEF sürümün şemasıyla birebir aynı olmalı.
+        //
+        //    Beklenti artık "v4 eksi password" diye hesaplanmıyor, `5.json`'dan
+        //    okunuyor. Fark önemli: hesaplanan beklenti yalnızca geçişin benim
+        //    kafamdaki sonucu ürettiğini gösterirdi. Room'un v5'te gerçekte ne
+        //    beklediğini ise ancak hedef şema söyleyebilir — ve uyuşmazsa
+        //    uygulama açılışta "Migration didn't properly handle" diye çöker.
+        val v5Staff = surumSemasi(5).tablo("staff")
         assertEquals(
-            staff.kolonlar - "password",
+            v5Staff.kolonlar,
             kolonlar(baglanti),
-            "DROP COLUMN yalnızca şifreyi kaldırmalı; kolon sırası da korunmalı",
+            "Geçişin sonucu v5 şemasıyla aynı olmalı; kolon sırası dahil",
         )
         assertFalse("password" in kolonlar(baglanti), "Şifre kolonu silinmeliydi")
+
+        // Kurgunun gerçekten bir şey sınadığının kontrolü: iki şema aynı
+        // olsaydı yukarıdaki iddia boş olurdu.
+        assertEquals(
+            staff.kolonlar - "password", v5Staff.kolonlar,
+            "v4 ile v5 arasındaki tek fark şifre kolonu olmalıydı",
+        )
 
         // 2) İndeksler ayakta mı? Tabloyu yeniden kuran bir geçiş bunları
         //    sessizce düşürürdü ve sonuç, sorguları yavaşlatan ama hiçbir
         //    testi düşürmeyen bir şema olurdu. Ayrıca `staff_authUserId`
         //    TEKİL: düşerse aynı hesap iki personele bağlanabilir hâle gelir.
         assertEquals(
-            staff.indeksAdlari.sorted(),
+            v5Staff.indeksAdlari.sorted(),
             indeksler(baglanti).sorted(),
-            "Geçişten sonra indeksler kaybolmuş",
+            "Geçişten sonra indeksler v5'teki hâliyle ayakta olmalı",
         )
 
         // 3) Satır ve içeriği yerinde mi?

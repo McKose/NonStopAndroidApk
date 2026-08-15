@@ -10,6 +10,7 @@ import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Pricing
+import com.gymapp.domain.SessionCarryOver
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -43,6 +44,21 @@ data class RegisterFormState(
     val submitError: String? = null,
     val isRenewal: Boolean = false,
     val memberId: String? = null,
+    /**
+     * Yenilemede kalan seansların ne olacağı.
+     *
+     * Varsayılan [SessionCarryOver.CARRY]: üye o seansların parasını ödemiş.
+     * Seçim ekranda açıkça duruyor, yani varsayılan bir politika dayatması değil
+     * yalnızca imlecin başladığı yer.
+     */
+    val carryOver: SessionCarryOver = SessionCarryOver.CARRY,
+    /**
+     * Üyenin şu anki kalan seansı; `null` sınırsız paket ya da bilinmiyor.
+     *
+     * Ekranda seçimin gösterilip gösterilmeyeceğini bu belirliyor: devredecek
+     * sayılabilir bir hak yoksa kullanıcıya sorulacak bir şey de yok.
+     */
+    val currentRemainingSessions: Int? = null,
     // Calculated price
     val previewPrice: Double = 0.0
 )
@@ -173,6 +189,10 @@ class MemberViewModel(
         }
     }
 
+    fun onCarryOverChange(value: SessionCarryOver) {
+        _formState.update { it.copy(carryOver = value) }
+    }
+
     fun onNotesChange(value: String) {
         _formState.update { it.copy(notes = value) }
     }
@@ -219,7 +239,8 @@ class MemberViewModel(
                     installmentCount = state.installmentCount,
                     discount = Decimals.parseOrDefault(state.discount),
                     paymentStatus = state.paymentStatus,
-                    paymentDateMs = state.paymentDateMs
+                    paymentDateMs = state.paymentDateMs,
+                    carryOver = state.carryOver,
                 ).map { state.memberId }
             } else {
                 repository.registerMember(
@@ -254,7 +275,8 @@ class MemberViewModel(
                         fullName = member.fullName,
                         phone = member.phone,
                         email = member.email ?: "",
-                        isRenewal = true
+                        isRenewal = true,
+                        currentRemainingSessions = member.remainingSessions,
                     )
                 }
             }
