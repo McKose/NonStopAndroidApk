@@ -28,6 +28,42 @@ görünen bir ekran gerçek veride bozuk çıkabilirdi.
 
 ---
 
+## Önce: sunucu şeması güncel mi (2. ve 3. yol için)
+
+Birinci yol (`?demo`) sunucuya hiç gitmiyor, bu adımı atlayabilirsiniz. Diğer
+ikisi gerçek sunucuya bağlanıyor ve şemanın güncel olması gerekiyor.
+
+Supabase panelinde **SQL Editor**'de `supabase/migrations/` altındaki dosyaları
+sırayla çalıştırın. Hepsi tekrar çalıştırılabilir — emin değilseniz yeniden
+koşturun, zarar vermez. En son eklenen:
+
+- `0004_role_based_access.sql` — kim neyi yazabilir kuralı
+
+Bu dosya çalıştırılmazsa uygulama ve panel çalışmaya devam eder; yalnızca
+yetki ayrımı olmaz (salona bağlı herkes her şeyi yazabilir).
+
+**Kendi hesabınızın rolü `ADMIN` olmalı.** `MANAGER` ise personel ekleyemez,
+`TRAINER` ise fiyat da değiştiremezsiniz. Kontrol ve düzeltme:
+
+```sql
+select u.email, gu.role
+  from public.gym_users gu join auth.users u on u.id = gu.user_id;
+
+update public.gym_users
+   set role = 'ADMIN'
+ where user_id = (select id from auth.users where email = '<e-postanız>');
+```
+
+`UPDATE 1` dönmeli. `UPDATE 0` dönerse e-posta tutmamıştır.
+
+Güncellemede salon süzgeci yok: bugün tek salon olduğu için gereksiz. İleride
+bir kullanıcı birden fazla salona bağlanırsa bu ifade **hepsindeki** rolünü
+değiştirir; o zaman `and gym_id = '<salon kimliği>'` eklenmeli.
+
+Ayrıntılı anlatım: `supabase/README.md` → "Kim neyi yazabilir".
+
+---
+
 ## 2. Uygulamayı APK indirerek denemek (Android Studio gerekmez)
 
 Her CI koşusu kurulabilir bir APK üretiyor.
@@ -105,6 +141,8 @@ Hata mesajları ne yapılması gerektiğini söyleyecek şekilde yazıldı.
 | "Sunucu ayarları eksik" | `local.properties` satırları yok (ya da APK'da depo gizli anahtarları) |
 | "E-posta veya şifre hatalı" | Şifre yanlış ya da hesap onaylanmamış — parantez içi kısım hangisi olduğunu söyler |
 | "Hesabınız bir salona bağlı değil" | Sunucuda `gym_users` satırı eksik |
+| Ekleme/silme düğmeleri yok, yerine kilitli bir şerit var | Rolünüz o tabloya yazamıyor — beklenen davranış; rolü yükseltin ya da yetkili hesapla girin |
+| Ayarlar'da gerekçe "Erişim reddedildi (403)" | Yetkisiz yazma sunucuda reddedildi. Uygulama artık bunu baştan engelliyor; yine de görüyorsanız kayıt `0004` uygulanmadan önce kuyruğa girmiş olabilir |
 | Ayarlar'da "Bekleyen: N" düşmüyor | Gönderim takılmış; aynı satırdaki gerekçe sebebi söyler |
 | Panelde "Kurulum tamamlanmamış" | `web/config.js` oluşturulmamış — ya da `?demo` ile açın |
 | Panelde liste boş ama hata yok | O tabloda veri yok; erişim sorunu olsaydı hata görürdünüz |
