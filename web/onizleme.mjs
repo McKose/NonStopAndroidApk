@@ -38,7 +38,7 @@ const govde = oku("index.html")
   .replace(/^[\s\S]*<main id="uygulama">/, '<main id="uygulama">')
   .replace(/<\/main>[\s\S]*$/, "</main>");
 
-const betik = birlestir(["domain.js", "ozet.js", "demo.js", "app.js"])
+const betik = birlestir(["domain.js", "ozet.js", "suzme.js", "demo.js", "app.js"])
   // Önizleme her zaman demo: `demoMu()` adres çubuğuna bakıyor, burada
   // bakılacak bir adres yok.
   .replace(/function demoMu\(\)[\s\S]*?\n}/, "function demoMu() {\n  return true;\n}");

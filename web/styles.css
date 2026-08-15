@@ -192,3 +192,64 @@ h2 { font-size: 16px; margin: 0 0 10px; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ─── Süzgeç çubuğu ─────────────────────────────────────────────────────────
+   Tek satırda başlıyor, dar ekranda alt alta geçiyor (`wrap`). Sabit sütunlu
+   bir düzen telefonda tarih kutularını ekran dışına taşırdı. */
+.suzgec {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+/* Arama kutusu boşluğu alıyor ama daralabiliyor: `min-width` olmadan flex
+   öğesi içeriğinden küçülmez ve dar ekranda çubuk taşardı. */
+.suzgec-arama {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.suzgec-tarih {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Sayaç en sağa itiliyor; sarma olduğunda kendi satırına düşüyor. */
+.suzgec-sayac {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.suzgec input {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--kenar);
+  border-radius: 6px;
+  background: var(--yuzey);
+  color: var(--metin);
+  font: inherit;
+}
+
+/* Tarayıcının takvim simgesi koyu temada siyah kalıyor ve zeminde kayboluyor.
+   Sayfanın geri kalanıyla aynı üç durumlu düzen: sistem koyu (elle AÇIK
+   seçilmediyse) ve elle KOYU. `:not([data-theme="light"])` medya sorgusunun
+   DIŞINDA yazılsaydı açık temada da tersine çevirirdi. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .suzgec input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+}
+
+:root[data-theme="dark"] .suzgec input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+button.ikincil {
+  background: transparent;
+  color: var(--metin);
+  border: 1px solid var(--kenar);
+}

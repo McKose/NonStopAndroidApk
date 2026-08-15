@@ -110,3 +110,37 @@ node --test *.test.js
 Bu kurallar uygulamadaki Kotlin karşılıklarının kopyası ve bu bir risk — iki
 taraf sapabilir. Sapmayı sınırlamak için panele yalnızca **gösterime dair**
 kurallar giriyor; hesaplama yapan hiçbir şey yok.
+
+## Arama ve tarih süzgeci
+
+Üyeler, Paketler, Randevular ve Finans sekmelerinde listenin üstünde bir süzgeç
+çubuğu var: arama kutusu, (tablo tarih taşıyorsa) tarih aralığı ve sayaç.
+
+**Arama Türkçe'ye göre katlanıyor.** "ayse" yazan biri "Ayşe"yi bulur; "isil"
+yazan "Işıl"ı bulur. JavaScript'in varsayılan büyük/küçük harf dönüşümü burada
+yanlış sonuç veriyor (`"İ".toLowerCase()` ayrı bir birleşen nokta bırakır,
+`"I".toLowerCase()` ise `ı` yerine `i` üretir), bu yüzden Türkçe'ye özgü harfler
+önce ASCII karşılıklarına eşleniyor. `ı` ile `i` bilinçli olarak aynı sayılıyor:
+kullanıcı çoğu zaman hangisini yazdığını bilmiyor.
+
+Boşlukla ayrılan parçaların **hepsi** aranıyor ve farklı kolonlarda olabilirler:
+"ayse 0532" hem ada hem telefona bakar.
+
+**Tarih aralığı her iki uçta da dahil.** "1–15 Ağustos" dendiğinde 15 Ağustos
+akşamı yazılmış kayıt da girer. Aralık **yerel** güne göre hesaplanıyor;
+`new Date("2026-08-15")` kullanılmıyor çünkü o UTC gece yarısı demek ve
+Türkiye'de günün ilk üç saati aralığın dışında kalırdı.
+
+Süzme tarayıcıda yapılıyor, sunucuda değil — salonun ölçeğinde (birkaç yüz üye)
+her tuşta ağ turu atmanın karşılığı yok. Kayıt sayısı on binlere çıkarsa
+değişecek yer `suzme.js`, ekranlar değil.
+
+### Testler
+
+```bash
+cd web && npm test        # TZ=Europe/Istanbul ile koşar
+```
+
+Saat dilimi **bilinçli** olarak ayarlanıyor: koşucular UTC ve UTC'de yerel gün
+ile UTC gün aynı çıkıyor, dolayısıyla tarih hesabını bozan bir hata testlerden
+geçerdi — ama salonun makinesinde (UTC+3) yanlış sonuç verirdi.
