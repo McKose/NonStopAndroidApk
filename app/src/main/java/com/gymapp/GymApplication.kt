@@ -17,11 +17,15 @@ import org.koin.core.context.startKoin
  * taşınamıyordu. Koin sıradan Kotlin kodu olduğu için iOS tarafından da
  * kullanılabiliyor.
  *
- * KALDIRILDI: WorkManager kurulumu. Tek işçi olan `MemberExpirationWorker`
- * kalktığında (üyelik durumu artık okuma anında bitiş tarihinden türetiliyor)
- * geriye hiçbir işçisi olmayan bir fabrika kalmıştı. Faz 4'teki senkronizasyon
- * kuyruğu gerçekten bir işçiye ihtiyaç duyduğunda onu kullanan kodla birlikte
- * geri gelecek.
+ * ### WorkManager
+ * Bir dönem tamamen kaldırılmıştı: tek işçi olan `MemberExpirationWorker`
+ * gereksizleşince (üyelik durumu artık okuma anında bitiş tarihinden
+ * türetiliyor) geriye hiçbir işçisi olmayan bir fabrika kalmıştı.
+ *
+ * Şimdi gerçek bir işçiyle geri geldi: `SenkronizasyonIsi`, uygulama kapalıyken
+ * gönderim kuyruğunu boşaltıyor. Burada ayrıca kurulum yok — işçi Koin'e
+ * `KoinComponent` üzerinden bağlanıyor, dolayısıyla `WorkerFactory` gerekmiyor.
+ * Planlama `ArkaPlanSenkronizasyonu` içinde ve girişte tetikleniyor.
  */
 class GymApplication : Application() {
 

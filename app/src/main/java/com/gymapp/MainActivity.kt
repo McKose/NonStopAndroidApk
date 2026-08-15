@@ -30,6 +30,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.gymapp.data.auth.SessionManager
+import com.gymapp.data.sync.ArkaPlanSenkronizasyonu
 import com.gymapp.data.sync.SyncCoordinator
 import com.gymapp.presentation.common.GlobalErrorHandler
 import kotlinx.coroutines.delay
@@ -58,6 +59,7 @@ class MainActivity : ComponentActivity() {
     private val errorHandler: GlobalErrorHandler by inject()
     private val sync: SyncCoordinator by inject()
     private val sessions: SessionManager by inject()
+    private val arkaPlan: ArkaPlanSenkronizasyonu by inject()
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,6 +83,12 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 sessions.restore()
                 oturumYuklendi = true
+                // Oturum varsa arka plan işi de kurulsun. Girişte zaten
+                // kuruluyor, ama uygulama güncellendiğinde ya da kullanıcı
+                // uzun süredir giriş yapmış durumdayken buradan tazeleniyor:
+                // iş tanımı (aralık, kısıtlar) değişmişse eskisi yaşamaya
+                // devam etmesin.
+                if (sessions.session.value != null) arkaPlan.baslat()
                 // Geri yüklenen oturumla, uygulama kapalıyken biriken
                 // değişiklikler hemen gönderilmeye başlansın; 60 saniyelik
                 // döngüyü beklemenin karşılığı yok.

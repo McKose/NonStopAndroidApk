@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.auth.SessionManager
 import com.gymapp.data.local.preferences.AppPreferences
+import com.gymapp.data.sync.ArkaPlanSenkronizasyonu
 import com.gymapp.data.sync.SyncCoordinator
 import com.gymapp.data.sync.SyncQueue
 import com.gymapp.data.sync.SyncState
@@ -19,6 +20,7 @@ class SettingsViewModel(
     private val prefs: AppPreferences,
     private val sessions: SessionManager,
     private val sync: SyncCoordinator,
+    private val arkaPlan: ArkaPlanSenkronizasyonu,
     syncQueue: SyncQueue,
 ) : ViewModel() {
 
@@ -69,6 +71,9 @@ class SettingsViewModel(
         viewModelScope.launch {
             sessions.signOut()
             prefs.clearSession()
+            // Arka plan işi de duruyor: bırakılsaydı çıkış yapmış cihaz 15
+            // dakikada bir uyanıp "oturum yok" deyip geri yatardı.
+            arkaPlan.durdur()
             onLogout()
         }
     }

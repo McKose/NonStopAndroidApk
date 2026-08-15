@@ -51,6 +51,21 @@ sealed interface SyncState {
         val pushed: Int,
         val pulled: Int,
         val failed: Int,
+        /**
+         * Aynı işi bir süre sonra tekrar denemenin anlamı var mı?
+         *
+         * "Sorun" tek bir şey değil ve ikisini ayırmamak arka planda pahalıya
+         * mal olur:
+         *  - **Ağ yok / sunucu yanıt vermiyor** → geçici. Tekrar denenmezse
+         *    kullanıcı uygulamayı açana kadar veri gitmez.
+         *  - **Sunucu kayıtları reddetti** (yetki, bozuk satır) → kalıcı. Tekrar
+         *    denemek her seferinde aynı sonucu verir; arka planda süresiz
+         *    tekrarlamak boşuna pil harcar ve sorunu da gizler.
+         *
+         * Ekranda gösterilen metin ikisi için de "sorun" diyor; ayrım yalnızca
+         * otomatik tekrar kararını veren taraf için gerekli.
+         */
+        val retryable: Boolean,
     ) : SyncState
 
     /** Giriş yapılmamış; gönderilecek bir şey aranmıyor bile. */
@@ -160,6 +175,7 @@ class SyncCoordinator(
                     pushed = pushed,
                     pulled = 0,
                     failed = failed,
+                    retryable = true,
                 )
                 return
             }
@@ -179,6 +195,10 @@ class SyncCoordinator(
             pushed = pushed,
             pulled = 0,
             failed = failed,
+            // Kuyruk hâlâ dolu: bu bir hata değil, "işim bitmedi". Tekrar
+            // denenmezse kalan kayıtlar uygulamanın bir sonraki açılışını
+            // bekler.
+            retryable = true,
         )
     }
 
@@ -192,6 +212,7 @@ class SyncCoordinator(
                 pushed = pushed,
                 pulled = cekme.applied,
                 failed = failed,
+                retryable = true,
             )
 
             failed > 0 -> SyncState.Problem(
@@ -199,6 +220,9 @@ class SyncCoordinator(
                 pushed = pushed,
                 pulled = cekme.applied,
                 failed = failed,
+                // Gönderim ve indirme tamamlandı; kalan tek şey sunucunun
+                // reddettiği kayıtlar. Tekrar denemek aynı reddi alır.
+                retryable = false,
             )
 
             else -> SyncState.Done(pushed, cekme.applied, now())

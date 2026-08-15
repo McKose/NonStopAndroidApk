@@ -285,6 +285,12 @@ update public.gym_users
 
 ## Senkronizasyon nasıl çalışıyor
 
+**Ne zaman tetikleniyor.** Girişte, oturum geri yüklendiğinde, uygulama
+önplandayken dakikada bir, Ayarlar'daki "Sunucuya Eşitle" ile ve **uygulama
+kapalıyken en sık 15 dakikada bir** (WorkManager; ağ varsa). Arka plan turu
+geçici bir engele takılırsa üstel geri çekilmeyle tekrar deneniyor; sunucunun
+reddettiği kayıtlar için tekrar denenmiyor — aynı reddi alırdı.
+
 **Yukarı (cihaz → sunucu).** Her yazma, satırı değiştiren işlemle aynı
 transaction içinde gönderim kuyruğuna kayıt bırakıyor. Kuyruk sırayla
 boşaltılıyor; başarısız kayıt kuyrukta kalıp üstel geri çekilmeyle tekrar
@@ -310,8 +316,5 @@ görünmeye devam ederdi.
 - **iOS tarafında oturum saklama yok.** Android'de oturum Keystore ile
   şifrelenip saklanıyor ve uygulama kapansa da korunuyor; iOS uygulaması
   yazıldığında Keychain karşılığı `SessionStore` arayüzünün arkasına eklenecek.
-- **Arkaplanda gönderim yok.** Tetikleme girişte, uygulama önplandayken dakikada
-  bir ve Ayarlar'daki "Sunucuya Eşitle" ile oluyor. Uygulama tamamen kapalıyken
-  gönderim yapılmıyor; bunun için bir arka plan işi (WorkManager) gerekiyor.
 - **`staff.password` kolonu duruyor** ama hiçbir yerde okunmuyor ve sunucuya
   gönderilmiyor. Şemadan kaldırılması ayrı bir geçiş.
