@@ -137,6 +137,50 @@ Yapıt **14 gün** duruyor; süresi dolmuşsa yeni bir koşu gerekiyor (depoya
 herhangi bir değişiklik gönderildiğinde ya da Actions sayfasından iş elle
 tetiklendiğinde üretilir).
 
+> **İmza uyarısı.** Projede özel bir imzalama ayarı yok, yani hata ayıklama
+> derlemeleri makinedeki `~/.android/debug.keystore` ile imzalanıyor. CI
+> koşucuları her seferinde sıfırdan kurulduğu için **her CI koşusu farklı bir
+> anahtarla imzalıyor**. Sonucu: bir APK'yı diğerinin üzerine kurmaya
+> çalıştığınızda `INSTALL_FAILED_UPDATE_INCOMPATIBLE` alırsınız. Bozuk bir şey
+> değil; tek çözümü önce kaldırıp sonra kurmak. Aynı sebeple Android Studio'dan
+> derlediğinizi CI APK'sının üzerine de kuramazsınız.
+
+## 2b. Uygulamayı tarayıcıda denemek (Appetize)
+
+Telefon ve kurulum gerekmez: master'a her merge sonrası APK Appetize'a
+yükleniyor ve koşunun **özet sayfasında** çalıştırılabilir bir bağlantı çıkıyor.
+
+1. <https://github.com/McKose/NonStopAndroidApk/actions> → master'daki son koşu
+2. Sayfanın üstündeki **Summary** bölümü → **"Uygulamayı tarayıcıda dene"**
+3. Bağlantıya tıklayın; uygulama tarayıcıda açılır
+
+**Dikkat:** APK'da sunucu anahtarları gömülü, yani Appetize'daki cihaz
+**gerçek verinize** bağlanır. Orada girdiğiniz üye gerçekten kaydedilir.
+
+**Appetize'da yapılamayan tek şey: veritabanı göçü testi.** Her oturum temiz bir
+cihazla başlıyor, yani üzerine kurulacak eski bir sürüm yok; veritabanı doğrudan
+güncel sürümle oluşur ve göç hiç koşmaz. Göç testi zorunlu olarak gerçek
+telefonda, eski sürümün üstüne kurarak yapılıyor (bkz. bölüm 3).
+
+### Tek seferlik ayar (Appetize için)
+
+1. <https://appetize.io> hesabınıza girin → hesap ayarlarından bir **API token**
+   alın
+2. Depo → **Settings → Secrets and variables → Actions** → **Secrets** sekmesi →
+   **New repository secret**
+   - Name: `APPETIZE_API_TOKEN`
+   - Secret: aldığınız token
+3. master'a bir değişiklik gidince yükleme çalışır. İlk koşunun özetinde bir
+   `publicKey` ve onu nereye yazacağınız yazacak:
+   - Aynı sayfa → **Variables** sekmesi → **New repository variable**
+   - Name: `APPETIZE_PUBLIC_KEY`, Value: özette yazan anahtar
+
+Üçüncü adım **atlanmamalı**: anahtar sabitlenmezse her koşu Appetize'da yeni bir
+uygulama açar, bağlantı her seferinde değişir ve daha önce paylaştığınız bağlantı
+eski sürümü göstermeye devam eder.
+
+Token eklenmezse CI **düşmez**, yükleme adımı atlanır ve sebebini günlüğe yazar.
+
 ### Sunucuya bağlanmak için tek seferlik ayar (APK ve panel için ortak)
 
 Bu adım yapılmazsa APK yine kurulur ve açılır, ama giriş ekranında **"sunucu
