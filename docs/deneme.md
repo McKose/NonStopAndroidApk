@@ -2,59 +2,109 @@
 
 Üç yol var, hızlıdan yavaşa. Küçük bir değişikliğe bakmak için birincisi yeter.
 
+Bu belgedeki bağlantılar bu depoya ve `jvkytncwedjcvssilhih` numaralı Supabase
+projesine göre yazıldı; başka bir kuruluma bakıyorsanız proje numarasını
+değiştirin.
+
 ---
 
 ## 1. Paneli kurulumsuz denemek (30 saniye)
 
 Panelin ekranlarına bakmak için Supabase ayarı, hesap ve internet gerekmiyor.
-Adres sonuna `?demo` ekleyin:
+
+İki yolu var. **Tek dosyalık kopya** üretip tarayıcıda açmak (paylaşmaya da
+uygun, sunucu gerektirmiyor):
+
+```bash
+node web/onizleme.mjs > /tmp/panel.html
+```
+
+Sonra `/tmp/panel.html` dosyasını tarayıcıda açın.
+
+**Ya da depodan çalıştırın:**
 
 ```bash
 cd web
 python3 -m http.server 8000
 ```
 
-Sonra **`http://localhost:8000/?demo`**
+Sonra tarayıcıda: **`http://localhost:8000/?demo`**
 
-Giriş ekranında herhangi bir e-posta ve şifreyle "Giriş yap" deyin — demo modda
-kontrol yok. İçeride örnek bir salonun verisi var: aktif, süresi dolmuş,
-dondurulmuş ve arşivlenmiş üyeler; dört paket; randevular; defter kayıtları.
+Adresin sonundaki `?demo` şart. Onsuz panel gerçek sunucuya bağlanmaya çalışır
+ve `web/config.js` olmadığı için "Kurulum tamamlanmamış" der.
+
+Giriş ekranında **herhangi bir e-posta ve şifre** yazıp "Giriş yap" deyin —
+demo modda kontrol yok. İçeride örnek bir salonun verisi var: aktif, süresi
+dolmuş, dondurulmuş ve arşivlenmiş üyeler; dört paket; randevular; defter
+kayıtları.
+
+Denemeye değer birkaç şey:
+
+- **Üyeler** sekmesi → arama kutusuna `ayse` yazın. `Ayşe Yılmaz` gelmeli:
+  arama aksansız yazımı da tanıyor.
+- Aynı kutuya `yilmaz` yazın → `Ayşe Yılmaz`. Noktasız `ı` ile `i` ayrımı
+  aramada kaldırılıyor.
+- `ozturk` yazın → `Burak Öztürk`; `sahin` yazın → `Ali Şahin`.
+- **Finans** sekmesi → tarih aralığını tek güne daraltın. Sayaç `1 / 6 kayıt`
+  gibi görünmeli.
+- **Temizle** düğmesi süzgeçleri sıfırlıyor.
 
 Demo verisi **gerçek sunucu biçiminin aynısı** (snake_case kolonlar, kuruş
 tutarlar, epoch ms tarihler). Sapmaması testle bağlı: sapsaydı demoda düzgün
 görünen bir ekran gerçek veride bozuk çıkabilirdi.
 
-`?demo` olmadan açıldığında panel normal çalışır ve sunucuya bağlanır.
-
 ---
 
-## Önce: sunucu şeması güncel mi (2. ve 3. yol için)
+## Önce: sunucu hazır mı (2. ve 3. yol için)
 
-Birinci yol (`?demo`) sunucuya hiç gitmiyor, bu adımı atlayabilirsiniz. Diğer
-ikisi gerçek sunucuya bağlanıyor ve şemanın güncel olması gerekiyor.
+Birinci yol (`?demo`) sunucuya hiç gitmiyor, bu bölümü atlayabilirsiniz.
+Diğer ikisi gerçek sunucuya bağlanıyor.
 
-Supabase panelinde **SQL Editor**'de `supabase/migrations/` altındaki dosyaları
-sırayla çalıştırın. Hepsi tekrar çalıştırılabilir — emin değilseniz yeniden
-koşturun, zarar vermez. En son eklenen:
+### a) Şemayı güncelleyin
 
-- `0004_role_based_access.sql` — kim neyi yazabilir kuralı
+1. Şu adresi açın:
+   **<https://supabase.com/dashboard/project/jvkytncwedjcvssilhih/sql/new>**
+   (elle: supabase.com → projeniz → sol menü **SQL Editor** → **New query**)
+2. `supabase/migrations/` altındaki dosyaların içeriğini **sırayla** yapıştırıp
+   her birinde **Run** deyin (yeşil düğme, sağ altta; ya da `Ctrl+Enter`).
 
-Bu dosya çalıştırılmazsa uygulama ve panel çalışmaya devam eder; yalnızca
-yetki ayrımı olmaz (salona bağlı herkes her şeyi yazabilir).
+   Hepsi tekrar çalıştırılabilir — emin değilseniz yeniden koşturun, zarar
+   vermez.
 
-**Kendi hesabınızın rolü `ADMIN` olmalı.** `MANAGER` ise personel ekleyemez,
-`TRAINER` ise fiyat da değiştiremezsiniz. Kontrol ve düzeltme:
+En son eklenen: **`0004_role_based_access.sql`** — kim neyi yazabilir kuralı.
+Çalıştırılmazsa uygulama ve panel çalışmaya devam eder; yalnızca yetki ayrımı
+olmaz, yani salona bağlı herkes her şeyi yazabilir.
+
+### b) Kendi rolünüzü kontrol edin
+
+Rol yalnızca bilgi değil, **ne yazabileceğinizi** belirliyor: `MANAGER` iseniz
+personel ekleyemez, `TRAINER` iseniz fiyat da değiştiremezsiniz.
+
+Aynı SQL Editor'de çalıştırın:
 
 ```sql
 select u.email, gu.role
-  from public.gym_users gu join auth.users u on u.id = gu.user_id;
+  from public.gym_users gu
+  join auth.users u on u.id = gu.user_id;
+```
 
+Sayfanın altında bir tablo çıkar. Kendi e-postanızın karşısında **`ADMIN`**
+yazmalı.
+
+**`ADMIN` yazmıyorsa** (e-postanızı ilk sorgunun çıktısındaki yazımla birebir
+kullanın):
+
+```sql
 update public.gym_users
    set role = 'ADMIN'
  where user_id = (select id from auth.users where email = '<e-postanız>');
 ```
 
-`UPDATE 1` dönmeli. `UPDATE 0` dönerse e-posta tutmamıştır.
+`UPDATE 1` dönmeli. `UPDATE 0` dönerse e-posta tutmamıştır — en sık sebep bir
+harf farkı.
+
+**Hiç satır dönmüyorsa** hesabınız salona hiç bağlanmamıştır; bağlama adımı
+`supabase/README.md` → "Kurulum" 5. maddede.
 
 Güncellemede salon süzgeci yok: bugün tek salon olduğu için gereksiz. İleride
 bir kullanıcı birden fazla salona bağlanırsa bu ifade **hepsindeki** rolünü
@@ -68,32 +118,73 @@ Ayrıntılı anlatım: `supabase/README.md` → "Kim neyi yazabilir".
 
 Her CI koşusu kurulabilir bir APK üretiyor.
 
-1. GitHub'da depo → **Actions** sekmesi → en üstteki başarılı koşuyu açın.
-2. Sayfanın altındaki **Artifacts** bölümünden `nonstop-debug-apk` dosyasını
-   indirin (zip olarak iner, içinden `app-debug.apk` çıkar).
-3. APK'yı telefona kopyalayıp açın. Android "bilinmeyen kaynak" uyarısı verirse
-   izin verin — imzasız bir geliştirme sürümü.
+1. Şu adresi açın: **<https://github.com/McKose/NonStopAndroidApk/actions>**
+2. Listenin **en üstündeki yeşil tikli** koşuya tıklayın. (Kırmızı çarpı varsa
+   o koşu başarısız; bir alttakini seçin.)
+3. Açılan sayfayı **en alta** kaydırın. **Artifacts** başlığı orada.
+4. **`nonstop-debug-apk`** yazısına tıklayın — zip olarak iner.
+5. Zip'i açın; içinden `app-debug.apk` çıkar.
+6. Dosyayı telefona kopyalayıp açın. Android "bilinmeyen kaynak" uyarısı
+   verirse izin verin — imzasız bir geliştirme sürümü.
+
+Yapıt **14 gün** duruyor; süresi dolmuşsa yeni bir koşu gerekiyor (depoya
+herhangi bir değişiklik gönderildiğinde ya da Actions sayfasından iş elle
+tetiklendiğinde üretilir).
 
 ### APK'nın sunucuya bağlanması için tek seferlik ayar
 
-APK'nın içine gömülecek proje bilgisi depoda tutulmuyor. Depo gizli
-anahtarlarına eklemeniz gerekiyor — **bir kez**:
+Bu adım yapılmazsa APK yine kurulur ve açılır, ama giriş ekranında **"sunucu
+ayarları eksik"** der ve hiçbir yere bağlanamaz.
 
-1. Depo → **Settings** → **Secrets and variables** → **Actions**
-2. **New repository secret** ile iki tane ekleyin:
+Sebebi: projenin adresi ve anahtarı depoda tutulmuyor. Derleme sırasında depo
+gizli anahtarlarından okunuyor.
 
-   | İsim | Değer |
+**Önce iki değeri Supabase'den alın:**
+
+1. Şu adresi açın:
+   **<https://supabase.com/dashboard/project/jvkytncwedjcvssilhih/settings/api>**
+   (elle: projeniz → sol altta **Project Settings** → **API**. Bazı projelerde
+   bu sayfa **API Keys** adıyla görünüyor.)
+2. **Project URL** kutusundaki değeri kopyalayın —
+   `https://jvkytncwedjcvssilhih.supabase.co` biçiminde.
+3. **Project API keys** bölümünde **`anon`** `public` etiketli anahtarı
+   kopyalayın. Uzun bir metindir.
+
+> **`service_role` / `secret` anahtarını ASLA kopyalamayın.** O anahtar bütün
+> erişim kurallarını baypas eder. Ne buraya, ne depoya, ne `local.properties`
+> dosyasına, ne de sohbete yapıştırılır.
+>
+> `anon` anahtarı ise gizli değil: uygulamanın içinde ve tarayıcıda zaten
+> görünür, tek başına hiçbir veriye erişemez (erişimi satır bazlı güvenlik
+> kuralları belirliyor). Gizli anahtar olarak tutulmasının sebebi gizlilik
+> değil, kuruluma özgü olması.
+
+**Sonra depoya ekleyin:**
+
+1. Şu adresi açın:
+   **<https://github.com/McKose/NonStopAndroidApk/settings/secrets/actions>**
+   (elle: depo → **Settings** sekmesi → sol menüde **Secrets and variables** →
+   **Actions**)
+2. Sağ üstteki yeşil **New repository secret** düğmesine basın.
+3. İki tane ekleyin — her biri için ad, değer, **Add secret**:
+
+   | Name | Secret |
    |---|---|
-   | `SUPABASE_URL` | `https://<proje-ref>.supabase.co` |
-   | `SUPABASE_ANON_KEY` | `anon` `public` anahtarı |
+   | `SUPABASE_URL` | 2. adımda kopyaladığınız Project URL |
+   | `SUPABASE_ANON_KEY` | 3. adımda kopyaladığınız `anon` `public` anahtarı |
 
-`anon` anahtarı gizli bir şey değil (istemcide bulunması normaldir ve tek başına
-hiçbir veriye erişemez); gizli anahtar olarak tutulmasının sebebi kuruluma özgü
-olması. **`service_role` anahtarı buraya da konmaz.**
+   Adları birebir böyle yazın; büyük/küçük harf ve alt çizgiler önemli.
 
-Bu iki değer yoksa APK yine üretiliyor, ama giriş ekranında "sunucu ayarları
-eksik" diyor. Derlemeyi düşürmek, ayarları olmayan birinin hiçbir şeyi
-denemesini engellerdi.
+4. **Yeni bir APK üretin.** Gizli anahtarlar derleme sırasında okunduğu için
+   daha önce indirdiğiniz APK bunları içermiyor. Actions sayfasında
+   **Android CI** iş akışını açıp **Run workflow** ile elle tetikleyebilir ya
+   da depoya herhangi bir değişiklik gönderebilirsiniz.
+
+5. Yeni koşu bitince APK'yı yukarıdaki adımlarla indirin. Giriş ekranı artık
+   "sunucu ayarları eksik" demiyorsa ayar tuttu demektir.
+
+Değerler eksikken derlemeyi düşürmemek bilinçli: ayarları olmayan biri de
+uygulamanın ekranlarına bakabilsin diye.
 
 ---
 
@@ -105,15 +196,17 @@ Kod değiştirip anında görmek için.
 git pull origin master
 ```
 
-Kök dizindeki `local.properties` dosyasına ekleyin:
+Kök dizindeki `local.properties` dosyasına ekleyin (dosya yoksa oluşturun):
 
 ```properties
-supabase.url=https://<proje-ref>.supabase.co
+supabase.url=https://jvkytncwedjcvssilhih.supabase.co
 supabase.anonKey=<anon public anahtarı>
 ```
 
-Android Studio'da Gradle sync + Run. Değerler derleme sırasında gömülüyor;
-dosyayı kaydetmek tek başına yetmez.
+Bu dosya `.gitignore` içinde, yani depoya gitmiyor.
+
+Android Studio'da Gradle sync + Run. Değerler **derleme sırasında** gömülüyor;
+dosyayı kaydetmek tek başına yetmez, yeniden derlemek gerekiyor.
 
 ---
 
@@ -127,6 +220,19 @@ Uygulama ile panelin aynı veriyi gösterdiğini doğrulamak:
 3. Paneli `?demo` **olmadan** açıp aynı hesapla girin — eklediğiniz üyeler
    listede olmalı.
 
+### Arka planda gönderimi denemek
+
+Uygulama tamamen kapalıyken de gönderim sürüyor. Denemek için:
+
+1. Giriş yapın, birkaç üye ekleyin.
+2. Uygulamayı tamamen kapatın — son kullanılanlar listesinden de kaydırın.
+3. Uçak modunu açıp kapatın (ağın geri gelmesi işi tetikliyor).
+4. **15 dakika içinde** panelde görünmeleri gerekiyor.
+
+Aralık işletim sisteminin toplu uyandırma penceresine bağlı, yani 15 dakika
+"en sık" değeri — garanti değil. Hemen görmek isterseniz Ayarlar →
+**Sunucuya Eşitle** zaten anında tetikliyor.
+
 Eşitleme ayrıca girişte, oturum geri yüklendiğinde ve uygulama önplandayken
 dakikada bir kendiliğinden çalışıyor.
 
@@ -138,11 +244,13 @@ Hata mesajları ne yapılması gerektiğini söyleyecek şekilde yazıldı.
 
 | Gördüğünüz | Anlamı |
 |---|---|
-| "Sunucu ayarları eksik" | `local.properties` satırları yok (ya da APK'da depo gizli anahtarları) |
+| "Sunucu ayarları eksik" | APK'da: depo gizli anahtarları eklenmemiş ya da eklendikten sonra yeni APK üretilmemiş. Yerel derlemede: `local.properties` satırları yok |
 | "E-posta veya şifre hatalı" | Şifre yanlış ya da hesap onaylanmamış — parantez içi kısım hangisi olduğunu söyler |
 | "Hesabınız bir salona bağlı değil" | Sunucuda `gym_users` satırı eksik |
 | Ekleme/silme düğmeleri yok, yerine kilitli bir şerit var | Rolünüz o tabloya yazamıyor — beklenen davranış; rolü yükseltin ya da yetkili hesapla girin |
 | Ayarlar'da gerekçe "Erişim reddedildi (403)" | Yetkisiz yazma sunucuda reddedildi. Uygulama artık bunu baştan engelliyor; yine de görüyorsanız kayıt `0004` uygulanmadan önce kuyruğa girmiş olabilir |
 | Ayarlar'da "Bekleyen: N" düşmüyor | Gönderim takılmış; aynı satırdaki gerekçe sebebi söyler |
-| Panelde "Kurulum tamamlanmamış" | `web/config.js` oluşturulmamış — ya da `?demo` ile açın |
+| Panelde "Kurulum tamamlanmamış" | `web/config.js` oluşturulmamış — ya da adrese `?demo` ekleyin |
 | Panelde liste boş ama hata yok | O tabloda veri yok; erişim sorunu olsaydı hata görürdünüz |
+| Panelde "Süzgece uyan kayıt yok" | Veri var ama arama/tarih süzgeci eliyor — **Temizle** düğmesine basın |
+| Actions'ta `nonstop-debug-apk` yok | Koşu başarısız bitmiş ya da yapıtın 14 günü dolmuş |
