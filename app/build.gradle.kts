@@ -94,6 +94,10 @@ dependencies {
     // idi, o da ortak koda taşınırken `GymDatabase.inTransaction` ile
     // değiştirildi. Entity, DAO, veritabanı ve repository'lerin tamamı artık
     // :shared modülünde.
+    // Uygulama kapalıyken senkronizasyon. Yalnızca `app` modülünde: iOS
+    // karşılığı BGTaskScheduler ve o da kendi platform modülüne girecek.
+    // Ortak olan tek şey "tekrar denensin mi" kararı ve o `:shared` içinde.
+    implementation(libs.androidx.work.runtime)
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
     testImplementation(libs.junit)

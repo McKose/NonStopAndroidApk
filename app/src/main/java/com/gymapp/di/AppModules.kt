@@ -3,6 +3,7 @@ package com.gymapp.di
 import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.db.createGymDatabase
 import com.gymapp.data.local.preferences.AppPreferences
+import com.gymapp.data.sync.ArkaPlanSenkronizasyonu
 import com.gymapp.data.repository.AppointmentRepository
 import com.gymapp.data.repository.FinanceRepository
 import com.gymapp.data.repository.LedgerRepository
@@ -63,6 +64,7 @@ val databaseModule = module {
 val appModule = module {
     single { AppPreferences(androidContext()) }
     single { GlobalErrorHandler() }
+    single { ArkaPlanSenkronizasyonu(androidContext()) }
 
     singleOf(::LedgerRepository)
     singleOf(::MemberRepository)

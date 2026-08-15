@@ -6,6 +6,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -108,6 +109,9 @@ class SyncCoordinatorTest {
         assertEquals(4, sorun.pushed)
         assertEquals(1, sorun.failed)
         assertTrue(sorun.reason.contains("Bağlantı"), "Gerekçe: ${sorun.reason}")
+        // Ağ geri geldiğinde arka plan işi tekrar denemeli; `false` olsaydı
+        // uygulama kapalıyken kuyruk hiç boşalmazdı.
+        assertTrue(sorun.retryable, "Bağlantı sorunu tekrar denenebilir olmalı")
     }
 
     /**
@@ -125,6 +129,9 @@ class SyncCoordinatorTest {
         val sorun = assertIs<SyncState.Problem>(durum)
         assertEquals(2, sorun.failed)
         assertTrue(sorun.reason.contains("reddedildi"), "Gerekçe: ${sorun.reason}")
+        // Sunucu reddetti: tekrar denemek her turda aynı sonucu verir. `true`
+        // olsaydı arka plan işi cihazı süresiz uyandırırdı.
+        assertFalse(sorun.retryable, "Reddedilen kayıtlar tekrar denenmemeli")
     }
 
     /**
@@ -143,6 +150,8 @@ class SyncCoordinatorTest {
         assertEquals(5, runner.cagriSayisi)
         val sorun = assertIs<SyncState.Problem>(durum)
         assertTrue(sorun.reason.contains("sürüyor"), "Gerekçe: ${sorun.reason}")
+        // Kuyruk hâlâ dolu — bu bir hata değil, "işim bitmedi". Devam edilmeli.
+        assertTrue(sorun.retryable, "Tur sınırına dayanmak tekrar denenebilir olmalı")
     }
 
     // ─── Oturum ─────────────────────────────────────────────────────────────
@@ -218,6 +227,7 @@ class SyncCoordinatorTest {
         val sorun = assertIs<SyncState.Problem>(durum)
         assertEquals(3, sorun.pulled)
         assertTrue(sorun.reason.contains("ağ yok"), "Gerekçe: ${sorun.reason}")
+        assertTrue(sorun.retryable, "Yarım kalan indirme tekrar denenebilir olmalı")
     }
 
     // ─── Tek seferlik koşma ─────────────────────────────────────────────────
