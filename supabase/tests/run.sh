@@ -47,6 +47,16 @@ hepsini_uygula
 # kez çalıştırıyordu.
 hepsini_uygula
 
-run "$here/10_rls_test.sql"
+# Test dosyaları da dizinden okunuyor, migrasyonlarla aynı gerekçeyle: elle
+# sayıldığında yeni bir test dosyası eklenip listeye yazılmayı unutulabiliyor ve
+# o test HİÇ koşmuyor — üstelik takım yeşil kalıyor. `00_` önekli dosyalar
+# kurulum, testten önce ve migrasyonlardan da önce koşuyorlar.
+testler=("$here"/[1-9]*_*.sql)
+if [ ${#testler[@]} -eq 0 ]; then
+    echo "HATA: tests/ altında hiç test dosyası yok — yol yanlış olabilir." >&2
+    exit 1
+fi
+
+for t in "${testler[@]}"; do run "$t"; done
 
 echo "Sunucu şeması ve erişim kuralları doğrulandı."
