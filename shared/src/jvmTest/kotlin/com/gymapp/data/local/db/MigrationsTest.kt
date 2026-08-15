@@ -24,8 +24,13 @@ import kotlin.test.assertTrue
  * Room'un şema doğrulamasını. Room bir veritabanını açarken gerçek tablo
  * yapısını beklediğiyle karşılaştırıyor ve uyuşmazsa hata veriyor. Onu sınamak
  * için Room'un `MigrationTestHelper` aracı ve **dışa aktarılmış şema
- * dosyaları** (`shared/schemas/*.json`) gerekiyor; o dosyalar şu an depoda
- * değil, yalnızca CI yapıtı olarak üretiliyor.
+ * dosyaları** (`shared/schemas` altındaki `.json` dosyaları) gerekiyor; onlar şu
+ * an depoda değil, yalnızca CI yapıtı olarak üretiliyor.
+ *
+ * NOT: yol burada `schemas` + yıldız biçiminde yazılmıyor. Kotlin blok yorumları
+ * **iç içe geçebiliyor**; yorumun içindeki bir eğik çizgi-yıldız dizisi yeni bir
+ * yorum açıyor ve dosyanın sonunda "Unclosed comment" hatası veriyor. Tam olarak
+ * bu hata bir kez yapıldı.
  *
  * Bu boşluk `MIGRATION_4_5` için bilinçli olarak küçük tutuldu: geçiş tabloyu
  * yeniden kurmuyor, tek bir `DROP COLUMN` yapıyor. Kalan her şey Room'un
@@ -108,7 +113,12 @@ class MigrationsTest {
         MIGRATION_4_5.migrate(baglanti)
 
         val hata = runCatching {
-            baglanti.prepare("SELECT `password` FROM `staff`").use { it.step() }
+            val ifade = baglanti.prepare("SELECT `password` FROM `staff`")
+            try {
+                ifade.step()
+            } finally {
+                ifade.close()
+            }
         }.exceptionOrNull()
 
         assertTrue(hata != null, "Silinen kolon hâlâ sorgulanabiliyor")
@@ -172,18 +182,27 @@ class MigrationsTest {
         )
     }
 
-    private fun kolonlar(baglanti: SQLiteConnection): List<String> =
-        baglanti.prepare("PRAGMA table_info(`staff`)").use { ifade ->
-            buildList {
+    private fun kolonlar(baglanti: SQLiteConnection): List<String> {
+        val ifade = baglanti.prepare("PRAGMA table_info(`staff`)")
+        try {
+            return buildList {
+                // PRAGMA table_info sütunları: 0=cid, 1=name, 2=type, ...
                 while (ifade.step()) add(ifade.getText(1))
             }
+        } finally {
+            ifade.close()
         }
+    }
 
-    private fun tekSatir(baglanti: SQLiteConnection, sql: String): List<String> =
-        baglanti.prepare(sql).use { ifade ->
+    private fun tekSatir(baglanti: SQLiteConnection, sql: String): List<String> {
+        val ifade = baglanti.prepare(sql)
+        try {
             assertTrue(ifade.step(), "Satır bulunamadı")
-            (0 until ifade.getColumnCount()).map { ifade.getText(it) }
+            return (0 until ifade.getColumnCount()).map { ifade.getText(it) }
+        } finally {
+            ifade.close()
         }
+    }
 
     /** Bellek içi veritabanı açar, iş bitince kapatır. */
     private fun sqliteIle(govde: (SQLiteConnection) -> Unit) {
