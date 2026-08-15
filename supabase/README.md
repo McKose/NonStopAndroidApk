@@ -316,8 +316,9 @@ görünmeye devam ederdi.
 - **iOS tarafında oturum saklama yok.** Android'de oturum Keystore ile
   şifrelenip saklanıyor ve uygulama kapansa da korunuyor; iOS uygulaması
   yazıldığında Keychain karşılığı `SessionStore` arayüzünün arkasına eklenecek.
-- **Room şema dosyaları depoda değil.** `shared/schemas/*.json` yalnızca CI
-  yapıtı olarak üretiliyor. Depoya alındığında Room'un `MigrationTestHelper`'ı
-  kullanılabilir hâle gelir ve geçişler, gerçek eski şemadan veritabanı kurularak
-  uçtan uca sınanabilir. Şimdilik geçişler `MigrationsTest` içinde doğrudan SQL
-  üzerinden doğrulanıyor.
+- **Room şema dosyalarının yalnızca bir sürümü depoda.** `shared/schemas`
+  altında `4.json` var; geçiş testi başlangıç tablosunu oradan kuruyor. Yeni
+  sürümlerin dosyaları da eklendiğinde Room'un `MigrationTestHelper` aracı
+  kullanılabilir hâle gelir ve geçişten sonra Room'un **kendi şema
+  doğrulaması** da test kapsamına girer. Dosyalar derleme sırasında üretiliyor
+  ve CI'da `room-schemas` yapıtı olarak indirilebiliyor.

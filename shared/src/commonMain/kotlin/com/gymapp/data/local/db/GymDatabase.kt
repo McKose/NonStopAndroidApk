@@ -20,11 +20,16 @@ import com.gymapp.data.local.entity.*
  * **Buradan sonrası katı migration disiplini**: her şema değişikliği bir sürüm
  * artışı ve elle yazılmış bir [androidx.room.migration.Migration] gerektirir.
  * `exportSchema = true` olduğu için her sürümün anlık görüntüsü `shared/schemas`
- * altına yazılıyor. DİKKAT: bu dizin şu an depoya **işlenmiyor**, yalnızca CI
- * yapıtı olarak yayımlanıyor. Dolayısıyla Room'un `MigrationTestHelper`'ı
- * (eski sürümün şemasından veritabanı kurup geçişi koşturan araç) henüz
- * kullanılamıyor; geçişler `MigrationsTest` içinde doğrudan SQL üzerinden
- * sınanıyor. Şemalar depoya alındığında tam kapsamlı geçiş testi mümkün olacak.
+ * altına yazılıyor. `4.json` depoya işlendi ve `MigrationsTest` başlangıç
+ * tablosunu **oradan** kuruyor — elle kopyalanan bir tanım gerçeğinden saparsa
+ * test, üretimde hiç var olmayan bir şema üzerinde koşar ve geçişi doğrulamış
+ * gibi görünürdü.
+ *
+ * Yeni bir sürüm eklendiğinde o sürümün dosyası da depoya alınmalı: derleme
+ * sırasında üretiliyor, CI'da `room-schemas` yapıtı olarak indirilebiliyor.
+ * Hem başlangıç hem hedef sürümün dosyası depoda olduğunda Room'un
+ * `MigrationTestHelper` aracı da kullanılabilir hâle gelir; o araç geçişten
+ * sonra Room'un kendi şema doğrulamasını da koşturuyor.
  *
  * **v2**: gönderim kuyruğu (`sync_outbox`) eklendi — bkz. [MIGRATION_1_2].
  *

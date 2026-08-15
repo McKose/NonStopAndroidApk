@@ -3,52 +3,55 @@ package com.gymapp.data.local.db
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * Geçişlerin gerçek SQLite üzerinde sınanması.
  *
- * Geçiş hatası, bu projede yapılabilecek en pahalı hatalardan biri: kullanıcının
+ * Geçiş hatası bu projede yapılabilecek en pahalı hatalardan biri: kullanıcının
  * telefonundaki veriyi bozar ya da uygulamayı açılışta düşürür ve geri dönüşü
  * yoktur. `fallbackToDestructiveMigration` bilinçli olarak kapalı olduğu için
  * yanlış bir geçiş sessizce veriyi silmez — ama açılışta çöker.
  *
- * ### Neyi kapsıyor
- * Geçişin **SQL etkisi**: hangi kolon gitti, hangi veri kaldı. Gerçek SQLite
- * üzerinde koşuyor, taklit değil.
+ * ### Eski şema ELLE YAZILMIYOR
+ * Başlangıç tablosu, Room'un dışa aktardığı `shared/schemas` altındaki sürüm
+ * dosyasından okunuyor. İlk yazımda tablo tanımı elle kopyalanmıştı ve bu
+ * sessiz bir risk: elle yazılan tanım gerçeğinden saparsa test, üretimde hiç
+ * var olmayan bir şema üzerinde koşar ve geçişi doğrulamış gibi görünür.
+ * (O ilk hâlin gerçekten doğru olduğu sonradan karşılaştırılarak teyit edildi,
+ * ama doğruluğu şansa bağlıydı.)
  *
- * ### Neyi KAPSAMIYOR
- * Room'un şema doğrulamasını. Room bir veritabanını açarken gerçek tablo
- * yapısını beklediğiyle karşılaştırıyor ve uyuşmazsa hata veriyor. Onu sınamak
- * için Room'un `MigrationTestHelper` aracı ve **dışa aktarılmış şema
- * dosyaları** (`shared/schemas` altındaki `.json` dosyaları) gerekiyor; onlar şu
- * an depoda değil, yalnızca CI yapıtı olarak üretiliyor.
- *
- * NOT: yol burada `schemas` + yıldız biçiminde yazılmıyor. Kotlin blok yorumları
- * **iç içe geçebiliyor**; yorumun içindeki bir eğik çizgi-yıldız dizisi yeni bir
- * yorum açıyor ve dosyanın sonunda "Unclosed comment" hatası veriyor. Tam olarak
- * bu hata bir kez yapıldı.
- *
- * Bu boşluk `MIGRATION_4_5` için bilinçli olarak küçük tutuldu: geçiş tabloyu
- * yeniden kurmuyor, tek bir `DROP COLUMN` yapıyor. Kalan her şey Room'un
- * kurduğu hâliyle duruyor, dolayısıyla sonuç tam olarak "v4 eksi bu kolon".
- * Tabloyu yeniden kuran bir geçiş yazılacaksa **önce şemalar depoya alınmalı**;
- * orada kolon sırası ya da indeks adı sapması gerçek bir risk.
+ * ### Neyi hâlâ kapsamıyor
+ * Room'un kendi şema doğrulamasını. Onun için `MigrationTestHelper` gerekiyor
+ * ve o araç hem başlangıç hem HEDEF sürümün şema dosyasını istiyor; hedef
+ * sürümünki henüz depoda değil, derleme sırasında üretiliyor. Bu geçişte açık
+ * küçük tutuldu: tablo yeniden kurulmuyor, tek bir `DROP COLUMN` yapılıyor,
+ * dolayısıyla sonuç tam olarak "eski şema eksi bir kolon".
  */
 class MigrationsTest {
 
     /**
-     * v4 → v5 şifre kolonunu siliyor, kalan veriye dokunmuyor.
+     * v4 → v5 şifre kolonunu siliyor, kalan her şeye dokunmuyor.
      *
-     * İki iddia birlikte anlamlı: yalnızca "kolon gitti" denseydi tabloyu
-     * boşaltan bir geçiş de testi geçerdi.
+     * Üç iddia birlikte anlamlı. Yalnızca "kolon gitti" denseydi tabloyu
+     * boşaltan ya da yeniden kuran bir geçiş de testi geçerdi.
      */
     @Test
-    fun `v4 to v5 sifre kolonunu siler, veriyi korur`() = sqliteIle { baglanti ->
-        v4StaffTablosuKur(baglanti)
+    fun `v4 to v5 sifre kolonunu siler, kalan sema ve veri korunur`() = sqliteIle { baglanti ->
+        val v4 = surumSemasi(4)
+        val staff = v4.tablo("staff")
+
+        baglanti.execSQL(staff.createSql)
+        staff.indeksSqlleri.forEach { baglanti.execSQL(it) }
 
         baglanti.execSQL(
             """
@@ -68,36 +71,46 @@ class MigrationsTest {
 
         MIGRATION_4_5.migrate(baglanti)
 
-        val sonrasi = kolonlar(baglanti)
-        assertFalse("password" in sonrasi, "Şifre kolonu silinmeliydi")
-
-        // Kalan kolonların hepsi duruyor mu? Yalnızca şifrenin gitmesi gerekiyor.
+        // 1) Kolon listesi: şemadan türetiliyor, elle sayılmıyor. Böylece
+        //    tabloya yeni bir kolon eklendiğinde bu test kendiliğinden güncel
+        //    kalıyor.
         assertEquals(
-            listOf(
-                "id", "tenantId", "fullName", "title", "role", "branch",
-                "commissionBasisPoints", "monthlySalaryMinor", "phone",
-                "nickname", "authUserId", "isActive",
-                "createdAtMs", "updatedAtMs", "deletedAtMs",
-            ),
-            sonrasi,
+            staff.kolonlar - "password",
+            kolonlar(baglanti),
             "DROP COLUMN yalnızca şifreyi kaldırmalı; kolon sırası da korunmalı",
         )
+        assertFalse("password" in kolonlar(baglanti), "Şifre kolonu silinmeliydi")
 
-        // Satır ve içeriği yerinde mi?
-        val satir = tekSatir(baglanti, "SELECT `id`, `fullName`, `commissionBasisPoints`, `authUserId` FROM `staff`")
-        assertEquals(listOf("st-1", "Ayşe Yılmaz", "4000", "auth-1"), satir)
+        // 2) İndeksler ayakta mı? Tabloyu yeniden kuran bir geçiş bunları
+        //    sessizce düşürürdü ve sonuç, sorguları yavaşlatan ama hiçbir
+        //    testi düşürmeyen bir şema olurdu. Ayrıca `staff_authUserId`
+        //    TEKİL: düşerse aynı hesap iki personele bağlanabilir hâle gelir.
+        assertEquals(
+            staff.indeksAdlari.sorted(),
+            indeksler(baglanti).sorted(),
+            "Geçişten sonra indeksler kaybolmuş",
+        )
+
+        // 3) Satır ve içeriği yerinde mi?
+        assertEquals(
+            listOf("st-1", "Ayşe Yılmaz", "4000", "auth-1"),
+            tekSatir(
+                baglanti,
+                "SELECT `id`, `fullName`, `commissionBasisPoints`, `authUserId` FROM `staff`",
+            ),
+        )
     }
 
     /**
-     * Şifre kolonuna yazılmış veri gerçekten diskten gidiyor.
+     * Şifre kolonuna yazılmış veri gerçekten sorgulanamaz hâle geliyor.
      *
-     * `DROP COLUMN` kolonu tablo tanımından çıkarıyor; bu testin sorduğu şey
-     * değerin sorgulanamaz hâle gelip gelmediği. Kolon "gizlenip" veri yerinde
-     * kalsaydı, düz metin şifreyi kaldırma amacının yarısı boşa giderdi.
+     * Kolon "gizlenip" veri yerinde kalsaydı, düz metin şifreyi kaldırma
+     * amacının yarısı boşa giderdi.
      */
     @Test
     fun `silinen sifre artik sorgulanamiyor`() = sqliteIle { baglanti ->
-        v4StaffTablosuKur(baglanti)
+        val staff = surumSemasi(4).tablo("staff")
+        baglanti.execSQL(staff.createSql)
         baglanti.execSQL(
             """
             INSERT INTO `staff`
@@ -148,39 +161,79 @@ class MigrationsTest {
         )
     }
 
-    // ─── Yardımcılar ────────────────────────────────────────────────────────
+    // ─── Şema dosyasının okunması ───────────────────────────────────────────
+
+    private class TabloSemasi(private val ham: kotlinx.serialization.json.JsonObject) {
+        val createSql: String
+            get() = ham.getValue("createSql").jsonPrimitive.content
+                .replace("\${TABLE_NAME}", ham.getValue("tableName").jsonPrimitive.content)
+
+        val kolonlar: List<String>
+            get() = ham.getValue("fields").jsonArray
+                .map { it.jsonObject.getValue("columnName").jsonPrimitive.content }
+
+        private val indeksler
+            get() = ham["indices"]?.jsonArray.orEmpty()
+
+        val indeksAdlari: List<String>
+            get() = indeksler.map { it.jsonObject.getValue("name").jsonPrimitive.content }
+
+        val indeksSqlleri: List<String>
+            get() = indeksler.map {
+                it.jsonObject.getValue("createSql").jsonPrimitive.content
+                    .replace("\${TABLE_NAME}", ham.getValue("tableName").jsonPrimitive.content)
+            }
+    }
+
+    private class Sema(private val entities: List<kotlinx.serialization.json.JsonObject>) {
+        fun tablo(ad: String): TabloSemasi {
+            val bulunan = entities.firstOrNull {
+                it.getValue("tableName").jsonPrimitive.content == ad
+            } ?: fail(
+                "Şemada '$ad' tablosu yok. Bulunanlar: " +
+                    entities.map { it.getValue("tableName").jsonPrimitive.content }
+            )
+            return TabloSemasi(bulunan)
+        }
+    }
 
     /**
-     * v4'teki `staff` tablosunun tanımı.
+     * Room'un dışa aktardığı sürüm şemasını okur.
      *
-     * Room'un ürettiği DDL ile aynı olacak şekilde elle yazıldı. Şema dosyaları
-     * depoda olsaydı buna gerek kalmazdı (bkz. sınıf açıklaması).
+     * Dosya yoksa test **hata veriyor**, sessizce atlanmıyor: atlanan bir geçiş
+     * testi, hiç olmayan bir testtir ve takım yine yeşil kalırdı.
      */
-    private fun v4StaffTablosuKur(baglanti: SQLiteConnection) {
-        baglanti.execSQL(
-            """
-            CREATE TABLE IF NOT EXISTS `staff` (
-                `id` TEXT NOT NULL,
-                `tenantId` TEXT NOT NULL,
-                `fullName` TEXT NOT NULL,
-                `title` TEXT NOT NULL,
-                `role` TEXT NOT NULL,
-                `branch` TEXT NOT NULL,
-                `commissionBasisPoints` INTEGER NOT NULL,
-                `monthlySalaryMinor` INTEGER NOT NULL,
-                `phone` TEXT NOT NULL,
-                `nickname` TEXT NOT NULL,
-                `authUserId` TEXT,
-                `password` TEXT NOT NULL,
-                `isActive` INTEGER NOT NULL,
-                `createdAtMs` INTEGER NOT NULL,
-                `updatedAtMs` INTEGER NOT NULL,
-                `deletedAtMs` INTEGER,
-                PRIMARY KEY(`id`)
-            )
-            """.trimIndent()
+    private fun surumSemasi(surum: Int): Sema {
+        val dosya = semaDosyasi(surum)
+        val kok = Json.parseToJsonElement(dosya.readText()).jsonObject
+        val db = kok.getValue("database").jsonObject
+        assertEquals(
+            surum, db.getValue("version").jsonPrimitive.content.toInt(),
+            "Şema dosyası beklenen sürümü taşımıyor: ${dosya.path}",
         )
+        return Sema(db.getValue("entities").jsonArray.map { it.jsonObject })
     }
+
+    private fun semaDosyasi(surum: Int): File {
+        var dir: File? = File(".").absoluteFile
+        while (dir != null) {
+            val semalar = File(dir, "shared/schemas")
+            if (semalar.isDirectory) {
+                // Alt dizin adı veritabanı sınıfının tam adı; aramak, o adı
+                // teste sabitlemekten sağlam.
+                val bulunan = semalar.walkTopDown().firstOrNull { it.name == "$surum.json" }
+                return bulunan ?: fail(
+                    "shared/schemas altında $surum.json yok. Bulunanlar: " +
+                        semalar.walkTopDown().filter { it.extension == "json" }
+                            .map { it.name }.toList()
+                )
+            }
+            dir = dir.parentFile
+        }
+        fail("shared/schemas bulunamadı (arama başlangıcı: ${File(".").absolutePath})")
+    }
+
+    // ─── SQLite yardımcıları ────────────────────────────────────────────────
 
     private fun kolonlar(baglanti: SQLiteConnection): List<String> {
         val ifade = baglanti.prepare("PRAGMA table_info(`staff`)")
@@ -188,6 +241,20 @@ class MigrationsTest {
             return buildList {
                 // PRAGMA table_info sütunları: 0=cid, 1=name, 2=type, ...
                 while (ifade.step()) add(ifade.getText(1))
+            }
+        } finally {
+            ifade.close()
+        }
+    }
+
+    private fun indeksler(baglanti: SQLiteConnection): List<String> {
+        val ifade = baglanti.prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'staff' " +
+                "AND name NOT LIKE 'sqlite_%'"
+        )
+        try {
+            return buildList {
+                while (ifade.step()) add(ifade.getText(0))
             }
         } finally {
             ifade.close()
