@@ -7,6 +7,7 @@ import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -126,7 +127,7 @@ class AllTablesPullerTest {
         val ozet = puller(reader, writer).pullAll(tenant)
 
         assertEquals(
-            SyncTable.entries, reader.istenenTablolar,
+            SyncTable.entries.toList(), reader.istenenTablolar,
             "Bozuk satır yalnızca kendi tablosunu durdurmalı",
         )
         assertTrue("randevu-1" in writer.yazilanlar, "Randevu yine de inmeliydi")
@@ -201,7 +202,7 @@ class AllTablesPullerTest {
         assertEquals(1, ozet.applied)
         assertEquals(0, ozet.unreadable)
         assertFalse(ozet.stopped)
-        assertEquals(null, ozet.reason)
-        assertEquals(SyncTable.entries, reader.istenenTablolar, "Her tablo denenmiş olmalı")
+        assertNull(ozet.reason)
+        assertEquals(SyncTable.entries.toList(), reader.istenenTablolar, "Her tablo denenmiş olmalı")
     }
 }
