@@ -126,6 +126,29 @@ Panel her `web/` değişikliğinden sonra GitHub Pages'e kendiliğinden yayınla
 
 **<https://mckose.github.io/NonStopAndroidApk/>**
 
+### Tek seferlik kurulum
+
+İki ayar gerekiyor ve ikisi de yalnızca bir kez yapılıyor.
+
+**1. Pages'i açın.** İş akışı bunu kendisi yapamıyor: varsayılan `GITHUB_TOKEN`
+Pages sitesi oluşturamıyor (ilk denemede `enablement: true` ile denendi,
+"Resource not accessible by integration" ile düştü).
+
+- <https://github.com/McKose/NonStopAndroidApk/settings/pages>
+- **Build and deployment** → **Source** = **GitHub Actions**
+
+Açılmamışsa iş akışı ilk adımda, ne yapılması gerektiğini söyleyerek duruyor.
+
+**2. Sunucu ayarlarını ekleyin** (panelin gerçek veriye bağlanması için;
+`?demo` bunlarsız da çalışıyor). Ayrıntılı anlatım `docs/deneme.md` içinde —
+APK ile aynı iki gizli anahtar:
+
+- <https://github.com/McKose/NonStopAndroidApk/settings/secrets/actions>
+- `SUPABASE_URL` ve `SUPABASE_ANON_KEY`
+
+Anahtarlar **derleme sırasında** okunuyor, yani ekledikten sonra yayının
+yeniden çalışması gerekiyor: Actions → **Paneli yayınla** → **Run workflow**.
+
 Derleme adımı yok; dosyalar olduğu gibi kopyalanıyor. İş akışının yaptığı tek
 "derleme", depoya işlenmeyen `config.js` dosyasını depo gizli anahtarlarından
 (`SUPABASE_URL`, `SUPABASE_ANON_KEY`) üretmek — APK tarafındaki desenin aynısı.

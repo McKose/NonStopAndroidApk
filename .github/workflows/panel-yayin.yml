@@ -45,13 +45,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Pages ilk kez kullanılıyorsa depo ayarında açılması gerekiyor;
-      # `enablement: true` bunu iş akışından yapıyor, böylece kurulum için
-      # panelden tek tıklık bir adım gerekmiyor.
+      # Pages'in depo ayarlarından AÇILMIŞ olması gerekiyor; iş akışı bunu
+      # kendisi yapamıyor.
+      #
+      # İlk denemede `actions/configure-pages` adımına `enablement: true`
+      # verilmişti — çalışmadı: varsayılan `GITHUB_TOKEN` Pages sitesi
+      # oluşturamıyor ve hata "Resource not accessible by integration" diye
+      # dönüyor. O mesaj ne yapılması gerektiğini söylemiyor, bu yüzden önce
+      # okunur bir kontrol var.
+      - name: Pages açık mı
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          kod=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/pages")
+          if [ "$kod" = "404" ]; then
+            echo "::error::GitHub Pages bu depoda açık değil."
+            echo "Tek seferlik ayar: depo -> Settings -> Pages ->"
+            echo "  'Build and deployment' -> Source = GitHub Actions"
+            echo "Adres: https://github.com/$GITHUB_REPOSITORY/settings/pages"
+            echo "Ayarladıktan sonra bu iş akışını yeniden çalıştırın."
+            exit 1
+          fi
+          echo "Pages açık (HTTP $kod)."
+
       - name: Pages'i hazırla
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       # Yayınlanacak dosyalar TEK TEK sayılıyor, `web/` olduğu gibi
       # kopyalanmıyor. Sebebi: o dizinde testler, örnek ayar dosyası ve

@@ -137,7 +137,7 @@ Yapıt **14 gün** duruyor; süresi dolmuşsa yeni bir koşu gerekiyor (depoya
 herhangi bir değişiklik gönderildiğinde ya da Actions sayfasından iş elle
 tetiklendiğinde üretilir).
 
-### APK'nın sunucuya bağlanması için tek seferlik ayar
+### Sunucuya bağlanmak için tek seferlik ayar (APK ve panel için ortak)
 
 Bu adım yapılmazsa APK yine kurulur ve açılır, ama giriş ekranında **"sunucu
 ayarları eksik"** der ve hiçbir yere bağlanamaz.
@@ -188,6 +188,11 @@ gizli anahtarlarından okunuyor.
 
 5. Yeni koşu bitince APK'yı yukarıdaki adımlarla indirin. Giriş ekranı artık
    "sunucu ayarları eksik" demiyorsa ayar tuttu demektir.
+
+**Aynı iki anahtar yayındaki paneli de besliyor.** Ekledikten sonra panelin de
+yeniden yayınlanması gerekiyor: Actions → **Paneli yayınla** → **Run workflow**.
+Panelin ayrıca tek seferlik bir adımı daha var (GitHub Pages'in açılması);
+`web/README.md` → "Tek seferlik kurulum".
 
 Değerler eksikken derlemeyi düşürmemek bilinçli: ayarları olmayan biri de
 uygulamanın ekranlarına bakabilsin diye.
