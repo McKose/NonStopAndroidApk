@@ -1,0 +1,105 @@
+name: Paneli yayınla
+
+# Web panelini GitHub Pages'e yayınlar.
+#
+# Panelin derleme adımı yok ve olmayacak: dosyalar olduğu gibi kopyalanıyor.
+# Buradaki tek "derleme" işi, depoya işlenmeyen `config.js` dosyasını depo gizli
+# anahtarlarından üretmek — APK tarafındaki desenin aynısı.
+#
+# Ayrı bir iş akışı, `android.yml` içine eklenmiş bir job değil. Gerekçe: o iş
+# akışı her PR'da koşuyor ve `pages` izinleri istiyor; yayınlama ise yalnızca
+# master'a merge sonrası anlamlı. İkisini ayırmak, PR koşularının yayın izniyle
+# dolaşmasını da önlüyor.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'web/**'
+      - '.github/workflows/panel-yayin.yml'
+  workflow_dispatch:
+
+# `deploy-pages` bunları istiyor. `contents: read` bilinçli olarak yazma değil:
+# yayınlama işinin depoya bir şey yazması gerekmiyor.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Aynı anda tek yayın. `cancel-in-progress: false` çünkü yarıda kesilen bir
+# yayın, sitenin yarısı eski yarısı yeni kalmasına yol açabilir.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  yayinla:
+    name: GitHub Pages'e gönder
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    environment:
+      name: github-pages
+      url: ${{ steps.dagitim.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pages ilk kez kullanılıyorsa depo ayarında açılması gerekiyor;
+      # `enablement: true` bunu iş akışından yapıyor, böylece kurulum için
+      # panelden tek tıklık bir adım gerekmiyor.
+      - name: Pages'i hazırla
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      # Yayınlanacak dosyalar TEK TEK sayılıyor, `web/` olduğu gibi
+      # kopyalanmıyor. Sebebi: o dizinde testler, örnek ayar dosyası ve
+      # önizleme üreticisi de var. Hepsini yayınlamak zararsız görünür ama
+      # `config.example.js` gibi bir dosyanın site kökünde durması kafa
+      # karıştırıcı, testler ise oraya hiç ait değil.
+      - name: Yayınlanacak dosyaları topla
+        run: |
+          mkdir -p _site
+          cp web/index.html   _site/
+          cp web/styles.css   _site/
+          cp web/app.js       _site/
+          cp web/domain.js    _site/
+          cp web/ozet.js      _site/
+          cp web/suzme.js     _site/
+          cp web/supabase.js  _site/
+          cp web/demo.js      _site/
+          echo "Yayınlanacak dosyalar:"; ls -1 _site
+
+      # Ayarlar depoda tutulmuyor; APK'daki desenin aynısı.
+      #
+      # Değerler yoksa dosya HİÇ yazılmıyor ve panel "Kurulum tamamlanmamış"
+      # diyor — ama `?demo` ile yine açılıyor. Yayını düşürmek, ayarları
+      # olmayan birinin panele hiç bakamaması demek olurdu.
+      - name: Sunucu ayarlarını yaz (varsa)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            cat > _site/config.js <<EOF
+          window.NONSTOP_CONFIG = {
+            url: "$SUPABASE_URL",
+            anonKey: "$SUPABASE_ANON_KEY",
+          };
+          EOF
+            echo "config.js yazıldı."
+          else
+            echo "UYARI: SUPABASE_URL / SUPABASE_ANON_KEY tanımlı değil."
+            echo "Panel yayınlanacak ama 'Kurulum tamamlanmamış' diyecek."
+            echo "Yine de ?demo ile açılabilir."
+          fi
+
+      - name: Yapıtı yükle
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Yayınla
+        id: dagitim
+        uses: actions/deploy-pages@v4

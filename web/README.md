@@ -70,33 +70,6 @@ python3 -m http.server 8000
 
 Sonra `http://localhost:8000` adresini açın.
 
-## nonstopstudio.tr üzerinde yayınlamak
-
-Panel statik olduğu için seçenek çok; en az bakım isteyeni:
-
-1. **Netlify** ya da **Vercel** hesabı açın, GitHub deposunu bağlayın.
-2. Yayın (publish) dizinini `web` olarak ayarlayın; derleme komutu **boş**.
-3. `config.js` depoda olmadığı için yayın ortamına elle eklenmeli. İki yol var:
-   - Netlify/Vercel arayüzünden dosyayı ortam dosyası olarak eklemek, ya da
-   - `config.js`'i yayın öncesi oluşturan tek satırlık bir komut kullanmak:
-     ```bash
-     printf 'window.NONSTOP_CONFIG={url:"%s",anonKey:"%s"};' "$SUPABASE_URL" "$SUPABASE_ANON_KEY" > web/config.js
-     ```
-     `SUPABASE_URL` ve `SUPABASE_ANON_KEY` değerlerini panelin ortam
-     değişkenlerine girersiniz.
-4. Alan adı ayarlarında `nonstopstudio.tr` alanını bağlayın; sertifika otomatik
-   geliyor.
-
-Alternatif olarak kendi sunucunuza da koyabilirsiniz: `web` klasörünü herhangi
-bir HTTP sunucusunun kök dizinine kopyalamak yeterli.
-
-### Supabase tarafında bir ayar gerekiyor mu
-
-Hayır. Panel `anon` anahtarıyla ve giriş yapan kullanıcının jetonuyla çalışıyor;
-uygulamanın kullandığı yolun aynısı. Yalnızca alan adınızı Supabase panelinde
-**Authentication → URL Configuration** altındaki izinli adresler listesine
-eklemeniz gerekebilir (şifre sıfırlama e-postaları için).
-
 ## Testler
 
 İş kuralları (tutar biçimi, tarih, üyelik durumu, tombstone ayıklama) Node'un
@@ -144,3 +117,68 @@ cd web && npm test        # TZ=Europe/Istanbul ile koşar
 Saat dilimi **bilinçli** olarak ayarlanıyor: koşucular UTC ve UTC'de yerel gün
 ile UTC gün aynı çıkıyor, dolayısıyla tarih hesabını bozan bir hata testlerden
 geçerdi — ama salonun makinesinde (UTC+3) yanlış sonuç verirdi.
+
+
+## Yayınlama
+
+Panel her `web/` değişikliğinden sonra GitHub Pages'e kendiliğinden yayınlanıyor
+(`.github/workflows/panel-yayin.yml`). Adres:
+
+**<https://mckose.github.io/NonStopAndroidApk/>**
+
+Derleme adımı yok; dosyalar olduğu gibi kopyalanıyor. İş akışının yaptığı tek
+"derleme", depoya işlenmeyen `config.js` dosyasını depo gizli anahtarlarından
+(`SUPABASE_URL`, `SUPABASE_ANON_KEY`) üretmek — APK tarafındaki desenin aynısı.
+Anahtarlar tanımlı değilse panel yine yayınlanıyor, yalnızca "Kurulum
+tamamlanmamış" diyor; `?demo` ile yine açılıyor.
+
+Yayınlanan dosyalar tek tek sayılıyor, `web/` olduğu gibi kopyalanmıyor: testler,
+örnek ayar dosyası ve önizleme üreticisi siteye ait değil.
+
+Başka bir yere koymak isterseniz panel statik: `web` klasörünü herhangi bir HTTP
+sunucusunun kök dizinine kopyalamak ve yanına `config.js` eklemek yeterli.
+
+### Panelin herkese açık olması sorun mu
+
+Hayır, ve bu tasarımın bir parçası:
+
+- Adresi bilen herkes **giriş ekranını** görebilir. İçeri girebilmek için
+  Supabase hesabı gerekiyor.
+- `anonKey` sayfada görünür ve görünmesi normaldir — tek başına hiçbir veriye
+  erişmiyor. Hangi satırın kime görüneceğini sunucudaki erişim kuralları
+  belirliyor (bkz. `supabase/README.md`).
+- Depo zaten herkese açık; panelin kaynak kodu da öyle.
+
+`service_role` anahtarı hiçbir zaman buraya konmuyor: o anahtar bütün erişim
+kurallarını baypas eder.
+
+### Supabase tarafında bir ayar gerekiyor mu
+
+Hayır. Panel `anon` anahtarıyla ve giriş yapan kullanıcının jetonuyla çalışıyor;
+uygulamanın kullandığı yolun aynısı. Yalnızca şifre sıfırlama e-postaları için
+adresi Supabase panelinde **Authentication → URL Configuration** altındaki
+izinli adresler listesine eklemeniz gerekebilir.
+
+### Kendi alan adına bağlamak (isteğe bağlı)
+
+`panel.nonstopstudio.tr` gibi bir adres istenirse iki adım var:
+
+1. **DNS kaydı** — alan adı sağlayıcınızda:
+
+   | Tür | Ad | Değer |
+   |---|---|---|
+   | `CNAME` | `panel` | `mckose.github.io` |
+
+   Apex (`nonstopstudio.tr`, alt alan adı olmadan) kullanmak isterseniz `CNAME`
+   yerine dört `A` kaydı gerekiyor; GitHub'ın adresleri
+   [belgelerinde](https://docs.github.com/pages/configuring-a-custom-domain-for-your-github-pages-site)
+   yazılı. Alt alan adı hem daha basit hem de ana alan adını salonun tanıtım
+   sitesine bırakıyor.
+
+2. **Depoda `CNAME` dosyası** — `web/` altına tek satırlık bir `CNAME` dosyası
+   (`panel.nonstopstudio.tr` yazan) koyup iş akışının kopyalama listesine
+   eklemek yeterli.
+
+**Sıra önemli:** önce DNS kaydını ekleyin, sonra `CNAME` dosyasını. Tersi
+yapılırsa GitHub Pages özel alan adını beklemeye başlar ve `github.io` adresi
+çalışmayı bırakır — yani DNS yayılana kadar panel hiçbir adresten açılmaz.

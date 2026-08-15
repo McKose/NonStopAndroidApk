@@ -12,7 +12,13 @@ değiştirin.
 
 Panelin ekranlarına bakmak için Supabase ayarı, hesap ve internet gerekmiyor.
 
-İki yolu var. **Tek dosyalık kopya** üretip tarayıcıda açmak (paylaşmaya da
+**En kolayı:** yayındaki panele `?demo` ekleyerek girmek —
+
+**<https://mckose.github.io/NonStopAndroidApk/?demo>**
+
+Bilgisayarınızda hiçbir şey kurmanız gerekmiyor, telefondan da açılıyor.
+
+Depodan çalıştırmak isterseniz iki yolu var. **Tek dosyalık kopya** üretip tarayıcıda açmak (paylaşmaya da
 uygun, sunucu gerektirmiyor):
 
 ```bash
