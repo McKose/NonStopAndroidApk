@@ -22,6 +22,7 @@ import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.PaymentState
 import com.gymapp.domain.Decimals
+import com.gymapp.domain.LedgerType
 import com.gymapp.domain.Membership
 import com.gymapp.domain.Money
 import com.gymapp.domain.PhoneNumber
@@ -508,8 +509,60 @@ fun PackagesTab(member: MemberEntity, viewModel: MemberViewModel = koinViewModel
         }
         
         HorizontalDivider()
-        Text("Paket Geçmişi", style = MaterialTheme.typography.titleSmall, color = Color.Gray)
-        Text("Henüz geçmiş işlem bulunmuyor.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+
+        // İşlem geçmişi artık gerçek: önceden burada sabit bir
+        // "Henüz geçmiş işlem bulunmuyor." metni vardı ve üyenin onlarca
+        // tahsilatı olsa bile aynı şeyi yazıyordu. Veri katmanı (defter)
+        // baştan beri hazırdı, yalnızca çağıran ekran yoktu.
+        Text("İşlem Geçmişi", style = MaterialTheme.typography.titleSmall, color = Color.Gray)
+
+        val hareketler by viewModel.getLedgerForMember(member.id)
+            .collectAsState(initial = emptyList())
+
+        if (hareketler.isEmpty()) {
+            Text(
+                "Henüz işlem kaydı yok.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray,
+            )
+        } else {
+            hareketler.forEach { hareket ->
+                LedgerRow(entry = hareket, dateFormat = dateFormat)
+            }
+        }
+    }
+}
+
+/**
+ * Defter satırı: tahsilat yeşil ve `+`, tahakkuk kırmızı ve `−`.
+ *
+ * İşaret ve renk birlikte veriliyor; yalnızca renge dayanmak, renk körlüğünde
+ * borçla tahsilatı ayırt edilemez hâle getirirdi.
+ */
+@Composable
+private fun LedgerRow(
+    entry: com.gymapp.data.local.entity.LedgerEntryEntity,
+    dateFormat: SimpleDateFormat,
+) {
+    val tahsilat = entry.type == LedgerType.PAYMENT
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(entry.description, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                dateFormat.format(Date(entry.occurredAtMs)),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray,
+            )
+        }
+        Text(
+            text = "${if (tahsilat) "+" else "−"}₺${Money(entry.amountMinor)}",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (tahsilat) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error,
+        )
     }
 }
 
