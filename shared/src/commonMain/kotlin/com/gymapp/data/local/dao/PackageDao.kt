@@ -20,7 +20,26 @@ interface PackageDao {
     @Update
     suspend fun updatePackage(pkg: PackageEntity)
 
-    @Query("SELECT * FROM gym_packages WHERE id = :id AND deletedAtMs IS NULL")
+    /**
+     * Kimliğe göre tek paket — **silinmişler dahil**.
+     *
+     * Süzgeç bilinçli olarak yok. Burada `AND deletedAtMs IS NULL` vardı ve
+     * projedeki dokuz kimlik sorgusundan tek süzeni buydu; gönderim yolu
+     * ([LocalRowPayloadProvider]) tam bunu kullandığı için silinen paketin
+     * içeriği üretilemiyor, gönderim `Permanent` hatayla duruyordu.
+     *
+     * Sonucu sessizdi: silme sunucuya hiç gitmiyor, paket panelde ve diğer
+     * cihazlarda canlı kalıyor, personel satmaya devam ediyordu. Kuyruk kaydı da
+     * hiç düşmediği için çekme tarafı o paketi kalıcı olarak atlıyor ve
+     * sunucudaki hâli geri de inemiyordu.
+     *
+     * Aynı kural `MeasurementDao.getById` üzerinde de yazılı: "süzülseydi silinen
+     * satır sunucuda sonsuza kadar canlı kalırdı."
+     *
+     * Çağıranın silinmişi elemesi gerekiyorsa bunu kendisi yapar; liste sorgusu
+     * ([getAllPackages]) zaten eliyor.
+     */
+    @Query("SELECT * FROM gym_packages WHERE id = :id")
     suspend fun getPackageById(id: String): PackageEntity?
 
     /**

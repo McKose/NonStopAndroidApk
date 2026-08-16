@@ -74,10 +74,15 @@ class SyncEngine(
 
             when (val result = remote.push(table, entry.entityId)) {
                 is PushResult.Success -> {
-                    // Yalnızca kayıt hâlâ aynıysa düşür: gönderim sürerken satır
-                    // tekrar değişmişse `enqueuedAtMs` yenilenmiş olur ve silme
-                    // eşleşmez, böylece yeni değişiklik kuyrukta kalır.
-                    if (outboxDao.removeIfUnchanged(entry.id, entry.enqueuedAtMs) > 0) {
+                    // Yalnızca satır bu arada tekrar değişmediyse düşür.
+                    // Ayırt edici `revision`: gönderim sürerken yapılan her
+                    // değişiklik onu artırıyor ve silme eşleşmiyor, böylece yeni
+                    // değişiklik kuyrukta kalıyor.
+                    //
+                    // Burada `enqueuedAtMs` kullanılıyordu ve o damga bilinçli
+                    // olarak SABİT (FIFO sırası ona dayanıyor) — yani koşul her
+                    // zaman eşleşiyor, koruma hiç çalışmıyordu.
+                    if (outboxDao.removeIfUnchanged(entry.id, entry.revision) > 0) {
                         pushed++
                     } else {
                         skipped++

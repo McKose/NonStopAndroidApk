@@ -69,7 +69,7 @@ import com.gymapp.data.local.entity.*
         // Çekme su işaretleri: hangi tablodan nereye kadar okunduğu.
         SyncPullStateEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

@@ -18,6 +18,7 @@ import com.gymapp.domain.Ids
 import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.PaymentState
 import com.gymapp.domain.StockMovementReason
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -153,12 +154,19 @@ class ProductRepository(
         memberId: String?,
         cartItems: Map<String, Int>,
         paymentMethod: PaymentMethod,
-        paymentStatus: String,
+        paymentStatus: PaymentState,
         deliveryStatus: DeliveryStatus,
         discount: Money = Money.ZERO,
         notes: String? = null
     ): Result<String> = runCatching {
         require(cartItems.isNotEmpty()) { "Sepet boş." }
+
+        // Veresiye satışın karşılığı üyeye açılan bir alacaktır; misafirin takip
+        // edilebilecek bir hesabı yok. İzin verilseydi ürün stoktan çıkar ve
+        // borç hiçbir yere yazılamazdı.
+        require(!(paymentStatus == PaymentState.PENDING && memberId == null)) {
+            "Ödenmemiş satış için üye seçilmelidir; misafire veresiye satılamaz."
+        }
 
         database.inTransaction {
             var total = Money.ZERO
@@ -220,20 +228,49 @@ class ProductRepository(
             syncQueue.enqueue(SyncTable.ORDERS, orderId, tenantId, nowMs)
             syncQueue.enqueueAll(SyncTable.STOCK_MOVEMENTS, movements.map { it.id }, tenantId, nowMs)
 
-            // 4) Tahsilat — yalnızca ödeme alındıysa (nakit esaslı).
-            if (paymentStatus == "PAID" && finalPrice.isPositive) {
-                ledgerRepository.recordPayment(
-                    amount = finalPrice,
-                    method = paymentMethod,
-                    description = buildString {
-                        append("Market satışı - Sipariş #").append(orderId.take(8))
-                        if (memberId == null) append(" (Misafir)")
-                    },
-                    category = LedgerCategory.MARKET,
-                    memberId = memberId,
-                    orderId = orderId,
-                    occurredAtMs = nowMs,
-                ).getOrThrow()
+            // 4) Defter kaydı.
+            //
+            // Ödendiyse **tahsilat** (nakit esaslı, kasada kapanan satış).
+            // Ödenmediyse **borç**: ürün stoktan çıktığına göre karşılığında bir
+            // alacak doğmuştur.
+            //
+            // Önceden yalnızca ilk dal vardı. Veresiye satışta HİÇ defter kaydı
+            // yazılmıyordu: ürünler stoktan kalıcı olarak düşüyor, üyenin
+            // bakiyesi sıfır görünüyor ve ödeme geldiğinde kaydedecek ekran
+            // bulunmuyordu. Para hiçbir yerde iz bırakmadan kayboluyordu.
+            if (finalPrice.isPositive) {
+                val etiket = buildString {
+                    append("Market satışı - Sipariş #").append(orderId.take(8))
+                    if (memberId == null) append(" (Misafir)")
+                }
+
+                if (paymentStatus == PaymentState.PAID) {
+                    ledgerRepository.recordPayment(
+                        amount = finalPrice,
+                        method = paymentMethod,
+                        description = etiket,
+                        category = LedgerCategory.MARKET,
+                        memberId = memberId,
+                        orderId = orderId,
+                        occurredAtMs = nowMs,
+                    ).getOrThrow()
+                } else {
+                    // Veresiye yalnızca üyeye açılabilir; misafirin takip
+                    // edilebilecek bir hesabı yok. Bu yukarıda zaten
+                    // reddediliyor, buradaki koşul o kuralın ikinci savunması.
+                    val borcluUye = memberId
+                        ?: throw IllegalStateException(
+                            "Misafire veresiye satış yapılamaz: borcu takip edilecek bir üye yok."
+                        )
+
+                    ledgerRepository.recordCharge(
+                        memberId = borcluUye,
+                        amount = finalPrice,
+                        description = "$etiket (veresiye)",
+                        category = LedgerCategory.MARKET,
+                        occurredAtMs = nowMs,
+                    ).getOrThrow()
+                }
             }
 
             orderId

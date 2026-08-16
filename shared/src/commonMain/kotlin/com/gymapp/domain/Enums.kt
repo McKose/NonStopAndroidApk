@@ -25,6 +25,22 @@ enum class MemberManualStatus { ACTIVE, FROZEN, ARCHIVED }
 /** Ödeme aracı. */
 enum class PaymentMethod { CASH, CARD, MULTISPORT }
 
+/**
+ * Tahsilat yapıldı mı?
+ *
+ * Serbest metindi (`"PAID"` / `"PENDING"`) ve bu dosyanın başındaki gerekçenin
+ * tam olarak elemek için var olduğu şeydi; iki para yazma yolu (üye kaydı ve
+ * market satışı) atlanmış. Metin olduğu sürece `"PAID"` dışındaki her değer —
+ * `"paid"`, ileride eklenecek bir `"PARTIAL"`, sunucudan gelen bozuk bir satır —
+ * tahsilatı SESSİZCE atlıyordu. Üstelik ekranlar iki farklı karşılaştırma
+ * kullanıyordu (`== "PENDING"` ve `!= "PAID"`), yani ikisinden de olmayan bir
+ * değer panelde hatırlatmayı kaybederken listede uyarı vermeye devam ediyordu.
+ *
+ * Saklanan metin değişmedi: `name` değerleri eskisiyle birebir aynı, dolayısıyla
+ * veritabanı göçü ve sunucu tarafında değişiklik gerekmiyor.
+ */
+enum class PaymentState { PAID, PENDING }
+
 /** Randevunun yaşam döngüsü. */
 enum class AppointmentState { SCHEDULED, COMPLETED, CANCELLED, POSTPONED, NO_SHOW }
 
@@ -162,6 +178,11 @@ fun PaymentMethod.labelTr(): String = when (this) {
     PaymentMethod.CASH -> "Nakit"
     PaymentMethod.CARD -> "Kart"
     PaymentMethod.MULTISPORT -> "MultiSpor"
+}
+
+fun PaymentState.labelTr(): String = when (this) {
+    PaymentState.PAID -> "Ödendi"
+    PaymentState.PENDING -> "Ödenmedi"
 }
 
 fun SessionCarryOver.labelTr(): String = when (this) {

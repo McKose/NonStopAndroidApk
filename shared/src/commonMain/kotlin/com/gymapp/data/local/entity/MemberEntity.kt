@@ -5,6 +5,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.gymapp.domain.MemberManualStatus
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.PaymentState
 
 /**
  * Salon üyesi.
@@ -71,8 +72,14 @@ data class MemberEntity(
     /** Vade farkı dahil ödenecek nihai tutar (kuruş). */
     val pricePaidMinor: Long = 0,
 
-    /** "PAID" | "PENDING" — gerçek bakiye defterden türetilir, bu kolon gösterim içindir. */
-    val paymentStatus: String = "PENDING",
+    /**
+     * Tahsilat durumu; gerçek bakiye defterden türetilir, bu kolon gösterim
+     * içindir.
+     *
+     * Serbest metindi ve `"PAID"` dışındaki her değer tahsilatı sessizce
+     * atlıyordu. Saklanan metin aynı (`name`), göç gerekmedi.
+     */
+    val paymentStatus: PaymentState = PaymentState.PENDING,
 
     val paymentDateMs: Long? = null,
 

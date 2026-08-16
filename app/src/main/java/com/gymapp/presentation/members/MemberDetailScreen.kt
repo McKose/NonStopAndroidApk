@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.MemberEntity
+import com.gymapp.domain.PaymentState
 import com.gymapp.domain.Decimals
 import com.gymapp.domain.Membership
 import com.gymapp.domain.PhoneNumber
@@ -127,8 +128,8 @@ fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = koinViewMo
                 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 
-                DetailRow(label = "Ödeme Durumu", value = if (member.paymentStatus == "PAID") "Ödendi" else "Ödeme Bekliyor")
-                if (member.paymentStatus == "PENDING") {
+                DetailRow(label = "Ödeme Durumu", value = member.paymentStatus.labelTr())
+                if (member.paymentStatus == PaymentState.PENDING) {
                     Button(
                         onClick = { viewModel.markAsPaid(member.id) },
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),

@@ -5,6 +5,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.gymapp.domain.DeliveryStatus
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.PaymentState
 
 /**
  * Market siparişi.
@@ -47,8 +48,8 @@ data class OrderEntity(
 
     val paymentMethod: PaymentMethod,
 
-    /** "PAID" | "PENDING" — üye ödeme durumu gibi ileride defterden türetilecek. */
-    val paymentStatus: String,
+    /** Tahsilat durumu. Saklanan metin `name`; göç gerekmedi. */
+    val paymentStatus: PaymentState,
 
     val deliveryStatus: DeliveryStatus,
 

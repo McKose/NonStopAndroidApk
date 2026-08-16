@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.OrderEntity
+import com.gymapp.domain.PaymentState
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import java.text.SimpleDateFormat
@@ -114,10 +115,10 @@ fun OrderItem(order: OrderEntity) {
                 
                 Column(horizontalAlignment = Alignment.End) {
                     Badge(
-                        containerColor = if (order.paymentStatus == "PAID") Color(0xFF4CAF50) else Color(0xFFF44336)
+                        containerColor = if (order.paymentStatus == PaymentState.PAID) Color(0xFF4CAF50) else Color(0xFFF44336)
                     ) {
                         Text(
-                            text = if (order.paymentStatus == "PAID") "ÖDENDİ" else "BEKLEMEDE",
+                            text = if (order.paymentStatus == PaymentState.PAID) "ÖDENDİ" else "BEKLEMEDE",
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                             color = Color.White
                         )

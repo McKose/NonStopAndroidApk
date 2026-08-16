@@ -17,6 +17,7 @@ import org.koin.androidx.compose.koinViewModel
 import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.PaymentState
 import com.gymapp.domain.SessionCarryOver
 import com.gymapp.domain.labelTr
 
@@ -227,8 +228,12 @@ fun RegisterMemberScreen(
             ) {
                 Text("Ödeme Yapıldı mı?", modifier = Modifier.weight(1f))
                 Switch(
-                    checked = formState.paymentStatus == "PAID",
-                    onCheckedChange = { viewModel.onPaymentStatusChange(if (it) "PAID" else "PENDING") }
+                    checked = formState.paymentStatus == PaymentState.PAID,
+                    onCheckedChange = {
+                        viewModel.onPaymentStatusChange(
+                            if (it) PaymentState.PAID else PaymentState.PENDING
+                        )
+                    }
                 )
             }
 

@@ -154,6 +154,28 @@ class AppointmentRepository(
                 val staff = staffDao.getStaffById(appointment.staffId)
                     ?: throw IllegalStateException("Randevuya bağlı eğitmen bulunamadı.")
 
+                // Kota kontrolü tamamlama anında da yapılıyor — yalnızca randevu
+                // alınırken değil.
+                //
+                // Sebep para: seans **tamamlanırken** düşüyor, ama randevu
+                // ALINIRKEN kontrol ediliyordu. 3 seanslık pakete arka arkaya 6
+                // randevu açılabiliyordu (her biri açılış anında `remaining > 0`
+                // görüyor) ve altısı da tamamlanabiliyordu. Sayaç 3→2→1→0→0→0
+                // gidiyor — `decrementSession` sıfırın altına inmiyor — ama
+                // hakediş koşulsuz yazıldığı için ALTI kayıt oluşuyordu:
+                // 300 TL gelire karşı 240 TL gider, doğrusu 120 TL.
+                //
+                // Sayaçtaki sessiz taban, negatif kotayı önlerken sorunun tek
+                // belirtisini de siliyordu. Kontrol burada, transaction içinde:
+                // okuma ile düşüm arasına başka bir tur giremiyor.
+                val kalanSeans = member.remainingSessions
+                if (kalanSeans != null && kalanSeans <= 0) {
+                    throw IllegalStateException(
+                        "${member.fullName} için kalan seans yok; randevu tamamlanamaz. " +
+                            "Önce paketi yenileyin."
+                    )
+                }
+
                 memberDao.decrementSession(appointment.memberId, nowMs)
 
                 // Matrah randevu anında donduruldu; boşsa üyeden hesaplanır (eski kayıtlar).

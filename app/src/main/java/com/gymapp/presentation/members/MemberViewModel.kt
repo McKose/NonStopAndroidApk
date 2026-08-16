@@ -8,6 +8,7 @@ import com.gymapp.data.repository.MemberRepository
 import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.PaymentState
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Pricing
 import com.gymapp.domain.SessionCarryOver
@@ -31,7 +32,7 @@ data class RegisterFormState(
     val installmentCount: Int = 1,
     val selectedPackage: PackageEntity? = null,
     val discount: String = "0",
-    val paymentStatus: String = "PAID", // PAID, PENDING
+    val paymentStatus: PaymentState = PaymentState.PAID,
     val paymentDateMs: Long? = System.currentTimeMillis(),
     val healthRisks: String = "",
     val healthNotes: String = "",
@@ -132,7 +133,7 @@ class MemberViewModel(
         }
     }
 
-    fun onPaymentStatusChange(status: String) {
+    fun onPaymentStatusChange(status: PaymentState) {
         _formState.update { it.copy(paymentStatus = status) }
     }
 

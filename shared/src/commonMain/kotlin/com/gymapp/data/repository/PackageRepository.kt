@@ -34,7 +34,19 @@ class PackageRepository(
 
     fun getAllPackages(): Flow<List<PackageEntity>> = packageDao.getAllPackages(tenantId)
 
-    suspend fun getPackageById(id: String): PackageEntity? = packageDao.getPackageById(id)
+    /**
+     * Ekranlar için tek paket; **silinmişler hariç**.
+     *
+     * Süzgeç artık burada, DAO'da değil. DAO ham satırı veriyor çünkü gönderim
+     * yolunun silinmiş satıra da erişmesi gerekiyor (bkz.
+     * [com.gymapp.data.local.dao.PackageDao.getPackageById]); hangi satırın
+     * kullanıcıya gösterileceği ise bir alan kuralı ve yeri burası.
+     *
+     * Süzgeç DAO'da kaldığı sürece ikisi aynı anda sağlanamıyordu ve gönderim
+     * tarafı sessizce kaybediyordu.
+     */
+    suspend fun getPackageById(id: String): PackageEntity? =
+        packageDao.getPackageById(id)?.takeIf { it.deletedAtMs == null }
 
     /**
      * Paketi kaydeder.
@@ -87,6 +99,15 @@ class PackageRepository(
                         validityDays = validityDays,
                         sessionCount = sessionCount,
                         basePriceMinor = basePrice.coerceNonNegative().minor,
+                        // Silinmiş bir kimliğe kayıt = **canlandırma**; üye
+                        // tarafındaki desenin aynısı (`registerMember`).
+                        //
+                        // Önceden DAO silinmişleri süzdüğü için `existing` null
+                        // gelir, `insertPackage` denenir ve birincil anahtar
+                        // çakışması ham SQLite hatası olarak dışarı çıkardı —
+                        // `StaffRepository` bu sınıf hatayı çevirirken burada
+                        // çevrilmiyordu. Artık o yol hiç oluşmuyor.
+                        deletedAtMs = null,
                         updatedAtMs = nowMs,
                     )
                 )

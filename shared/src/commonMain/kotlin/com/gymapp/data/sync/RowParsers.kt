@@ -16,6 +16,7 @@ import com.gymapp.domain.LedgerType
 import com.gymapp.domain.MemberManualStatus
 import com.gymapp.domain.PackageCategory
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.PaymentState
 import com.gymapp.domain.StaffRole
 import com.gymapp.domain.StockMovementReason
 import com.gymapp.domain.TrainingType
@@ -62,7 +63,7 @@ internal object RowParsers {
             packagePriceMinor = row.longOrNull("package_price_minor") ?: 0,
             discountMinor = row.longOrNull("discount_minor") ?: 0,
             pricePaidMinor = row.longOrNull("price_paid_minor") ?: 0,
-            paymentStatus = row.str("payment_status") ?: "PENDING",
+            paymentStatus = row.enum("payment_status", PaymentState.PENDING),
             paymentDateMs = row.longOrNull("payment_date_ms"),
             notes = row.strOrNull("notes"),
             healthRisks = row.strOrNull("health_risks"),
@@ -155,7 +156,12 @@ internal object RowParsers {
             discountMinor = row.longOrNull("discount_minor") ?: 0,
             finalPriceMinor = row.longOrNull("final_price_minor") ?: return null,
             paymentMethod = row.enum("payment_method", PaymentMethod.CASH),
-            paymentStatus = row.str("payment_status") ?: return null,
+            // Eksik/tanınmayan değerde PENDING. Önceden satır okunamaz
+            // sayılıyordu; okunamayan satır artık tabloyu durdurduğu için
+            // (tombstone düzeltmesi) bu, tek bir bozuk alanın bütün siparişleri
+            // durdurması demek olurdu. PENDING güvenli taraf: olmayan bir
+            // tahsilatı varmış saymıyor.
+            paymentStatus = row.enum("payment_status", PaymentState.PENDING),
             deliveryStatus = row.enum("delivery_status", DeliveryStatus.PRE_DELIVERY),
             dateMs = row.longOrNull("date_ms") ?: return null,
             notes = row.strOrNull("notes"),

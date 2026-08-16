@@ -8,6 +8,7 @@ import com.gymapp.domain.LedgerType
 import com.gymapp.domain.MemberManualStatus
 import com.gymapp.domain.PackageCategory
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.PaymentState
 import com.gymapp.domain.StaffRole
 import com.gymapp.domain.StockMovementReason
 import com.gymapp.domain.TrainingType
@@ -33,6 +34,12 @@ class Converters {
     @TypeConverter fun packageCategoryToName(value: PackageCategory): String = value.name
     @TypeConverter fun nameToPackageCategory(value: String): PackageCategory =
         enumOrDefault(value, PackageCategory.INDIVIDUAL)
+
+    @TypeConverter fun paymentStateToName(value: PaymentState): String = value.name
+    @TypeConverter fun nameToPaymentState(value: String): PaymentState =
+        // Tanınmayan değerde PENDING: olmayan bir tahsilatı varmış saymak,
+        // saymamaktan çok daha pahalı.
+        enumOrDefault(value, PaymentState.PENDING)
 
     @TypeConverter fun memberStatusToName(value: MemberManualStatus): String = value.name
     @TypeConverter fun nameToMemberStatus(value: String): MemberManualStatus =

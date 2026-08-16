@@ -16,6 +16,7 @@ import com.gymapp.domain.LedgerType
 import com.gymapp.domain.MemberManualStatus
 import com.gymapp.domain.PackageCategory
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.PaymentState
 import com.gymapp.domain.StaffRole
 import com.gymapp.domain.StockMovementReason
 import com.gymapp.domain.TrainingType
@@ -43,7 +44,7 @@ internal object SampleRows {
         remainingSessions = 9, startDateMs = 1, endDateMs = 2,
         status = MemberManualStatus.FROZEN, paymentType = PaymentMethod.MULTISPORT,
         installmentCount = 3, packagePriceMinor = 100, discountMinor = 10,
-        pricePaidMinor = 90, paymentStatus = "PAID", paymentDateMs = 1, notes = "not",
+        pricePaidMinor = 90, paymentStatus = PaymentState.PAID, paymentDateMs = 1, notes = "not",
         healthRisks = "yok", riskLevel = "LOW", healthNotes = "yok",
         createdAtMs = 1, updatedAtMs = 2, deletedAtMs = 3,
     )
@@ -79,7 +80,7 @@ internal object SampleRows {
     val order = OrderEntity(
         id = "o1", tenantId = TENANT, memberId = "m1", totalPriceMinor = 100,
         discountMinor = 10, finalPriceMinor = 90, paymentMethod = PaymentMethod.CARD,
-        paymentStatus = "PAID", deliveryStatus = DeliveryStatus.POST_DELIVERY,
+        paymentStatus = PaymentState.PAID, deliveryStatus = DeliveryStatus.POST_DELIVERY,
         dateMs = 1, notes = "not", createdAtMs = 1, updatedAtMs = 2, deletedAtMs = 3,
     )
 
