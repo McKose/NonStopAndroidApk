@@ -11,6 +11,7 @@ import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.DeliveryStatus
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.PaymentState
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -21,7 +22,7 @@ data class MarketUiState(
     val cart: Map<String, Int> = emptyMap(), // ProductId -> Quantity
     val selectedMemberId: String? = null,
     val paymentType: String = "CASH",
-    val paymentStatus: String = "PAID",
+    val paymentStatus: PaymentState = PaymentState.PAID,
     val deliveryStatus: String = "POST_DELIVERY",
     val discount: Double = 0.0,
     val notes: String = "",
@@ -77,7 +78,7 @@ private data class MarketForm(
     val cart: Map<String, Int> = emptyMap(),
     val selectedMemberId: String? = null,
     val paymentType: String = "CASH",
-    val paymentStatus: String = "PAID",
+    val paymentStatus: PaymentState = PaymentState.PAID,
     val deliveryStatus: String = "POST_DELIVERY",
     val discount: Double = 0.0,
     val notes: String = "",
@@ -155,7 +156,7 @@ class MarketViewModel(
 
     fun selectMember(memberId: String?) = _form.update { it.copy(selectedMemberId = memberId) }
     fun setPaymentType(type: String) = _form.update { it.copy(paymentType = type) }
-    fun setPaymentStatus(status: String) = _form.update { it.copy(paymentStatus = status) }
+    fun setPaymentStatus(status: PaymentState) = _form.update { it.copy(paymentStatus = status) }
     fun setDeliveryStatus(status: String) = _form.update { it.copy(deliveryStatus = status) }
     fun setNotes(notes: String) = _form.update { it.copy(notes = notes) }
 

@@ -26,6 +26,8 @@ import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.ProductEntity
 import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
+import com.gymapp.domain.PaymentState
+import com.gymapp.domain.labelTr
 import java.util.Locale
 
 private const val LOW_STOCK_THRESHOLD = 5
@@ -197,7 +199,7 @@ fun CheckoutContent(
     uiState: MarketUiState,
     onMemberSelect: (String?) -> Unit,
     onPaymentTypeSelect: (String) -> Unit,
-    onPaymentStatusSelect: (String) -> Unit,
+    onPaymentStatusSelect: (PaymentState) -> Unit,
     onDeliveryStatusSelect: (String) -> Unit,
     onDiscountChange: (String) -> Unit,
     onConfirm: () -> Unit
@@ -274,11 +276,13 @@ fun CheckoutContent(
         // Ödeme Durumu
         Text("Ödeme Durumu", style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("PAID" to "Ödendi", "PENDING" to "Ödenmedi").forEach { (valStr, label) ->
+            // Sabit metin listesi yerine enum: yeni bir durum eklendiğinde
+            // ekran kendiliğinden güncel kalıyor ve etiket tek yerden geliyor.
+            PaymentState.entries.forEach { durum ->
                 FilterChip(
-                    selected = uiState.paymentStatus == valStr,
-                    onClick = { onPaymentStatusSelect(valStr) },
-                    label = { Text(label) }
+                    selected = uiState.paymentStatus == durum,
+                    onClick = { onPaymentStatusSelect(durum) },
+                    label = { Text(durum.labelTr()) }
                 )
             }
         }

@@ -18,6 +18,7 @@ import com.gymapp.domain.Ids
 import com.gymapp.domain.MemberManualStatus
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.PaymentState
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Pricing
 import com.gymapp.domain.SessionCarryOver
@@ -73,7 +74,7 @@ class MemberRepository(
         paymentType: PaymentMethod,
         installmentCount: Int,
         discount: Double,
-        paymentStatus: String,
+        paymentStatus: PaymentState,
         paymentDateMs: Long?,
         healthRisks: String?,
         healthNotes: String?,
@@ -180,7 +181,7 @@ class MemberRepository(
         paymentType: PaymentMethod,
         installmentCount: Int,
         discount: Double,
-        paymentStatus: String,
+        paymentStatus: PaymentState,
         paymentDateMs: Long?,
         carryOver: SessionCarryOver,
     ): Result<Unit> = runCatching {
@@ -259,7 +260,7 @@ class MemberRepository(
         packageName: String,
         amount: Money,
         paymentType: PaymentMethod,
-        paymentStatus: String,
+        paymentStatus: PaymentState,
         occurredAtMs: Long,
         suffix: String?,
     ) {
@@ -274,7 +275,7 @@ class MemberRepository(
             occurredAtMs = occurredAtMs,
         ).getOrThrow()
 
-        if (paymentStatus == "PAID") {
+        if (paymentStatus == PaymentState.PAID) {
             ledgerRepository.recordPayment(
                 amount = amount,
                 method = paymentType,
@@ -319,7 +320,7 @@ class MemberRepository(
                 ).getOrThrow()
 
                 memberDao.updateMember(
-                    member.copy(paymentStatus = "PAID", paymentDateMs = nowMs, updatedAtMs = nowMs)
+                    member.copy(paymentStatus = PaymentState.PAID, paymentDateMs = nowMs, updatedAtMs = nowMs)
                 )
                 syncQueue.enqueue(SyncTable.MEMBERS, memberId, tenantId, nowMs)
             } else {
@@ -331,7 +332,7 @@ class MemberRepository(
                 if (reversed == 0) return@inTransaction
 
                 memberDao.updateMember(
-                    member.copy(paymentStatus = "PENDING", paymentDateMs = null, updatedAtMs = nowMs)
+                    member.copy(paymentStatus = PaymentState.PENDING, paymentDateMs = null, updatedAtMs = nowMs)
                 )
                 syncQueue.enqueue(SyncTable.MEMBERS, memberId, tenantId, nowMs)
             }

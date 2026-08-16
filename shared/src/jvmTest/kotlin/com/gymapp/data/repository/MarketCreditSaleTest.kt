@@ -8,6 +8,7 @@ import com.gymapp.data.testTenants
 import com.gymapp.domain.DeliveryStatus
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.PaymentState
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -72,7 +73,7 @@ class MarketCreditSaleTest {
             memberId = uye,
             cartItems = mapOf(urun to 3),
             paymentMethod = PaymentMethod.CASH,
-            paymentStatus = "PENDING",
+            paymentStatus = PaymentState.PENDING,
             deliveryStatus = DeliveryStatus.POST_DELIVERY,
         ).getOrElse { fail("Satış başarısız: $it") }
 
@@ -96,7 +97,7 @@ class MarketCreditSaleTest {
             memberId = uye,
             cartItems = mapOf(urun to 3),
             paymentMethod = PaymentMethod.CASH,
-            paymentStatus = "PENDING",
+            paymentStatus = PaymentState.PENDING,
             deliveryStatus = DeliveryStatus.POST_DELIVERY,
         ).getOrThrow()
 
@@ -118,7 +119,7 @@ class MarketCreditSaleTest {
             memberId = uye,
             cartItems = mapOf(urun to 3),
             paymentMethod = PaymentMethod.CASH,
-            paymentStatus = "PENDING",
+            paymentStatus = PaymentState.PENDING,
             deliveryStatus = DeliveryStatus.POST_DELIVERY,
         ).getOrThrow()
 
@@ -139,7 +140,7 @@ class MarketCreditSaleTest {
             memberId = null,
             cartItems = mapOf(urun to 1),
             paymentMethod = PaymentMethod.CASH,
-            paymentStatus = "PENDING",
+            paymentStatus = PaymentState.PENDING,
             deliveryStatus = DeliveryStatus.POST_DELIVERY,
         )
 
@@ -167,7 +168,7 @@ class MarketCreditSaleTest {
             memberId = uye,
             cartItems = mapOf(urun to 3),
             paymentMethod = PaymentMethod.CASH,
-            paymentStatus = "PAID",
+            paymentStatus = PaymentState.PAID,
             deliveryStatus = DeliveryStatus.POST_DELIVERY,
         ).getOrThrow()
 
@@ -183,7 +184,7 @@ class MarketCreditSaleTest {
             memberId = null,
             cartItems = mapOf(urun to 1),
             paymentMethod = PaymentMethod.CASH,
-            paymentStatus = "PAID",
+            paymentStatus = PaymentState.PAID,
             deliveryStatus = DeliveryStatus.POST_DELIVERY,
         )
 
@@ -204,7 +205,7 @@ class MarketCreditSaleTest {
             memberId = uye,
             cartItems = mapOf(urun to 5),
             paymentMethod = PaymentMethod.CASH,
-            paymentStatus = "PENDING",
+            paymentStatus = PaymentState.PENDING,
             deliveryStatus = DeliveryStatus.POST_DELIVERY,
         )
 

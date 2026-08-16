@@ -13,6 +13,7 @@ import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.MemberManualStatus
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.PaymentState
 import com.gymapp.domain.StaffRole
 import com.gymapp.domain.TrainingType
 import kotlinx.coroutines.flow.first
@@ -71,7 +72,7 @@ class AppointmentCommissionTest {
                 startDateMs = 0, endDateMs = Long.MAX_VALUE,
                 status = MemberManualStatus.ACTIVE, paymentType = PaymentMethod.CASH,
                 installmentCount = 1, packagePriceMinor = 30_000,
-                discountMinor = 0, pricePaidMinor = 30_000, paymentStatus = "PAID",
+                discountMinor = 0, pricePaidMinor = 30_000, paymentStatus = PaymentState.PAID,
                 riskLevel = "LOW", createdAtMs = 0, updatedAtMs = 0,
             )
         )

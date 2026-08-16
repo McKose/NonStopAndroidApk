@@ -13,6 +13,7 @@ import com.gymapp.data.repository.StaffRepository
 import com.gymapp.domain.Membership
 import com.gymapp.domain.MembershipState
 import com.gymapp.domain.Money
+import com.gymapp.domain.PaymentState
 import com.gymapp.domain.Periods
 import com.gymapp.domain.StaffRole
 import kotlinx.coroutines.flow.*
@@ -103,7 +104,7 @@ class DashboardViewModel(
 
         // Bekleyen ödemeler — arşivlenmiş üyeler için uyarı üretme.
         members.filter {
-            it.paymentStatus == "PENDING" &&
+            it.paymentStatus == PaymentState.PENDING &&
                 Membership.stateOf(it.status, it.endDateMs, now) != MembershipState.PASSIVE
         }.forEach {
             alerts.add("Ödeme Bekliyor: ${it.fullName} (₺${Money(it.pricePaidMinor)})")

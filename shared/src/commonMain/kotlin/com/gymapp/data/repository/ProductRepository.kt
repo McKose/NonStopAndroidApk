@@ -18,6 +18,7 @@ import com.gymapp.domain.Ids
 import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.PaymentState
 import com.gymapp.domain.StockMovementReason
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -153,7 +154,7 @@ class ProductRepository(
         memberId: String?,
         cartItems: Map<String, Int>,
         paymentMethod: PaymentMethod,
-        paymentStatus: String,
+        paymentStatus: PaymentState,
         deliveryStatus: DeliveryStatus,
         discount: Money = Money.ZERO,
         notes: String? = null
@@ -163,7 +164,7 @@ class ProductRepository(
         // Veresiye satışın karşılığı üyeye açılan bir alacaktır; misafirin takip
         // edilebilecek bir hesabı yok. İzin verilseydi ürün stoktan çıkar ve
         // borç hiçbir yere yazılamazdı.
-        require(!(paymentStatus != "PAID" && memberId == null)) {
+        require(!(paymentStatus == PaymentState.PENDING && memberId == null)) {
             "Ödenmemiş satış için üye seçilmelidir; misafire veresiye satılamaz."
         }
 
@@ -243,7 +244,7 @@ class ProductRepository(
                     if (memberId == null) append(" (Misafir)")
                 }
 
-                if (paymentStatus == "PAID") {
+                if (paymentStatus == PaymentState.PAID) {
                     ledgerRepository.recordPayment(
                         amount = finalPrice,
                         method = paymentMethod,

@@ -22,6 +22,7 @@ import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Membership
 import com.gymapp.domain.MembershipState
+import com.gymapp.domain.PaymentState
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.labelTr
 
@@ -172,7 +173,7 @@ fun MemberItem(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(text = member.fullName, style = MaterialTheme.typography.titleMedium)
-                    if (member.paymentStatus != "PAID") {
+                    if (member.paymentStatus == PaymentState.PENDING) {
                         Surface(
                             color = MaterialTheme.colorScheme.errorContainer,
                             shape = androidx.compose.foundation.shape.CircleShape,
