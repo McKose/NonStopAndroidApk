@@ -311,6 +311,10 @@ class MemberViewModel(
     fun getMeasurements(memberId: String): Flow<List<com.gymapp.data.local.entity.MeasurementEntity>> =
         repository.getMeasurementsForMember(memberId)
 
+    /** Üyenin işlem geçmişi; ekrandaki sabit metnin yerini alıyor. */
+    fun getLedgerForMember(memberId: String): Flow<List<com.gymapp.data.local.entity.LedgerEntryEntity>> =
+        repository.observeLedgerForMember(memberId)
+
     fun addMeasurement(
         memberId: String,
         height: Double,

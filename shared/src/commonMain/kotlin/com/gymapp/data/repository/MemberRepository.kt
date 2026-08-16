@@ -7,6 +7,7 @@ import com.gymapp.data.local.dao.MemberDao
 import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.db.inTransaction
 import com.gymapp.data.local.db.isUniqueConstraintViolation
+import com.gymapp.data.local.entity.LedgerEntryEntity
 import com.gymapp.data.local.entity.MeasurementEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.PackageEntity
@@ -371,6 +372,17 @@ class MemberRepository(
     /** Üyenin kalan borcu — defterden türetilir, üye satırındaki kolondan değil. */
     suspend fun outstandingBalance(memberId: String): Money =
         ledgerRepository.outstandingBalance(memberId)
+
+    /**
+     * Üyenin işlem geçmişi (tahakkuk ve tahsilatlar).
+     *
+     * Veri katmanı hazırdı ([LedgerRepository.observeForMember]) ama hiçbir ekran
+     * çağırmıyordu: üye detayındaki "Paket Geçmişi" bölümü sabit bir
+     * "Henüz geçmiş işlem bulunmuyor." metniydi ve kayıt olsa da olmasa da aynı
+     * şeyi yazıyordu.
+     */
+    fun observeLedgerForMember(memberId: String): Flow<List<LedgerEntryEntity>> =
+        ledgerRepository.observeForMember(memberId)
 
     // ─── Sorgu metodları ──────────────────────────────────────────────────────
 

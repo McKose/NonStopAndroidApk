@@ -30,6 +30,7 @@ fun OrderHistoryScreen(
     viewModel: OrderHistoryViewModel = koinViewModel()
 ) {
     val orders by viewModel.orders.collectAsState()
+    val memberNames by viewModel.memberNames.collectAsState()
 
     Scaffold(
         topBar = {
@@ -61,7 +62,7 @@ fun OrderHistoryScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(orders) { order ->
-                    OrderItem(order)
+                    OrderItem(order, memberNames)
                 }
             }
         }
@@ -69,7 +70,7 @@ fun OrderHistoryScreen(
 }
 
 @Composable
-fun OrderItem(order: OrderEntity) {
+fun OrderItem(order: OrderEntity, memberNames: Map<String, String> = emptyMap()) {
     val sdf = remember { SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("tr")) }
     
     Card(
@@ -103,7 +104,14 @@ fun OrderItem(order: OrderEntity) {
             ) {
                 Column {
                     Text(
-                        text = if (order.memberId == null) "Misafir Müşteri" else "Üye ID: ${order.memberId}",
+                        // Ham UUID yerine ad. Önceden "Üye ID: 9f3c1a0e-…"
+                        // basılıyordu; hangi üyenin ne aldığı ekrandan
+                        // okunamıyordu. Adı bulunamayan kimlik silinmiş üyeye
+                        // ait: kimliği göstermek yine okunmaz olurdu.
+                        text = when (val uyeId = order.memberId) {
+                            null -> "Misafir Müşteri"
+                            else -> memberNames[uyeId] ?: "Silinmiş üye"
+                        },
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
