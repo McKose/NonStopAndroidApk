@@ -31,6 +31,39 @@ data class MarketUiState(
     val isCheckingOut: Boolean = false,
 ) {
     fun stockOf(productId: String): Int = stockByProduct[productId] ?: 0
+
+    // ─── Sepet tutarları ────────────────────────────────────────────────────
+    //
+    // Burada, ekranda değil. Ekran bu hesabı İKİ ayrı yerde `Double` ile
+    // tekrarlıyordu; gerçek tutar ise kuruş tam sayısıyla hesaplanıyor
+    // (`ProductRepository.processOrder`). İki ayrı aritmetik, gösterilen ile
+    // çekilen tutarın sapması demekti.
+    //
+    // İfadeler deponunkiyle birebir aynı — sapmanın kaynağı buydu.
+
+    /** Sepetin iskonto öncesi tutarı. */
+    val cartTotal: Money
+        get() = Money(
+            cart.entries.sumOf { (id, adet) ->
+                (products.find { it.id == id }?.priceMinor ?: 0L) * adet
+            }
+        )
+
+    /**
+     * Uygulanan iskonto — sepeti **aşamaz**.
+     *
+     * Ekran kırpmıyordu, depo kırpıyordu. 50 TL'lik sepete 80 TL iskonto
+     * girildiğinde ekran "₺-30,00" gösteriyor, kaydedilen siparişin nihai tutarı
+     * ise 0 oluyordu. Üstelik `processOrder` tahsilatı yalnızca tutar pozitifken
+     * yazdığı için, "ÖDENDİ" işaretli o sipariş **hiç tahsilat yazmıyordu**:
+     * ürünler stoktan çıkıyor, gelir sıfır kalıyordu.
+     */
+    val cartDiscount: Money
+        get() = Money.ofMajor(discount).coerceNonNegative().coerceAtMost(cartTotal)
+
+    /** Tahsil edilecek tutar. */
+    val cartFinal: Money
+        get() = cartTotal - cartDiscount
 }
 
 /** Bir kez tüketilen kullanıcı bildirimleri (Snackbar). */

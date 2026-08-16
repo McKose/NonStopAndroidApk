@@ -101,6 +101,11 @@ dependencies {
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
     testImplementation(libs.junit)
+    // `kotlin.test` — `:shared` zaten bunu kullanıyor, `app` kullanmıyordu.
+    // Sebebi basit: `app/src/test` BOŞTU. CI'daki "Uygulama birim testleri"
+    // adımı sıfır test koşuyor ve doğal olarak geçiyordu; yeşil olması bir şey
+    // sınandığı anlamına gelmiyordu. JUnit4 üzerine oturuyor, ayrı koşucu yok.
+    testImplementation(kotlin("test"))
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

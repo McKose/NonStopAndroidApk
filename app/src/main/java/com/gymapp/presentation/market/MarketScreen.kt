@@ -113,9 +113,10 @@ fun MarketScreen(
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
                 ) {
                     val totalItems = uiState.cart.values.sum()
-                    val totalPrice = uiState.cart.map { (id, qty) -> 
-                        Money(uiState.products.find { it.id == id }?.priceMinor ?: 0L).asDouble * qty 
-                    }.sum()
+                    // Ara toplam (iskonto ödeme sayfasında giriliyor). Tutar
+                    // artık burada hesaplanmıyor: ekran kuruş yerine `Double`
+                    // ile topluyordu ve gerçek tutardan sapabiliyordu.
+                    val totalPrice = uiState.cartTotal.asDouble
 
                     Row(
                         modifier = Modifier.padding(24.dp).fillMaxWidth(),
@@ -296,15 +297,23 @@ fun CheckoutContent(
 
         Spacer(Modifier.height(16.dp))
 
-        val totalPrice = uiState.cart.map { (id, qty) -> 
-            Money(uiState.products.find { it.id == id }?.priceMinor ?: 0L).asDouble * qty 
-        }.sum()
-        val finalPrice = totalPrice - uiState.discount
+        val totalPrice = uiState.cartTotal.asDouble
+        val appliedDiscount = uiState.cartDiscount.asDouble
+        val finalPrice = uiState.cartFinal.asDouble
 
         Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
             Text("Ara Toplam: ₺${String.format(Locale.getDefault(), "%.2f", totalPrice)}", style = MaterialTheme.typography.bodyMedium)
-            if (uiState.discount > 0) {
-                Text("İndirim: -₺${String.format(Locale.getDefault(), "%.2f", uiState.discount)}", style = MaterialTheme.typography.bodyMedium, color = Color.Red)
+            if (appliedDiscount > 0) {
+                Text("İndirim: -₺${String.format(Locale.getDefault(), "%.2f", appliedDiscount)}", style = MaterialTheme.typography.bodyMedium, color = Color.Red)
+            }
+            // Girilen iskonto sepeti aşıyorsa sessizce kırpmak yerine söyleniyor:
+            // kasiyer 80 yazıp 50 uygulandığını görmeliyse, görmeli.
+            if (uiState.discount > appliedDiscount) {
+                Text(
+                    "Girilen indirim sepeti aşıyor; ₺${String.format(Locale.getDefault(), "%.2f", appliedDiscount)} uygulandı.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Red,
+                )
             }
             Text("Genel Toplam: ₺${String.format(Locale.getDefault(), "%.2f", finalPrice)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         }
