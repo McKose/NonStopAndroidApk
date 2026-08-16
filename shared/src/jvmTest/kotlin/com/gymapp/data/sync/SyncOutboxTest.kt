@@ -94,7 +94,7 @@ class SyncOutboxTest {
         val afterSave = db.syncOutboxDao().peek(TEST_TENANT, limit = 10).single()
         db.syncOutboxDao().removeIfUnchanged(afterSave.id, afterSave.revision)
 
-        packages.deletePackage(id)
+        packages.deletePackage(id).getOrThrow()
 
         val pending = db.syncOutboxDao().peek(TEST_TENANT, limit = 10)
         assertEquals(1, pending.size)

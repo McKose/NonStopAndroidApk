@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 /** Bir kez tüketilen kullanıcı bildirimleri. */
 sealed interface PersonnelEvent {
     data object Saved : PersonnelEvent
+    data object Deleted : PersonnelEvent
     data class Failed(val message: String) : PersonnelEvent
 }
 
@@ -105,7 +106,12 @@ class PersonnelViewModel(
             return
         }
         viewModelScope.launch {
-            repository.deleteStaff(staffId)
+            repository.deleteStaff(staffId).fold(
+                onSuccess = { _events.send(PersonnelEvent.Deleted) },
+                onFailure = {
+                    _events.send(PersonnelEvent.Failed(it.message ?: "Personel silinemedi."))
+                },
+            )
         }
     }
 

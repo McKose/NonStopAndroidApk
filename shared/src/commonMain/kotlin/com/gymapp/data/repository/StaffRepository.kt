@@ -174,7 +174,7 @@ class StaffRepository(
     }
 
     /** Silme de bir değişiklik: tombstone satır kuyruğa girmezse silme senkronize olmaz. */
-    suspend fun deleteStaff(staffId: String) {
+    suspend fun deleteStaff(staffId: String): Result<Unit> = runCatching {
         val nowMs = Now.epochMillis()
         database.inTransaction {
             staffDao.softDelete(staffId, nowMs)

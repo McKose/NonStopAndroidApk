@@ -57,6 +57,8 @@ fun AddPackageScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is PackageEvent.Saved -> onNavigateBack()
+                // Silme bu ekrandan yapılamıyor; liste ekranı bildiriyor.
+                is PackageEvent.Deleted -> Unit
                 is PackageEvent.Failed -> snackbarHostState.showSnackbar(event.message)
             }
         }
