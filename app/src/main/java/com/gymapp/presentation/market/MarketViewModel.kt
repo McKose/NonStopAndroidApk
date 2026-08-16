@@ -70,6 +70,7 @@ data class MarketUiState(
 /** Bir kez tüketilen kullanıcı bildirimleri (Snackbar). */
 sealed interface MarketEvent {
     data class OrderCompleted(val orderId: String) : MarketEvent
+    data object ProductSaved : MarketEvent
     data object ProductDeleted : MarketEvent
     data class Failed(val message: String) : MarketEvent
 }
@@ -230,7 +231,12 @@ class MarketViewModel(
                 category = category,
                 price = Money.ofMajor(price),
                 desiredStock = stock,
-            ).onFailure { _events.send(MarketEvent.Failed(it.message ?: "Ürün kaydedilemedi.")) }
+            ).fold(
+                // Başarı da bildiriliyor: önceden yalnızca hata gönderiliyordu,
+                // yani kaydın gerçekten yazılıp yazılmadığı ekrandan anlaşılmıyordu.
+                onSuccess = { _events.send(MarketEvent.ProductSaved) },
+                onFailure = { _events.send(MarketEvent.Failed(it.message ?: "Ürün kaydedilemedi.")) },
+            )
         }
     }
 

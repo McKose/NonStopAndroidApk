@@ -23,6 +23,7 @@ import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.PaymentState
 import com.gymapp.domain.Decimals
 import com.gymapp.domain.Membership
+import com.gymapp.domain.Money
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.SessionQuota
 import com.gymapp.domain.labelTr
@@ -53,6 +54,7 @@ fun MemberDetailScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is MemberEvent.Deleted -> onNavigateBack()
+                is MemberEvent.Saved -> snackbarHostState.showSnackbar(event.message)
                 is MemberEvent.Failed -> {
                     siliniyor = false
                     snackbarHostState.showSnackbar(event.message)
@@ -153,9 +155,37 @@ fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = koinViewMo
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 
                 DetailRow(label = "Ödeme Durumu", value = member.paymentStatus.labelTr())
+
+                // Kalan borç artık ekranda. Önceden hiçbir yerde
+                // gösterilmiyordu; oysa "Ödemeyi Onayla" tam olarak bu tutarı
+                // tahsil ediyordu.
+                var kalanBorc by remember(member.id) { mutableStateOf<Money?>(null) }
+                LaunchedEffect(member.id, member.paymentStatus) {
+                    kalanBorc = viewModel.outstandingBalance(member.id)
+                }
+                kalanBorc?.let { borc ->
+                    if (borc.isPositive) DetailRow(label = "Kalan Borç", value = "₺$borc")
+                }
+
+                var tahsilatAcik by remember { mutableStateOf(false) }
+                if (tahsilatAcik) {
+                    PaymentDialog(
+                        memberName = member.fullName,
+                        outstanding = kalanBorc ?: Money.ZERO,
+                        onConfirm = { tutar ->
+                            tahsilatAcik = false
+                            viewModel.markAsPaid(member.id, tutar)
+                        },
+                        onDismiss = { tahsilatAcik = false },
+                    )
+                }
+
                 if (member.paymentStatus == PaymentState.PENDING) {
                     Button(
-                        onClick = { viewModel.markAsPaid(member.id) },
+                        // Borç okunana kadar pasif: tutarı bilmeden tahsilat
+                        // diyaloğu açmak, düzeltilen hatanın aynısı olurdu.
+                        enabled = kalanBorc?.isPositive == true,
+                        onClick = { tahsilatAcik = true },
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                     ) {
