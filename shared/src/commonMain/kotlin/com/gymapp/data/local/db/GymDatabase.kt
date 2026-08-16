@@ -87,6 +87,9 @@ abstract class GymDatabase : RoomDatabase() {
     abstract fun stockMovementDao(): StockMovementDao
     abstract fun syncOutboxDao(): SyncOutboxDao
     abstract fun syncPullStateDao(): SyncPullStateDao
+
+    /** Çıkışta yerel veriyi silmek için; bkz. [MaintenanceDao]. */
+    abstract fun maintenanceDao(): MaintenanceDao
 }
 
 /**

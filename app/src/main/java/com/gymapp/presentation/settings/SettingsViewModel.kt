@@ -12,8 +12,6 @@ import com.gymapp.data.sync.ArkaPlanSenkronizasyonu
 import com.gymapp.data.sync.SyncCoordinator
 import com.gymapp.data.sync.SyncQueue
 import com.gymapp.data.sync.SyncState
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -118,9 +116,11 @@ class SettingsViewModel(
         // dakikada bir uyanıp "oturum yok" deyip geri yatardı. Ayrıca yarıda
         // kalmış bir turun temizlenen tabloya yazmasını da engelliyor.
         arkaPlan.durdur()
-        // Ana iş parçacığında değil: `viewModelScope` ana iş parçacığında koşuyor
-        // ve Room orada disk erişimini reddediyor.
-        withContext(Dispatchers.IO) { database.clearAllTables() }
+        // Room'un `clearAllTables`'ı ortak (KMP) yüzeyde yok; silme ortak kodda
+        // açıkça yazıldı ki iOS'ta da geçerli olsun ve testi gerçek SQLite
+        // üzerinde koşabilsin. Askıya alınabilir olduğu için Room kendi iş
+        // parçacığına geçiyor — ana iş parçacığı bloke olmuyor.
+        database.maintenanceDao().wipeAll()
         sessions.signOut()
         prefs.clearSession()
         onLogout()
