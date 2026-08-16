@@ -18,6 +18,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.domain.labelTr
+import com.gymapp.data.access.AppDestination
+import com.gymapp.presentation.common.ReadOnlyNotice
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.StaffEntity
@@ -40,10 +42,15 @@ fun DashboardScreen(
             TopAppBar(
                 title = { Text("Non Stop", fontWeight = FontWeight.Bold) },
                 actions = {
-                    if (!uiState.isTrainer) {
+                    // Ayarlar herkeste duruyor: "Çıkış Yap" burada. Eskiden
+                    // eğitmene gizleniyordu ve uygulamadan çıkmanın tek yolu
+                    // üye listesindeki çekmeceden dolaşmaktı.
+                    if (uiState.gorebilir(AppDestination.SETTINGS)) {
                         IconButton(onClick = onNavigateToSettings) {
                             Icon(Icons.Default.Settings, contentDescription = "Ayarlar")
                         }
+                    }
+                    if (uiState.gorebilir(AppDestination.PACKAGES)) {
                         IconButton(onClick = onNavigateToPackages) {
                             Icon(Icons.Default.Inventory, contentDescription = "Paketler")
                         }
@@ -59,6 +66,21 @@ fun DashboardScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // Eğitmenin hesabı bir personel kaydına bağlı değilse pano boş
+            // görünür. Sebebini yazmadan boş bırakmak, kullanıcıya "uygulama
+            // verimi kaybetti" dedirtiyordu; asıl gereken iş salon sahibinde.
+            if (uiState.personelBaglantisiYok) {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ReadOnlyNotice(
+                        "Hesabınız bir personel kaydına bağlı olmadığı için kendi " +
+                            "dersleriniz ve üyeleriniz listelenemiyor. Salon sahibinin " +
+                            "Ayarlar → Personel Yönetimi'nden kartınıza Supabase " +
+                            "kullanıcı kimliğinizi girmesi gerekiyor."
+                    )
+                }
+            }
+
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 // ─── İstatistik Kartları (Pill Design) ──────────────────────
@@ -89,29 +111,37 @@ fun DashboardScreen(
             item {
                 Text("Hızlı Erişim", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    QuickActionCard("Takvim", Icons.Default.CalendarMonth, Modifier.weight(1f), onNavigateToCalendar)
-                    QuickActionCard("Üyeler", Icons.Default.Groups, Modifier.weight(1f), onNavigateToMembers)
-                }
-                if (!uiState.isTrainer) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                // Kısayollar rolün görebildiği hedeflerden üretiliyor; hangi
+                // rolün neyi göreceği tek yerde (`AppDestination`). Eskiden
+                // burada elle yazılmış bir "eğitmen değilse" koşulu vardı ve
+                // üye listesindeki çekmece aynı kararı bağımsız veriyordu:
+                // pano dördünü gizlerken çekmece dördünü de açıyordu.
+                val kisayollar = buildList {
+                    add(Kisayol(AppDestination.CALENDAR, "Takvim", Icons.Default.CalendarMonth, onNavigateToCalendar))
+                    add(Kisayol(AppDestination.MEMBERS, "Üyeler", Icons.Default.Groups, onNavigateToMembers))
+                    add(Kisayol(AppDestination.PACKAGES, "Paketler", Icons.Default.Inventory, onNavigateToPackages))
+                    add(Kisayol(AppDestination.MARKET, "Market", Icons.Default.ShoppingCart, onNavigateToMarket))
+                    add(Kisayol(AppDestination.FINANCE, "Finans", Icons.Default.Payments, onNavigateToFinance))
+                    add(Kisayol(AppDestination.SETTINGS, "Ayarlar", Icons.Default.Settings, onNavigateToSettings))
+                }.filter { uiState.gorebilir(it.destination) }
+
+                kisayollar.chunked(2).forEachIndexed { index, satir ->
+                    if (index > 0) Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        QuickActionCard("Paketler", Icons.Default.Inventory, Modifier.weight(1f), onNavigateToPackages)
-                        QuickActionCard("Market", Icons.Default.ShoppingCart, Modifier.weight(1f), onNavigateToMarket)
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        QuickActionCard("Finans", Icons.Default.Payments, Modifier.weight(1f), onNavigateToFinance)
-                        QuickActionCard("Ayarlar", Icons.Default.Settings, Modifier.weight(1f), onNavigateToSettings)
+                        satir.forEach { kisayol ->
+                            QuickActionCard(
+                                kisayol.label,
+                                kisayol.icon,
+                                Modifier.weight(1f),
+                                kisayol.onClick,
+                            )
+                        }
+                        // Tek kalan kartın satırın tamamına yayılmaması için
+                        // boş bir ağırlık bırakılıyor.
+                        if (satir.size == 1) Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -148,6 +178,14 @@ fun DashboardScreen(
         }
     }
 }
+
+/** Panodaki bir hızlı erişim kartı ve hangi hedefe ait olduğu. */
+private data class Kisayol(
+    val destination: AppDestination,
+    val label: String,
+    val icon: ImageVector,
+    val onClick: () -> Unit,
+)
 
 @Composable
 fun StatCard(label: String, value: String, icon: ImageVector, containerColor: Color) {

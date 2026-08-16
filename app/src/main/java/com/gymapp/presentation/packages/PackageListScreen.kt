@@ -26,7 +26,7 @@ fun PackageListScreen(
     viewModel: PackageViewModel = koinViewModel()
 ) {
     val packages by viewModel.packages.collectAsState()
-    val canWrite = viewModel.canWrite
+    val canWrite by viewModel.canWrite.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Silme sonucu artık her durumda bildiriliyor. Önceden `deletePackage`

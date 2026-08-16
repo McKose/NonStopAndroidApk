@@ -202,6 +202,51 @@ değiştirilebilir. Sunucudaki değer ise erişim kurallarının dayanağıyla a
 yerde duruyor. En dar yetkiye düşmek de bilinçli: bir yazım hatasının yönetici
 yetkisi vermesi, yetki vermemesinden çok daha pahalı.
 
+## Rol tek kaynaktan ve tepkili okunur
+
+**Karar:** Rol yalnızca oturumdan (`Session.role`) okunur ve akış olarak
+verilir (`CurrentUser`). Cihazda ikinci bir kopya tutulmaz.
+
+**Neden:** Kopya girişte yazılıyordu, yalnızca orada. Uygulama açılışında oturum
+`SessionManager.restore()` ile geri yükleniyor ve o yol kopyaya hiç dokunmuyordu:
+sunucuda rolü düşürülen kullanıcı, cihazda giriş ekranından geçmediği sürece eski
+yetkisiyle çalışmaya devam ediyordu. Kopya ayrıca tepkisizdi — ekranlar rolü ya
+ViewModel kurulurken bir kez ya da bir `combine` bloğunun içinde okuyordu.
+
+Personel bağlantısı (`staff.id`) da aynı sebeple akış: kart sonradan
+doldurulduğunda ya da satır senkronizasyonla indiğinde kullanıcının çıkıp
+yeniden girmesi gerekmiyor.
+
+## "Bağlantı yok" ile "kayıt yok" ayrı şeyler
+
+**Karar:** Personel bağlantısı üç durumlu (`StaffLink`): oturum yok, bağlantı
+kurulmamış, bağlı. Boş metinle temsil edilmiyor.
+
+**Neden:** Boş kimlikle yapılan karşılaştırma her zaman boş liste veriyordu ve
+ekran bunu "sizin dersiniz/üyeniz yok" diye gösteriyordu. Oysa doğru cümle "kim
+olduğunuzu bilmiyoruz" ve yapılacak iş salon sahibinde: personel kartına Supabase
+kimliğini girmek. Eğitmen boş bir pano görüp uygulamanın verisini kaybettiğini
+sanıyordu.
+
+## Ekran görünürlüğü de tek kaynakta
+
+**Karar:** Hangi rolün hangi ekranı göreceği `AppDestination` içinde; ekranlar bu
+kararı kendileri vermiyor. Finans yalnızca salon sahibi ve yöneticide; Ayarlar
+**her** rolde açık.
+
+**Neden:** Aynı karar iki ekranda birbirinden habersiz kopyalanmıştı. Pano
+eğitmene Finans, Market, Paketler ve Ayarlar kısayollarını gizliyordu; üye
+listesindeki çekmece aynı dört hedefi herkese açıyordu — yani kısıt gerçek bir
+kısıt değildi, yalnızca bir ekranda görünmeyen bir düğmeydi.
+
+Ayarlar'ın herkese açık olması zorunlu: "Çıkış Yap" orada. Panonun eğitmene
+Ayarlar'ı gizlemesi, çekmecedeki ikinci yol olmasa eğitmenin uygulamadan hiç
+çıkamaması demekti.
+
+**Sınır değil:** Okuma sunucuda salona bağlı herkese açık (migrasyon `0004`);
+bu gizleme bir güvenlik sınırı değil, arayüz kararı. Gerçek sınır yazma
+tarafında ve o sunucuda.
+
 ## Salon kimliği oturumdan gelir
 
 **Karar:** `tenantId` sabit değil; `TenantProvider` üzerinden oturumdan okunuyor

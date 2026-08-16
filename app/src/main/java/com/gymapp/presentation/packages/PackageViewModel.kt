@@ -3,7 +3,7 @@ package com.gymapp.presentation.packages
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.entity.PackageEntity
-import com.gymapp.data.local.preferences.AppPreferences
+import com.gymapp.data.auth.CurrentUser
 import com.gymapp.data.repository.PackageRepository
 import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.Money
@@ -12,6 +12,7 @@ import com.gymapp.domain.TrainingType
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -26,7 +27,7 @@ sealed interface PackageEvent {
 
 class PackageViewModel(
     private val repository: PackageRepository,
-    prefs: AppPreferences,
+    currentUser: CurrentUser,
 ) : ViewModel() {
 
     /**
@@ -37,8 +38,19 @@ class PackageViewModel(
      * satış yapabilmesi için de gerekmiyor. Buradaki kontrol, yetkisiz
      * kullanıcının işi yapıp sonucu ancak senkronizasyon turunda 403 olarak
      * öğrenmesini önlüyor.
+     *
+     * Akış, düz bir `Boolean` değil: önceki hâli ViewModel kurulurken **bir
+     * kez** okunuyordu ve o an oturum henüz geri yüklenmemiş olabiliyordu.
+     *
+     * `Eagerly` çünkü bu değer yalnızca ekranın çizimi için değil, aşağıdaki
+     * yazma kontrolleri için de okunuyor; `WhileSubscribed` altında hiç
+     * toplayan yokken `.value` başlangıç değerine düşerdi. Başlangıç değeri en
+     * dar yetki: yükleniyorken düğmeyi açık göstermek, kullanıcıya reddedilecek
+     * bir işi yaptırmak olurdu.
      */
-    val canWrite: Boolean = SyncTable.PACKAGES.isWritableBy(prefs.currentUserRole)
+    val canWrite: StateFlow<Boolean> = currentUser.role
+        .map { SyncTable.PACKAGES.isWritableBy(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val packages: StateFlow<List<PackageEntity>> = repository.getAllPackages()
         .stateIn(
@@ -69,7 +81,7 @@ class PackageViewModel(
     ) {
         // Ekranda düğme gizleniyor ama kontrol burada da var: gizlenmiş bir
         // düğme kural değil, yalnızca görüntü.
-        if (!canWrite) {
+        if (!canWrite.value) {
             viewModelScope.launch { _events.send(PackageEvent.Failed(YETKI_YOK)) }
             return
         }
@@ -91,7 +103,7 @@ class PackageViewModel(
     }
 
     fun deletePackage(packageId: String) {
-        if (!canWrite) {
+        if (!canWrite.value) {
             viewModelScope.launch { _events.send(PackageEvent.Failed(YETKI_YOK)) }
             return
         }

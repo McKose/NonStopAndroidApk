@@ -19,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import com.gymapp.data.access.AppDestination
+import com.gymapp.presentation.common.ReadOnlyNotice
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Membership
 import com.gymapp.domain.MembershipState
@@ -89,42 +91,57 @@ fun MemberListScreen(
                     onClick = { scope.launch { drawerState.close() } },
                     icon = { Icon(Icons.Default.Menu, contentDescription = null) }
                 )
-                NavigationDrawerItem(
-                    label = { Text("Finans") },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        onNavigateToFinance()
-                    },
-                    icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null) }
-                )
-                NavigationDrawerItem(
-                    label = { Text("Ders Paketleri") },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        onNavigateToPackages()
-                    },
-                    icon = { Icon(Icons.Default.Inventory, contentDescription = null) }
-                )
-                NavigationDrawerItem(
-                    label = { Text("Market") },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        onNavigateToMarket()
-                    },
-                    icon = { Icon(Icons.Default.ShoppingCart, contentDescription = null) }
-                )
-                NavigationDrawerItem(
-                    label = { Text("Ayarlar") },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        onNavigateToSettings()
-                    },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null) }
-                )
+                // Çekmece artık rolün göremediği hedefi çizmiyor.
+                //
+                // Önceden bu liste koşulsuzdu: pano eğitmene Finans'ı
+                // gizliyordu ama aynı ekran buradan iki dokunuşla açılıyordu.
+                // Yani kısıt gerçek bir kısıt değil, yalnızca bir ekranda
+                // görünmeyen bir düğmeydi. Görünürlük kararı artık
+                // `AppDestination` içinde, tek yerde.
+                if (uiState.gorebilir(AppDestination.FINANCE)) {
+                    NavigationDrawerItem(
+                        label = { Text("Finans") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToFinance()
+                        },
+                        icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = null) }
+                    )
+                }
+                if (uiState.gorebilir(AppDestination.PACKAGES)) {
+                    NavigationDrawerItem(
+                        label = { Text("Ders Paketleri") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToPackages()
+                        },
+                        icon = { Icon(Icons.Default.Inventory, contentDescription = null) }
+                    )
+                }
+                if (uiState.gorebilir(AppDestination.MARKET)) {
+                    NavigationDrawerItem(
+                        label = { Text("Market") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToMarket()
+                        },
+                        icon = { Icon(Icons.Default.ShoppingCart, contentDescription = null) }
+                    )
+                }
+                if (uiState.gorebilir(AppDestination.SETTINGS)) {
+                    NavigationDrawerItem(
+                        label = { Text("Ayarlar") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToSettings()
+                        },
+                        icon = { Icon(Icons.Default.Settings, contentDescription = null) }
+                    )
+                }
             }
         }
     ) {
@@ -162,13 +179,56 @@ fun MemberListScreen(
                     singleLine = true
                 )
 
+                // Kapsam görünür bir seçim: hangi listeye bakıldığı ekranda
+                // yazıyor ve tek dokunuşla değişiyor. Sessiz süzme, eğitmenin
+                // yeni kaydettiği (henüz randevusu olmayan) üyeyi bulamaması
+                // demek olurdu.
+                if (uiState.kapsamSecilebilir) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        FilterChip(
+                            selected = uiState.kapsam == MemberScope.MINE,
+                            onClick = { viewModel.onKapsamChange(MemberScope.MINE) },
+                            label = { Text("Üyelerim") },
+                        )
+                        FilterChip(
+                            selected = uiState.kapsam == MemberScope.ALL,
+                            onClick = { viewModel.onKapsamChange(MemberScope.ALL) },
+                            label = { Text("Tüm üyeler") },
+                        )
+                    }
+                }
+
+                // Bağlantısı olmayan eğitmende "üyelerim" tanımsız; liste
+                // süzülmüyor ve sebebi yazıyor.
+                if (uiState.personelBaglantisiYok) {
+                    ReadOnlyNotice(
+                        text = "Hesabınız bir personel kaydına bağlı olmadığı için " +
+                            "\"üyelerim\" ayrımı yapılamıyor; salonun tamamı listeleniyor.",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+
                 if (uiState.isLoading) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                 } else if (uiState.members.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Üye bulunamadı.")
+                        // Boş listenin sebebi kapsam olabilir; "üye bulunamadı"
+                        // demek kullanıcıyı salonda hiç üye yok sanmaya iterdi.
+                        Text(
+                            if (uiState.kapsam == MemberScope.MINE) {
+                                "Size atanmış randevusu olan üye yok. " +
+                                    "Salonun tamamı için \"Tüm üyeler\" seçin."
+                            } else {
+                                "Üye bulunamadı."
+                            }
+                        )
                     }
                 } else {
                     LazyColumn(

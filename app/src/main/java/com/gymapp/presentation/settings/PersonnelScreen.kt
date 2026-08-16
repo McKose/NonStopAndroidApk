@@ -28,6 +28,7 @@ import com.gymapp.domain.Money
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Rate
 import com.gymapp.domain.StaffRole
+import com.gymapp.data.access.yetkiOzetiTr
 import com.gymapp.presentation.common.ReadOnlyNotice
 import com.gymapp.domain.labelTr
 
@@ -39,7 +40,7 @@ fun PersonnelScreen(
 ) {
     val staffList by viewModel.staffList.collectAsState(initial = emptyList())
     val snackbarHostState = remember { SnackbarHostState() }
-    val canWrite = viewModel.canWrite
+    val canWrite by viewModel.canWrite.collectAsState()
 
     /** `null` = diyalog kapalı; `StaffEntity?` içeren değer = düzenleme (veya yeni kayıt). */
     var editing by remember { mutableStateOf<StaffFormTarget?>(null) }
@@ -298,6 +299,38 @@ private fun StaffDialog(
                                     }
                                 )
                             }
+                        }
+                    }
+                }
+
+                // Seçilen rolün somut karşılığı.
+                //
+                // Önceden yalnızca "Admin / Yönetici / Antrenör" yazıyordu ve bu
+                // üç kelimenin ne verdiği hiçbir yerde görünmüyordu; salon
+                // sahibi maaş ve hakediş görebilen bir yetkiyi ne verdiğini
+                // bilmeden atıyordu. Satırlar elle yazılmıyor, uygulanan
+                // kuralların kendisinden üretiliyor (`yetkiOzetiTr`) — yani
+                // kural değişip açıklama unutulamaz.
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            "${role.labelTr()} yetkisi",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        role.yetkiOzetiTr().forEach { satir ->
+                            Text(
+                                "• $satir",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 }

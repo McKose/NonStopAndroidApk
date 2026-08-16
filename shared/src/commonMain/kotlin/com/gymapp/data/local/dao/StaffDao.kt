@@ -55,6 +55,22 @@ interface StaffDao {
     suspend fun findByAuthUserId(tenantId: String, authUserId: String): StaffEntity?
 
     /**
+     * Aynı bağlantının **akış** hâli; oturum boyunca dinlenir.
+     *
+     * Tek seferlik okuma yetmiyordu: bağlantı girişte bir kez kuruluyor,
+     * kurulamazsa oturum boyunca kurulamıyordu. Oysa personel kartı sonradan
+     * doldurulabiliyor ve satır senkronizasyon turuyla sonradan inebiliyor —
+     * ikisinde de kullanıcı çıkıp yeniden girene kadar kendi derslerini
+     * göremiyordu. Bkz. [com.gymapp.data.auth.CurrentUser].
+     */
+    @Query("""
+        SELECT * FROM staff
+        WHERE tenantId = :tenantId AND authUserId = :authUserId AND deletedAtMs IS NULL
+        LIMIT 1
+    """)
+    fun observeByAuthUserId(tenantId: String, authUserId: String): Flow<StaffEntity?>
+
+    /**
      * Kullanıcı adı çakışma kontrolü — silinmiş kayıtlar **dahil**.
      *
      * UNIQUE index tombstone satırlarını da kapsıyor; silinmiş bir personelin

@@ -90,10 +90,12 @@ class SettingsViewModel(
      * Çıkış — oturum hem sunucu tarafında hem cihazda kapatılıyor, **ve yerel
      * veritabanı temizleniyor.**
      *
-     * `prefs.clearSession()` tek başına yetmez: o yalnızca rol ve personel
-     * kimliğini siliyor, jeton ve salon kimliği [SessionManager]'da duruyordu.
-     * Yarım bir çıkış, giriş ekranına dönmüş ama hâlâ veri gönderebilen bir
-     * uygulama demek olurdu.
+     * Oturuma ait tek durum artık [SessionManager]'da: rol ve personel kimliği
+     * için ayrıca temizlenmesi gereken bir tercih kalmadı (ikisi de oturumdan
+     * türetiliyor, bkz. `CurrentUser`). Eskiden `prefs.clearSession()` da
+     * çağrılıyordu ve o tek başına yetmiyordu — jeton ile salon kimliği
+     * burada duruyor. Yarım bir çıkış, giriş ekranına dönmüş ama hâlâ veri
+     * gönderebilen bir uygulama demek olurdu.
      *
      * ### Veritabanı neden temizleniyor
      * Temizlenmediğinde cihazda kalan satırlar bir sonraki kullanıcıya açıktı.
@@ -114,7 +116,6 @@ class SettingsViewModel(
         // parçacığına geçiyor — ana iş parçacığı bloke olmuyor.
         database.maintenanceDao().wipeAll()
         sessions.signOut()
-        prefs.clearSession()
         onLogout()
     }
 }

@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.ProductEntity
-import com.gymapp.data.local.preferences.AppPreferences
+import com.gymapp.data.auth.CurrentUser
 import com.gymapp.data.repository.MemberRepository
 import com.gymapp.data.repository.ProductRepository
 import com.gymapp.data.sync.SyncTable
@@ -90,7 +90,7 @@ private data class MarketForm(
 class MarketViewModel(
     private val repository: ProductRepository,
     private val memberRepository: MemberRepository,
-    prefs: AppPreferences,
+    currentUser: CurrentUser,
 ) : ViewModel() {
 
     /**
@@ -100,8 +100,13 @@ class MarketViewModel(
      * ayrımı yapıyor: `products` salon sahibi ve yöneticiye açık, `orders` ile
      * `stock_movements` üç role de. Eğitmen satış yapabilmeli — satış zaten
      * işinin kendisi — ama ürünün fiyatını değiştirememeli.
+     *
+     * Tepkili okunuyor (bkz. `CurrentUser`); toplayan yokken de doğru olması
+     * gerektiği için `Eagerly`, başlangıç değeri en dar yetki.
      */
-    val canManageProducts: Boolean = SyncTable.PRODUCTS.isWritableBy(prefs.currentUserRole)
+    val canManageProducts: StateFlow<Boolean> = currentUser.role
+        .map { SyncTable.PRODUCTS.isWritableBy(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _form = MutableStateFlow(MarketForm())
 
@@ -219,7 +224,7 @@ class MarketViewModel(
     ) {
         // Ekranda düğme gizleniyor ama kontrol burada da var: gizlenmiş bir
         // düğme kural değil, yalnızca görüntü.
-        if (!canManageProducts) {
+        if (!canManageProducts.value) {
             viewModelScope.launch { _events.send(MarketEvent.Failed(YETKI_YOK)) }
             return
         }
@@ -241,7 +246,7 @@ class MarketViewModel(
     }
 
     fun deleteProduct(productId: String) {
-        if (!canManageProducts) {
+        if (!canManageProducts.value) {
             viewModelScope.launch { _events.send(MarketEvent.Failed(YETKI_YOK)) }
             return
         }

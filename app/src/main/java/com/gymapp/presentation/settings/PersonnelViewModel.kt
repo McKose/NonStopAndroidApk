@@ -3,7 +3,7 @@ package com.gymapp.presentation.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.local.entity.StaffEntity
-import com.gymapp.data.local.preferences.AppPreferences
+import com.gymapp.data.auth.CurrentUser
 import com.gymapp.data.repository.StaffRepository
 import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.Money
@@ -11,7 +11,11 @@ import com.gymapp.domain.Rate
 import com.gymapp.domain.StaffRole
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Bir kez tüketilen kullanıcı bildirimleri. */
@@ -23,7 +27,7 @@ sealed interface PersonnelEvent {
 
 class PersonnelViewModel(
     private val repository: StaffRepository,
-    prefs: AppPreferences,
+    currentUser: CurrentUser,
 ) : ViewModel() {
 
     val staffList: Flow<List<StaffEntity>> = repository.getAllStaff()
@@ -37,10 +41,14 @@ class PersonnelViewModel(
      * önlemek: kayıt yerelde başarılı görünür, kuyruğa girer ve sunucudan kalıcı
      * 403 ile döner. Yani kayıp değil ama kullanıcı açısından sessiz.
      *
-     * Rol oturum açılırken sunucudan geliyor (`gym_users.role`), cihazda
-     * belirlenmiyor.
+     * Rol oturumdan geliyor (`gym_users.role`), cihazdaki bir tercihten değil —
+     * ve **tepkili**: önceki hâli ViewModel kurulurken bir kez okunuyordu.
+     * Toplayan yokken de doğru olması gerektiği için `Eagerly`; başlangıç
+     * değeri en dar yetki.
      */
-    val canWrite: Boolean = SyncTable.STAFF.isWritableBy(prefs.currentUserRole)
+    val canWrite: StateFlow<Boolean> = currentUser.role
+        .map { SyncTable.STAFF.isWritableBy(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _events = Channel<PersonnelEvent>(Channel.BUFFERED)
     val events: Flow<PersonnelEvent> = _events.receiveAsFlow()
@@ -73,7 +81,7 @@ class PersonnelViewModel(
         // düğme kural değil, yalnızca görüntü. Yeni bir çağrı yolu eklendiğinde
         // (ör. derin bağlantı, toplu içe aktarma) yalnızca ekrana bakan bir
         // koruma sessizce atlanırdı.
-        if (!canWrite) {
+        if (!canWrite.value) {
             viewModelScope.launch { _events.send(PersonnelEvent.Failed(YETKI_YOK)) }
             return
         }
@@ -101,7 +109,7 @@ class PersonnelViewModel(
     }
 
     fun deleteStaff(staffId: String) {
-        if (!canWrite) {
+        if (!canWrite.value) {
             viewModelScope.launch { _events.send(PersonnelEvent.Failed(YETKI_YOK)) }
             return
         }

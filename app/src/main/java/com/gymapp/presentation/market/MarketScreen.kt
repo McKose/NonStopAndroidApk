@@ -40,6 +40,7 @@ fun MarketScreen(
     viewModel: MarketViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val canManageProducts by viewModel.canManageProducts.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var showCheckoutSheet by remember { mutableStateOf(false) }
     var productToEdit by remember { mutableStateOf<ProductEntity?>(null) }
@@ -80,7 +81,7 @@ fun MarketScreen(
                     // Ürün tanımı yetkisi olmayanda bu giriş hiç çizilmiyor.
                     // Satış (sepet, ödeme) etkilenmiyor: eğitmen satış
                     // yapabilmeli, ürünün fiyatını değiştirememeli.
-                    if (viewModel.canManageProducts) {
+                    if (canManageProducts) {
                         IconButton(onClick = { showAddDialog = true }) {
                             Icon(Icons.Default.AddBusiness, contentDescription = "Ürün Yönetimi")
                         }
@@ -106,7 +107,7 @@ fun MarketScreen(
                         onRemove = { viewModel.removeFromCart(product.id) },
                         onEdit = { productToEdit = product },
                         onDelete = { viewModel.deleteProduct(product.id) },
-                        canManage = viewModel.canManageProducts,
+                        canManage = canManageProducts,
                     )
                 }
             }

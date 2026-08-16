@@ -2,6 +2,8 @@ package com.gymapp.presentation.finance
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gymapp.data.access.AppDestination
+import com.gymapp.data.auth.CurrentUser
 import com.gymapp.data.repository.FinanceRepository
 import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.Money
@@ -34,8 +36,26 @@ sealed interface FinanceEvent {
 }
 
 class FinanceViewModel(
-    private val repository: FinanceRepository
+    private val repository: FinanceRepository,
+    currentUser: CurrentUser,
 ) : ViewModel() {
+
+    /**
+     * Bu kullanıcı finans ekranını görebilir mi?
+     *
+     * Giriş noktalarını gizlemek tek başına yetmiyor: gizlenmiş bir düğme kural
+     * değil, yalnızca görüntü. Ekranın kendisi de soruyor ki hedefe başka bir
+     * yoldan gelen (ileride eklenecek bir kısayol, bir bildirim) yetkisiz
+     * kullanıcı salonun cirosunu görmesin.
+     *
+     * Bunun bir **güvenlik sınırı olmadığını** açıkça yazmak gerekiyor: defter
+     * satırları sunucuda salona bağlı herkesin okumasına açık (migrasyon
+     * `0004`) ve cihazdaki kopyada zaten duruyorlar. Buradaki kontrol arayüz
+     * kararı; gerçek sınır yazma tarafında.
+     */
+    val gorebilir: StateFlow<Boolean> = currentUser.role
+        .map { AppDestination.FINANCE.isVisibleTo(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _filter = MutableStateFlow("ALL")
     private val _methodFilter = MutableStateFlow("ALL")
