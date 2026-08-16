@@ -175,8 +175,76 @@ class MigrationsTest {
         // Zincirin sonu veritabanının bugünkü sürümüne varmalı. Varmazsa,
         // sürümü artırıp geçişi yazmayı unutmuşuz demektir.
         assertEquals(
-            5, zincir.last().endVersion,
+            6, zincir.last().endVersion,
             "Son geçiş, @Database(version = ...) değerine varmalı",
+        )
+    }
+
+    /**
+     * v5 → v6 kuyruğa `revision` kolonunu ekliyor, bekleyen kayıtları koruyor.
+     *
+     * Kolonun kendisi sessiz bir veri kaybını kapatıyor: gönderim sürerken satır
+     * tekrar değiştiğinde kaydın kuyrukta kalmasını sağlayan ayırt edici bu.
+     * Önceden bu iş `enqueuedAtMs`e yükleniyordu ama o damga bilinçli olarak
+     * sabit (FIFO sırası ona dayanıyor), yani koruma hiç çalışmıyordu.
+     *
+     * Hedef şema dosyası (`6.json`) henüz depoda değil — derleme sırasında
+     * üretiliyor. Bu yüzden beklenti v5'ten türetiliyor: sonuç tam olarak "v5
+     * artı bir kolon" olmalı. `4.json` eklenmeden önce v4→v5 testi de böyle
+     * yazılmıştı.
+     */
+    @Test
+    fun `v5 to v6 kuyruga revision ekler, bekleyen kayitlar korunur`() = sqliteIle { baglanti ->
+        val v5 = surumSemasi(5)
+        val kuyruk = v5.tablo("sync_outbox")
+
+        baglanti.execSQL(kuyruk.createSql)
+        kuyruk.indeksSqlleri.forEach { baglanti.execSQL(it) }
+
+        baglanti.execSQL(
+            """
+            INSERT INTO `sync_outbox`
+                (`id`, `tenantId`, `entityTable`, `entityId`, `enqueuedAtMs`,
+                 `attemptCount`, `lastAttemptAtMs`, `lastError`)
+            VALUES
+                ('o-1', 'salon-1', 'gym_members', 'm-1', 1700, 2, 1800, 'ağ yok')
+            """.trimIndent()
+        )
+
+        MIGRATION_5_6.migrate(baglanti)
+
+        // 1) Kolon listesi: v5 artı `revision`.
+        assertEquals(
+            kuyruk.kolonlar + "revision",
+            kolonlar(baglanti, "sync_outbox"),
+            "Geçiş yalnızca `revision` eklemeli",
+        )
+
+        // 2) Bekleyen kayıt duruyor ve alanları bozulmamış. Kuyruk kaydını
+        //    kaybetmek, o satırın sunucuya hiç gitmemesi demek olurdu.
+        assertEquals(
+            listOf("o-1", "gym_members", "m-1", "1700", "2"),
+            tekSatir(
+                baglanti,
+                "SELECT `id`, `entityTable`, `entityId`, `enqueuedAtMs`, `attemptCount` " +
+                    "FROM `sync_outbox`",
+            ),
+        )
+
+        // 3) Mevcut kayıtlar sıfırdan başlıyor: ilk gönderimlerinde normal
+        //    biçimde düşsünler.
+        assertEquals(
+            listOf("0"),
+            tekSatir(baglanti, "SELECT `revision` FROM `sync_outbox`"),
+        )
+
+        // 4) İndeksler ayakta. `(tenantId, entityTable, entityId)` TEKİL ve
+        //    kuyruğa alma tam ona dayanıyor: düşerse aynı satır için birden çok
+        //    kayıt birikir ve revizyon sayacı anlamsızlaşır.
+        assertEquals(
+            kuyruk.indeksAdlari.sorted(),
+            indeksler(baglanti, "sync_outbox").sorted(),
+            "Geçişten sonra kuyruk indeksleri kaybolmuş",
         )
     }
 
@@ -254,8 +322,8 @@ class MigrationsTest {
 
     // ─── SQLite yardımcıları ────────────────────────────────────────────────
 
-    private fun kolonlar(baglanti: SQLiteConnection): List<String> {
-        val ifade = baglanti.prepare("PRAGMA table_info(`staff`)")
+    private fun kolonlar(baglanti: SQLiteConnection, tablo: String = "staff"): List<String> {
+        val ifade = baglanti.prepare("PRAGMA table_info(`$tablo`)")
         try {
             return buildList {
                 // PRAGMA table_info sütunları: 0=cid, 1=name, 2=type, ...
@@ -266,9 +334,9 @@ class MigrationsTest {
         }
     }
 
-    private fun indeksler(baglanti: SQLiteConnection): List<String> {
+    private fun indeksler(baglanti: SQLiteConnection, tablo: String = "staff"): List<String> {
         val ifade = baglanti.prepare(
-            "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'staff' " +
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = '$tablo' " +
                 "AND name NOT LIKE 'sqlite_%'"
         )
         try {

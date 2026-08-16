@@ -118,6 +118,35 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+/**
+ * v5 → v6: `sync_outbox.revision` kolonu eklendi.
+ *
+ * Kuyruğun "gönderim sürerken satır tekrar değişti" koruması yoktu.
+ * `SyncEngine` bunu `enqueuedAtMs`in tazelenmesine dayandırıyordu, ama kuyruğa
+ * alma çakışmada eski kaydı **koruyor** (ve korumalı: FIFO sırası o damgaya
+ * dayanıyor, tazelenseydi sık düzenlenen satır kuyruğun sonuna atılıp aç
+ * kalırdı). İki KDoc birbiriyle çelişiyordu; `IGNORE` kazanıyor ve koşul her
+ * zaman eşleşiyordu.
+ *
+ * Sonucu sessiz veri kaybıydı: gönderim penceresinde yapılan ikinci değişiklik
+ * kuyruktan düşüyor, kullanıcı "eşitlendi" görüyor, iki cihaz kalıcı olarak
+ * ayrışıyordu.
+ *
+ * Ayrı bir sayaç bu yüzden gerekli: `enqueuedAtMs` sıra için sabit kalıyor,
+ * `revision` ise değişikliği sayıyor.
+ *
+ * `DEFAULT 0` bilinçli: kuyrukta bekleyen mevcut kayıtlar sıfırdan başlıyor ve
+ * ilk gönderimlerinde normal biçimde düşüyorlar. Geçiş anında gönderim
+ * sürmediği için ara durum oluşmuyor.
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            "ALTER TABLE `sync_outbox` ADD COLUMN `revision` INTEGER NOT NULL DEFAULT 0"
+        )
+    }
+}
+
 /** Sürüm sırasına göre uygulanacak geçişler. */
 internal val ALL_MIGRATIONS: Array<Migration> =
-    arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+    arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)

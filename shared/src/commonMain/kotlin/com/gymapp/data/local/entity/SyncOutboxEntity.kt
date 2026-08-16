@@ -45,6 +45,23 @@ data class SyncOutboxEntity(
     val enqueuedAtMs: Long,
 
     /**
+     * Kayıt kuyruğa girdikten sonra satırın **kaç kez daha** değiştiği.
+     *
+     * Gönderim sırasında satır tekrar değişirse gönderilen içerik eskimiş olur;
+     * o kaydın kuyruktan düşmemesi gerekiyor. Ayırt edici olarak [enqueuedAtMs]
+     * kullanılamıyor çünkü o bilinçli olarak **sabit** — FIFO sırası ona
+     * dayanıyor ve tazelenseydi sık düzenlenen bir satır kuyruğun sonuna
+     * atılarak aç kalırdı.
+     *
+     * Önceden ayrı bir sayaç yoktu ve `SyncEngine` `enqueuedAtMs`'in
+     * tazelendiğini VARSAYIYORDU. Varsayım yanlıştı (`IGNORE` eskiyi korur), yani
+     * koruma hiç çalışmıyordu: gönderim penceresinde yapılan değişiklik kuyruktan
+     * sessizce düşüyor, kullanıcı "eşitlendi" görüyor ve iki cihaz kalıcı olarak
+     * ayrışıyordu.
+     */
+    val revision: Int = 0,
+
+    /**
      * Kaç kez gönderilmeye çalışıldı.
      *
      * Geri çekilme (backoff) ve "bu kayıt sürekli patlıyor" teşhisi için.

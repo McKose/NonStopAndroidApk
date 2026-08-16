@@ -145,7 +145,7 @@ class PackageRepositoryTest {
         val id = paketOlustur()
         repo.deletePackage(id)
         db.syncOutboxDao().peek(TEST_TENANT, limit = 10).forEach {
-            db.syncOutboxDao().removeIfUnchanged(it.id, it.enqueuedAtMs)
+            db.syncOutboxDao().removeIfUnchanged(it.id, it.revision)
         }
 
         repo.savePackage(

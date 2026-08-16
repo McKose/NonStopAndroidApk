@@ -167,9 +167,8 @@ class SyncEngineTest {
     fun `gonderim sirasinda degisen satir kuyrukta kalir`() = runTest {
         enqueue("a", atMs = 1_000)
         val remote = FakeRemote { _, id ->
-            // Gönderim sürerken satır tekrar değişti: kayıt yenilendi.
-            val current = db.syncOutboxDao().peek(TEST_TENANT, 1).single()
-            db.syncOutboxDao().removeIfUnchanged(current.id, current.enqueuedAtMs)
+            // Gönderim sürerken satır tekrar değişti: kuyruğa yeniden alınıyor
+            // ve bu, kaydın revizyonunu artırıyor.
             enqueue(id, atMs = 9_000)
             PushResult.Success
         }

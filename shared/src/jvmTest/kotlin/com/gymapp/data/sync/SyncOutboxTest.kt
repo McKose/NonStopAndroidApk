@@ -92,7 +92,7 @@ class SyncOutboxTest {
         val id = savePackage()
         // Kaydetmenin bıraktığı kaydı düşür ki silmenin kendi kaydını görelim.
         val afterSave = db.syncOutboxDao().peek(TEST_TENANT, limit = 10).single()
-        db.syncOutboxDao().removeIfUnchanged(afterSave.id, afterSave.enqueuedAtMs)
+        db.syncOutboxDao().removeIfUnchanged(afterSave.id, afterSave.revision)
 
         packages.deletePackage(id)
 
@@ -154,7 +154,7 @@ class SyncOutboxTest {
         savePackage()
         val entry = db.syncOutboxDao().peek(TEST_TENANT, limit = 10).single()
 
-        val removed = db.syncOutboxDao().removeIfUnchanged(entry.id, entry.enqueuedAtMs)
+        val removed = db.syncOutboxDao().removeIfUnchanged(entry.id, entry.revision)
 
         assertEquals(1, removed)
         assertEquals(0, db.syncOutboxDao().pendingCount(TEST_TENANT))
@@ -163,18 +163,59 @@ class SyncOutboxTest {
     /**
      * Gönderim sürerken satır tekrar değişmişse silme eşleşmemeli.
      *
-     * Koşulsuz silseydik gönderim penceresinde yapılan değişiklik sessizce
-     * kaybolurdu: satır güncel değil ama kuyrukta da kaydı yok.
+     * Bu testin ilk hâli korumayı **hiç sınamıyordu**: silme çağrısına
+     * `enqueuedAtMs + 1` diye uydurma bir değer geçiyor, yani yalnızca
+     * "eşleşmeyen değerle silme olmaz" diyordu — o zaten SQL'in tanımı. Gerçek
+     * senaryo hiç kurulmadığı için, koruma çalışmazken de yeşil kalıyordu.
+     *
+     * Şimdi satır gerçekten yeniden kuyruğa alınıyor. Ayırt edici `revision`:
+     * `enqueuedAtMs` bilinçli olarak sabit (FIFO sırası ona dayanıyor), yani
+     * ona bakan bir koşul her zaman eşleşir ve gönderim penceresinde yapılan
+     * değişiklik sessizce kaybolurdu.
      */
     @Test
     fun `gonderim penceresinde degisen kayit dusmez`() = runTest {
-        savePackage()
-        val entry = db.syncOutboxDao().peek(TEST_TENANT, limit = 10).single()
+        val paketId = savePackage()
+        val gonderilen = db.syncOutboxDao().peek(TEST_TENANT, limit = 10).single()
 
-        val removed = db.syncOutboxDao().removeIfUnchanged(entry.id, entry.enqueuedAtMs + 1)
+        // Gönderim sürerken kullanıcı AYNI satırı bir kez daha değiştirdi.
+        // Kimlik geçilmezse yeni bir paket oluşur ve senaryo kurulmamış olurdu.
+        savePackage(packageId = paketId, name = "Adı değişti")
 
-        assertEquals(0, removed, "enqueuedAtMs eşleşmiyorsa silme olmamalı")
-        assertNotNull(db.syncOutboxDao().peek(TEST_TENANT, limit = 10).singleOrNull())
+        val removed = db.syncOutboxDao().removeIfUnchanged(gonderilen.id, gonderilen.revision)
+
+        assertEquals(0, removed, "Satır tekrar değişmişse eski gönderim kaydı düşmemeli")
+        assertNotNull(
+            db.syncOutboxDao().peek(TEST_TENANT, limit = 10).singleOrNull(),
+            "İkinci değişiklik kuyrukta kalmalı; yoksa sunucuya hiç gitmez",
+        )
+    }
+
+    /**
+     * Aynı satır tekrar kuyruğa alınınca `enqueuedAtMs` **değişmiyor**,
+     * `revision` artıyor.
+     *
+     * İkisi de gerekli: damga sabit kalmazsa sık düzenlenen bir satır sürekli
+     * kuyruğun sonuna atılıp aç kalır; revizyon artmazsa gönderim penceresi
+     * koruması çalışmaz.
+     */
+    @Test
+    fun `tekrar kuyruga alma damgayi korur, revizyonu artirir`() = runTest {
+        val paketId = savePackage()
+        val ilk = db.syncOutboxDao().peek(TEST_TENANT, limit = 10).single()
+
+        savePackage(packageId = paketId, name = "Adı değişti")
+        val ikinci = db.syncOutboxDao().peek(TEST_TENANT, limit = 10).single()
+
+        assertEquals(ilk.id, ikinci.id, "Aynı satır için ikinci kayıt açılmamalı")
+        assertEquals(
+            ilk.enqueuedAtMs, ikinci.enqueuedAtMs,
+            "FIFO sırası ilk değişim anına dayanıyor; damga tazelenmemeli",
+        )
+        assertEquals(
+            ilk.revision + 1, ikinci.revision,
+            "Her yeni değişiklik revizyonu artırmalı",
+        )
     }
 
     private suspend fun savePackage(
