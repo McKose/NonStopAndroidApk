@@ -27,8 +27,23 @@ fun PackageListScreen(
 ) {
     val packages by viewModel.packages.collectAsState()
     val canWrite = viewModel.canWrite
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Silme sonucu artık her durumda bildiriliyor. Önceden `deletePackage`
+    // fırlatıyor ve sonuç hiçbir yerde okunmuyordu: başarısız silme başarılı
+    // silmeden ayırt edilemiyor, üstelik uygulama kapanıyordu.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is PackageEvent.Saved -> Unit // kaydetme başka ekranda
+                is PackageEvent.Deleted -> snackbarHostState.showSnackbar("Paket silindi.")
+                is PackageEvent.Failed -> snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Paket Yönetimi") },

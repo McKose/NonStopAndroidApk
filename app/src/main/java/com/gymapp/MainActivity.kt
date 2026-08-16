@@ -105,12 +105,38 @@ class MainActivity : ComponentActivity() {
                     }
                 } else {
                     val navController = rememberNavController()
+
+                    // Oturum artık TEPKİLİ okunuyor.
+                    //
+                    // Önceden yalnızca `.value` ile bir kez okunuyordu. Yenileme
+                    // jetonu reddedildiğinde `SessionManager` oturumu düşürüyor
+                    // (bkz. `currentAccessToken`), ama arayüz bunu hiç görmüyordu:
+                    // kullanıcı giriş yapmış görünen bir panelde kalıyor, açtığı
+                    // ilk veri ekranı `requireTenantId()` yüzünden çöküyordu.
+                    val oturum by sessions.session.collectAsState()
+
+                    // Başlangıç hedefi ilk karede sabitleniyor; sonraki
+                    // değişiklikleri NavHost zaten dikkate almaz, `remember`
+                    // bunu açık hâle getiriyor.
+                    val baslangicHedefi = remember { if (oturum != null) "dashboard" else "login" }
+
+                    LaunchedEffect(oturum) {
+                        if (oturum == null &&
+                            navController.currentDestination?.route != "login"
+                        ) {
+                            navController.navigate("login") {
+                                // Geri yığınında veri ekranı bırakmıyoruz: geri
+                                // tuşu oturumsuz bir ekrana dönmemeli.
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    }
+
                     Surface(modifier = Modifier.fillMaxSize()) {
                         NavHost(
                             navController = navController,
                             // Oturum geri yüklendiyse doğrudan panoya giriliyor.
-                            startDestination =
-                                if (sessions.session.value != null) "dashboard" else "login",
+                            startDestination = baslangicHedefi,
                         ) {
                             composable("login") {
                                 LoginScreen(

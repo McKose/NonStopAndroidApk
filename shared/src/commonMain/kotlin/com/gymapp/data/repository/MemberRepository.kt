@@ -357,8 +357,13 @@ class MemberRepository(
      *
      * Silme de bir değişiklik: tombstone satır kuyruğa girmezse silme sunucuya hiç
      * gitmez ve üye diğer cihazlarda yaşamaya devam eder.
+     *
+     * Sonuç [Result]: bu yolun hata vermesi çağıranın **görmesi gereken** bir şey.
+     * Önceden fırlatıyordu ve çağıran çıplak bir `viewModelScope.launch` içindeydi;
+     * projede hiç `CoroutineExceptionHandler` olmadığı için uygulama kapanıyordu.
+     * Kaydetme yolları bu deseni zaten kullanıyordu, silme yolları atlanmıştı.
      */
-    suspend fun deleteMember(id: String) {
+    suspend fun deleteMember(id: String): Result<Unit> = runCatching {
         val nowMs = Now.epochMillis()
         database.inTransaction {
             memberDao.softDeleteMember(id, nowMs)
@@ -419,7 +424,7 @@ class MemberRepository(
     }
 
     /** Fiziksel silmez; tombstone işaretler ki silme de senkronize olabilsin. */
-    suspend fun deleteMeasurement(measurementId: String) {
+    suspend fun deleteMeasurement(measurementId: String): Result<Unit> = runCatching {
         val nowMs = Now.epochMillis()
         database.inTransaction {
             measurementDao.softDelete(measurementId, nowMs)

@@ -49,6 +49,7 @@ fun PersonnelScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is PersonnelEvent.Saved -> editing = null
+                is PersonnelEvent.Deleted -> snackbarHostState.showSnackbar("Personel silindi.")
                 is PersonnelEvent.Failed -> snackbarHostState.showSnackbar(event.message)
             }
         }

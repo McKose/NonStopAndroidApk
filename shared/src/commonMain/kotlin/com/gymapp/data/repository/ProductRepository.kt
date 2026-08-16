@@ -132,7 +132,7 @@ class ProductRepository(
      * Silme de bir değişiklik: tombstone satır kuyruğa girmezse silme sunucuya
      * hiç gitmez ve ürün diğer cihazlarda yaşamaya devam eder.
      */
-    suspend fun deleteProduct(productId: String) {
+    suspend fun deleteProduct(productId: String): Result<Unit> = runCatching {
         val nowMs = Now.epochMillis()
         database.inTransaction {
             productDao.softDelete(productId, nowMs)

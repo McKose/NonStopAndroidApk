@@ -125,7 +125,7 @@ class PackageRepository(
      * Silme de bir değişiklik: tombstone satır kuyruğa girmezse silme sunucuya
      * hiç gitmez ve kayıt diğer cihazlarda yaşamaya devam eder.
      */
-    suspend fun deletePackage(packageId: String) {
+    suspend fun deletePackage(packageId: String): Result<Unit> = runCatching {
         val nowMs = Now.epochMillis()
         database.inTransaction {
             packageDao.softDelete(packageId, nowMs)

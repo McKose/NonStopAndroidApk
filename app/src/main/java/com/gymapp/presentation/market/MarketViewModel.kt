@@ -70,6 +70,7 @@ data class MarketUiState(
 /** Bir kez tüketilen kullanıcı bildirimleri (Snackbar). */
 sealed interface MarketEvent {
     data class OrderCompleted(val orderId: String) : MarketEvent
+    data object ProductDeleted : MarketEvent
     data class Failed(val message: String) : MarketEvent
 }
 
@@ -239,7 +240,10 @@ class MarketViewModel(
             return
         }
         viewModelScope.launch {
-            repository.deleteProduct(productId)
+            repository.deleteProduct(productId).fold(
+                onSuccess = { _events.send(MarketEvent.ProductDeleted) },
+                onFailure = { _events.send(MarketEvent.Failed(it.message ?: "Ürün silinemedi.")) },
+            )
         }
     }
 

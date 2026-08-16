@@ -6,13 +6,18 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.auth.SessionManager
+import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.preferences.AppPreferences
 import com.gymapp.data.sync.ArkaPlanSenkronizasyonu
 import com.gymapp.data.sync.SyncCoordinator
 import com.gymapp.data.sync.SyncQueue
 import com.gymapp.data.sync.SyncState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -21,7 +26,8 @@ class SettingsViewModel(
     private val sessions: SessionManager,
     private val sync: SyncCoordinator,
     private val arkaPlan: ArkaPlanSenkronizasyonu,
-    syncQueue: SyncQueue,
+    private val database: GymDatabase,
+    private val syncQueue: SyncQueue,
 ) : ViewModel() {
 
     /**
@@ -60,21 +66,63 @@ class SettingsViewModel(
     }
 
     /**
-     * Çıkış — oturum hem sunucu tarafında hem cihazda kapatılıyor.
+     * Çıkışta gönderilmemiş değişiklik sayısı; `null` ise soru sorulmuyor.
+     *
+     * Cihazdaki veri çıkışta siliniyor (aşağıya bakın). Kuyrukta bekleyen kayıt
+     * varken bunu sessizce yapmak, kullanıcının henüz hiçbir yere ulaşmamış
+     * işini yok etmek olurdu — o yüzden önce sayı gösteriliyor.
+     */
+    private val _cikistaBekleyen = MutableStateFlow<Int?>(null)
+    val cikistaBekleyen: StateFlow<Int?> = _cikistaBekleyen.asStateFlow()
+
+    /**
+     * Çıkış isteği. Kuyruk doluysa önce soruyor, boşsa doğrudan çıkıyor.
+     */
+    fun requestLogout(onLogout: () -> Unit) {
+        viewModelScope.launch {
+            // Sayı çıkıştan ÖNCE okunuyor: `signOut` salon kimliğini siliyor ve
+            // sonrasında kuyruk sorgulanamaz.
+            val bekleyen = runCatching { syncQueue.pendingCount() }.getOrDefault(0)
+            if (bekleyen > 0) _cikistaBekleyen.value = bekleyen else performLogout(onLogout)
+        }
+    }
+
+    fun cancelLogout() {
+        _cikistaBekleyen.value = null
+    }
+
+    fun confirmLogout(onLogout: () -> Unit) {
+        _cikistaBekleyen.value = null
+        viewModelScope.launch { performLogout(onLogout) }
+    }
+
+    /**
+     * Çıkış — oturum hem sunucu tarafında hem cihazda kapatılıyor, **ve yerel
+     * veritabanı temizleniyor.**
      *
      * `prefs.clearSession()` tek başına yetmez: o yalnızca rol ve personel
      * kimliğini siliyor, jeton ve salon kimliği [SessionManager]'da duruyordu.
      * Yarım bir çıkış, giriş ekranına dönmüş ama hâlâ veri gönderebilen bir
      * uygulama demek olurdu.
+     *
+     * ### Veritabanı neden temizleniyor
+     * Temizlenmediğinde cihazda kalan satırlar bir sonraki kullanıcıya açıktı.
+     * Somut: ADMIN giriş yapar, personel tablosunu (maaşlar dahil — ekranda
+     * gösteriliyor) ve defteri indirir, çıkar; aynı cihazda TRAINER giriş yapar
+     * ve bu satırları **salt okunur olarak görür**. Rol kontrolü yalnızca yazma
+     * düğmelerini gizliyordu, veriyi değil. Sunucu tarafındaki erişim kuralları
+     * doğru çalışıyordu; sızıntı tamamen cihazda kalan kopyadaydı.
      */
-    fun logout(onLogout: () -> Unit) {
-        viewModelScope.launch {
-            sessions.signOut()
-            prefs.clearSession()
-            // Arka plan işi de duruyor: bırakılsaydı çıkış yapmış cihaz 15
-            // dakikada bir uyanıp "oturum yok" deyip geri yatardı.
-            arkaPlan.durdur()
-            onLogout()
-        }
+    private suspend fun performLogout(onLogout: () -> Unit) {
+        // Önce arka plan işi duruyor: bırakılsaydı çıkış yapmış cihaz 15
+        // dakikada bir uyanıp "oturum yok" deyip geri yatardı. Ayrıca yarıda
+        // kalmış bir turun temizlenen tabloya yazmasını da engelliyor.
+        arkaPlan.durdur()
+        // Ana iş parçacığında değil: `viewModelScope` ana iş parçacığında koşuyor
+        // ve Room orada disk erişimini reddediyor.
+        withContext(Dispatchers.IO) { database.clearAllTables() }
+        sessions.signOut()
+        prefs.clearSession()
+        onLogout()
     }
 }

@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 /** Bir kez tüketilen kullanıcı bildirimleri. */
 sealed interface PackageEvent {
     data object Saved : PackageEvent
+    data object Deleted : PackageEvent
     data class Failed(val message: String) : PackageEvent
 }
 
@@ -95,7 +96,10 @@ class PackageViewModel(
             return
         }
         viewModelScope.launch {
-            repository.deletePackage(packageId)
+            repository.deletePackage(packageId).fold(
+                onSuccess = { _events.send(PackageEvent.Deleted) },
+                onFailure = { _events.send(PackageEvent.Failed(it.message ?: "Paket silinemedi.")) },
+            )
         }
     }
 

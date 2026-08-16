@@ -39,7 +39,27 @@ fun MemberDetailScreen(
     val member by viewModel.getMemberById(memberId).collectAsState(initial = null)
     var selectedTab by remember { mutableIntStateOf(0) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var siliniyor by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
     val tabs = listOf("Genel", "Sağlık", "Ölçümler", "Paketler")
+
+    // Ekrandan çıkmak SONUCA bağlı.
+    //
+    // Önceden diyalog kapanıyor ve `onNavigateBack()` sonuç beklenmeden
+    // çağrılıyordu: silme başarısız olsa bile kullanıcı listeye dönüyor, üyeyi
+    // orada görüyor ve neden hâlâ durduğunu anlayamıyordu. Daha kötüsü, silme
+    // fırlattığında uygulama kapanıyordu.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is MemberEvent.Deleted -> onNavigateBack()
+                is MemberEvent.Failed -> {
+                    siliniyor = false
+                    snackbarHostState.showSnackbar(event.message)
+                }
+            }
+        }
+    }
 
     if (showDeleteConfirm) {
         AlertDialog(
@@ -49,11 +69,14 @@ fun MemberDetailScreen(
                 Text("${member?.fullName ?: "Bu üye"} listeden kaldırılacak. Devam edilsin mi?")
             },
             confirmButton = {
-                TextButton(onClick = {
-                    showDeleteConfirm = false
-                    viewModel.deleteMember(memberId)
-                    onNavigateBack()
-                }) { Text("Sil", color = Color.Red) }
+                TextButton(
+                    enabled = !siliniyor, // çift dokunma iki silme denemesi başlatmasın
+                    onClick = {
+                        siliniyor = true
+                        showDeleteConfirm = false
+                        viewModel.deleteMember(memberId)
+                    },
+                ) { Text("Sil", color = Color.Red) }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) { Text("Vazgeç") }
@@ -62,6 +85,7 @@ fun MemberDetailScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(member?.fullName ?: "Üye Detayı") },

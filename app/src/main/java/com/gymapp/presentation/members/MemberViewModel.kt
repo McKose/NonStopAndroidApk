@@ -13,8 +13,15 @@ import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Pricing
 import com.gymapp.domain.SessionCarryOver
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+
+/** Bir kez tüketilen kullanıcı bildirimleri (Snackbar). */
+sealed interface MemberEvent {
+    data object Deleted : MemberEvent
+    data class Failed(val message: String) : MemberEvent
+}
 
 // ─── UI State ────────────────────────────────────────────────────────────────
 
@@ -68,6 +75,18 @@ class MemberViewModel(
     private val repository: MemberRepository,
     private val packageRepository: com.gymapp.data.repository.PackageRepository
 ) : ViewModel() {
+
+    /**
+     * Bir kez tüketilen bildirimler.
+     *
+     * Diğer üç ViewModel'de (paket, personel, market) bu kanal zaten vardı;
+     * üye tarafı atlanmıştı. Eksikliği somut bir çökmeye yol açıyordu: silme
+     * yolu fırlatıyor, çağrı çıplak bir `viewModelScope.launch` içinde
+     * yapılıyor ve projede hiç `CoroutineExceptionHandler` olmadığı için
+     * uygulama kapanıyordu.
+     */
+    private val _events = Channel<MemberEvent>(Channel.BUFFERED)
+    val events: Flow<MemberEvent> = _events.receiveAsFlow()
 
     val packages = packageRepository.getAllPackages()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -327,7 +346,10 @@ class MemberViewModel(
 
     fun deleteMember(memberId: String) {
         viewModelScope.launch {
-            repository.deleteMember(memberId)
+            repository.deleteMember(memberId).fold(
+                onSuccess = { _events.send(MemberEvent.Deleted) },
+                onFailure = { _events.send(MemberEvent.Failed(it.message ?: "Üye silinemedi.")) },
+            )
         }
     }
 

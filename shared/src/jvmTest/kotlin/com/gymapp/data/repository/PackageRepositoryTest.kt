@@ -66,7 +66,7 @@ class PackageRepositoryTest {
     @Test
     fun `silinen paketin gonderilecek icerigi uretilebiliyor`() = runTest {
         val id = paketOlustur()
-        repo.deletePackage(id)
+        repo.deletePackage(id).getOrThrow()
 
         val icerik = LocalRowPayloadProvider(db).payload(SyncTable.PACKAGES, id)
 
@@ -80,7 +80,7 @@ class PackageRepositoryTest {
     @Test
     fun `silme kuyruga giriyor`() = runTest {
         val id = paketOlustur()
-        repo.deletePackage(id)
+        repo.deletePackage(id).getOrThrow()
 
         val kuyruk = db.syncOutboxDao().peek(TEST_TENANT, limit = 10)
         assertTrue(
@@ -93,7 +93,7 @@ class PackageRepositoryTest {
     @Test
     fun `silinen paket ekranlara gelmiyor`() = runTest {
         val id = paketOlustur()
-        repo.deletePackage(id)
+        repo.deletePackage(id).getOrThrow()
 
         assertNull(
             repo.getPackageById(id),
@@ -112,7 +112,7 @@ class PackageRepositoryTest {
     @Test
     fun `silinmis kimlige kayit paketi canlandiriyor`() = runTest {
         val id = paketOlustur(ad = "Aylık")
-        repo.deletePackage(id)
+        repo.deletePackage(id).getOrThrow()
 
         val sonuc = repo.savePackage(
             packageId = id,
@@ -143,7 +143,7 @@ class PackageRepositoryTest {
     @Test
     fun `canlandirma da kuyruga giriyor`() = runTest {
         val id = paketOlustur()
-        repo.deletePackage(id)
+        repo.deletePackage(id).getOrThrow()
         db.syncOutboxDao().peek(TEST_TENANT, limit = 10).forEach {
             db.syncOutboxDao().removeIfUnchanged(it.id, it.revision)
         }

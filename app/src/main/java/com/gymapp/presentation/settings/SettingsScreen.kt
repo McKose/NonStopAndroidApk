@@ -15,6 +15,7 @@ import com.gymapp.data.sync.SyncState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
@@ -32,6 +33,30 @@ fun SettingsScreen(
 
     var showCommissionDialog by remember { mutableStateOf(false) }
     var showSalonInfoDialog by remember { mutableStateOf(false) }
+
+    // Çıkışta cihazdaki veri siliniyor; gönderilmemiş kayıt varsa önce soruluyor.
+    val cikistaBekleyen by viewModel.cikistaBekleyen.collectAsState()
+    cikistaBekleyen?.let { bekleyen ->
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelLogout() },
+            title = { Text("Gönderilmemiş değişiklik var") },
+            text = {
+                Text(
+                    "$bekleyen değişiklik henüz sunucuya gönderilmedi. Çıkış yapıldığında " +
+                        "cihazdaki veriler silinir ve bu değişiklikler kaybolur.\n\n" +
+                        "İnternet bağlantınız varsa önce \"Şimdi Eşitle\" deyip bekleyin."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmLogout(onLogout) }) {
+                    Text("Yine de çık", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelLogout() }) { Text("Vazgeç") }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -99,7 +124,7 @@ fun SettingsScreen(
                 title = "Çıkış Yap",
                 subtitle = "Oturumu sonlandır",
                 icon = Icons.Default.Logout,
-                onClick = { viewModel.logout(onLogout) }
+                onClick = { viewModel.requestLogout(onLogout) }
             )
         }
 
