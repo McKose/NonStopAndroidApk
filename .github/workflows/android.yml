@@ -110,6 +110,71 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+      # APK'yı tarayıcıda çalıştırılabilir hâle getirir.
+      #
+      # Yalnızca master'a merge sonrası: PR'larda da koşsaydı her PR Appetize
+      # kotasını yakar ve paylaşılan bağlantı, birleşmemiş bir daldaki sürümü
+      # gösterirdi.
+      #
+      # Ayrı bir iş değil, aynı işin son adımı: APK zaten burada derlendi.
+      # Ayrı işte yeniden derlemek dört dakika daha CI süresi demekti.
+      #
+      # Token yoksa adım BAŞARISIZ OLMUYOR, atlanıyor ve sebebini yazıyor —
+      # `SUPABASE_*` anahtarlarındaki desenin aynısı. Yoksa Appetize hesabı
+      # olmayan biri master'a hiçbir şey birleştiremezdi.
+      - name: Appetize'a yükle (master, token varsa)
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        continue-on-error: true
+        env:
+          APPETIZE_API_TOKEN: ${{ secrets.APPETIZE_API_TOKEN }}
+          APPETIZE_PUBLIC_KEY: ${{ vars.APPETIZE_PUBLIC_KEY }}
+        run: |
+          if [ -z "$APPETIZE_API_TOKEN" ]; then
+            echo "APPETIZE_API_TOKEN tanımlı değil; yükleme atlandı."
+            echo "Eklemek için: Settings -> Secrets and variables -> Actions."
+            exit 0
+          fi
+
+          apk=$(ls app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1)
+          if [ -z "$apk" ]; then
+            echo "::error::APK bulunamadı; derleme adımı düşmüş olmalı."
+            exit 1
+          fi
+
+          sonuc=$(python3 tools/appetize_runner.py \
+            --file "$apk" --device pixel7 --os-version 13.0 --json) || dustu=1
+
+          echo "$sonuc"
+          durum=$(printf '%s' "$sonuc" | python3 -c \
+            "import json,sys; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
+
+          if [ "$durum" = "success" ]; then
+            adres=$(printf '%s' "$sonuc" | python3 -c \
+              "import json,sys; print(json.load(sys.stdin)['simulator_url'])")
+            anahtar=$(printf '%s' "$sonuc" | python3 -c \
+              "import json,sys; print(json.load(sys.stdin)['public_key'])")
+            {
+              echo "## Uygulamayı tarayıcıda dene"
+              echo ""
+              echo "[$adres]($adres)"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            # Anahtar sabitlenmezse her koşu YENİ bir uygulama açar ve daha önce
+            # paylaşılan bağlantı eski sürümde kalır.
+            if [ -z "$APPETIZE_PUBLIC_KEY" ]; then
+              {
+                echo ""
+                echo "> **Tek seferlik ayar:** Settings → Secrets and variables →"
+                echo "> Actions → **Variables** sekmesi → \`APPETIZE_PUBLIC_KEY\` ="
+                echo "> \`$anahtar\`"
+                echo ">"
+                echo "> Eklenmezse her koşu yeni bir uygulama açar ve bu bağlantı değişir."
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "::warning::Appetize yüklemesi başarısız; ayrıntı yukarıdaki JSON'da."
+          fi
+
       # Test raporu, hata durumunda hangi assert'in patladığını görebilmek için.
       - name: Test raporlarını yükle
         if: always()
@@ -166,6 +231,14 @@ jobs:
         run: node --test web/*.test.js
         env:
           TZ: Europe/Istanbul
+
+      # Appetize yükleyicisi burada sınanıyor, `build` işinde değil: o iş
+      # Gradle'ı bekliyor ve bu testin Gradle ile ilgisi yok. Buraya konunca
+      # sonuç dört dakika daha erken görünüyor ve ek koşucu maliyeti yok.
+      #
+      # Test yerel bir sahte HTTP sunucusu kuruyor; ağ erişimi gerektirmiyor.
+      - name: Appetize yükleyicisi testleri
+        run: python3 tools/appetize_runner_test.py
 
   # Sunucu şeması ve erişim kuralları. Ubuntu koşucusu, 1x ücret.
   #
@@ -237,7 +310,12 @@ jobs:
 
           # Derlemeyi etkilemediği bilinen yollar. Bunların DIŞINDA tek bir dosya
           # bile varsa iOS işi koşar.
-          if echo "$degisenler" | grep -qvE '^(docs/|supabase/|web/|\.github/|\.agents/|\.claude/|skills-lock\.json$|.*\.md$|LICENSE$|\.gitignore$)'; then
+          #
+          # `tools/` listede: oradaki betikler derleme sonrası çalışan yardımcı
+          # araçlar (Appetize yükleyicisi), Kotlin kaynağına girmiyorlar. Kendi
+          # testleri ucuz Linux işinde koşuyor; 10x ücretli macOS işini
+          # tetiklemelerinin karşılığı yok.
+          if echo "$degisenler" | grep -qvE '^(docs/|supabase/|web/|tools/|\.github/|\.agents/|\.claude/|skills-lock\.json$|.*\.md$|LICENSE$|\.gitignore$)'; then
             echo "Derlemeyi etkileyen değişiklik var."
             echo "kod-degisti=true" >> "$GITHUB_OUTPUT"
           else
