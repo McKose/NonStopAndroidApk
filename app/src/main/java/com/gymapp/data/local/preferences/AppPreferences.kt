@@ -9,13 +9,12 @@ class AppPreferences(
 ) {
     private val prefs: SharedPreferences = context.getSharedPreferences("gym_app_prefs", Context.MODE_PRIVATE)
 
-    var commissionRate: Float
-        get() = prefs.getFloat("commission_rate", 10f)
-        set(value) = prefs.edit().putFloat("commission_rate", value).apply()
-
-    var multiSportCommission: Float
-        get() = prefs.getFloat("multisport_commission", 15f)
-        set(value) = prefs.edit().putFloat("multisport_commission", value).apply()
+    // KALDIRILDI: `commissionRate` / `multiSportCommission`. Yalnızca Ayarlar
+    // ekranı yazıp okuyordu; gerçek hakediş hesabı `staff.commissionBasisPoints`
+    // üzerinden yapılıyor (`AppointmentRepository`). Salon sahibi buradan oranı
+    // değiştirdiğinde hiçbir hesap değişmiyor, ama değiştirdiğini sanıyordu.
+    // Okunmayan bir ayarı tutmak, ileride birinin ona güvenmesi riskini canlı
+    // tutardı — `salonPassword` da tam olarak bu yüzden kaldırılmıştı.
 
     var salonName: String
         get() = prefs.getString("salon_name", "NonStop Gym") ?: "NonStop Gym"

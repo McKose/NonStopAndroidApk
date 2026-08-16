@@ -25,19 +25,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.gymapp.data.auth.SessionManager
 import com.gymapp.data.sync.ArkaPlanSenkronizasyonu
 import com.gymapp.data.sync.SyncCoordinator
-import com.gymapp.presentation.common.GlobalErrorHandler
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
-import android.widget.Toast
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.presentation.calendar.CalendarScreen
 import com.gymapp.presentation.dashboard.DashboardScreen
@@ -56,7 +53,6 @@ import com.gymapp.presentation.settings.PersonnelScreen
 import com.gymapp.ui.theme.GymAppTheme
 
 class MainActivity : ComponentActivity() {
-    private val errorHandler: GlobalErrorHandler by inject()
     private val sync: SyncCoordinator by inject()
     private val sessions: SessionManager by inject()
     private val arkaPlan: ArkaPlanSenkronizasyonu by inject()
@@ -67,12 +63,12 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         baslatSenkronizasyonDongusu()
         setContent {
-            val context = LocalContext.current
-            LaunchedEffect(Unit) {
-                errorHandler.errors.collect { message ->
-                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                }
-            }
+            // KALDIRILDI: `GlobalErrorHandler`. Hiçbir yerden beslenmiyordu —
+            // `handleError` ve `showMessage` projede sıfır kez çağrılıyor — yani
+            // burada hiç yayın yapmayan bir akış dinleniyordu. Varlığı yanıltıcıydı:
+            // "genel hata yakalama var" izlenimi veriyor, gerçekte hiçbir hata
+            // buraya ulaşmıyordu. Hatalar ekran bazında Snackbar ile bildiriliyor.
+
             // Saklanan oturum okunana kadar hiçbir ekran gösterilmiyor.
             //
             // Beklemeden başlansaydı giriş ekranı bir an görünür, oturum geri

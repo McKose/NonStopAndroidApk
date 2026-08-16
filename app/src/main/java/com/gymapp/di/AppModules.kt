@@ -13,7 +13,6 @@ import com.gymapp.data.repository.ProductRepository
 import com.gymapp.data.repository.StaffRepository
 import com.gymapp.data.sync.SyncQueue
 import com.gymapp.presentation.calendar.CalendarViewModel
-import com.gymapp.presentation.common.GlobalErrorHandler
 import com.gymapp.presentation.dashboard.DashboardViewModel
 import com.gymapp.presentation.finance.FinanceViewModel
 import com.gymapp.presentation.login.LoginViewModel
@@ -63,7 +62,6 @@ val databaseModule = module {
  */
 val appModule = module {
     single { AppPreferences(androidContext()) }
-    single { GlobalErrorHandler() }
     single { ArkaPlanSenkronizasyonu(androidContext()) }
 
     singleOf(::LedgerRepository)

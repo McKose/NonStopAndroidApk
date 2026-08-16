@@ -22,6 +22,7 @@ import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Membership
 import com.gymapp.domain.MembershipState
+import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentState
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.labelTr
@@ -41,6 +42,41 @@ fun MemberListScreen(
     val uiState by viewModel.listUiState.collectAsState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Tahsilat sonucu artık bildiriliyor: `markAsPaid` sonucunu yutuyordu, yani
+    // reddedilen bir tahsilat başarılı olandan ayırt edilemiyordu.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is MemberEvent.Saved -> snackbarHostState.showSnackbar(event.message)
+                is MemberEvent.Failed -> snackbarHostState.showSnackbar(event.message)
+                is MemberEvent.Deleted -> Unit // silme detay ekranından yapılıyor
+            }
+        }
+    }
+
+    // Tahsilat diyaloğu: hangi üye için açıldığı ve o üyenin kalan borcu.
+    var tahsilatUyesi by remember { mutableStateOf<MemberEntity?>(null) }
+    var tahsilatBorcu by remember { mutableStateOf<Money?>(null) }
+    tahsilatUyesi?.let { uye ->
+        LaunchedEffect(uye.id) { tahsilatBorcu = viewModel.outstandingBalance(uye.id) }
+        tahsilatBorcu?.let { borc ->
+            PaymentDialog(
+                memberName = uye.fullName,
+                outstanding = borc,
+                onConfirm = { tutar ->
+                    tahsilatUyesi = null
+                    tahsilatBorcu = null
+                    viewModel.markAsPaid(uye.id, tutar)
+                },
+                onDismiss = {
+                    tahsilatUyesi = null
+                    tahsilatBorcu = null
+                },
+            )
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -93,6 +129,7 @@ fun MemberListScreen(
         }
     ) {
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     title = { Text("Üye Listesi") },
@@ -144,7 +181,7 @@ fun MemberListScreen(
                                 member = member,
                                 onClick = { onNavigateToDetail(member.id) },
                                 onRenewClick = { onNavigateToRenew(member.id) },
-                                onPaymentReceived = { viewModel.markAsPaid(member.id) }
+                                onPaymentReceived = { tahsilatUyesi = member }
                             )
                         }
                     }

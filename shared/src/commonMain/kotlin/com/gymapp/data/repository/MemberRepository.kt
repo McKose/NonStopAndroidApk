@@ -299,8 +299,24 @@ class MemberRepository(
      * Bakiyeyi okuyup üzerine tahsilat yazmak tek bir transaction içinde olmak
      * zorunda: iki eşzamanlı "ödendi" işareti aynı bakiyeyi okuyup ikisi de
      * tahsilat yazsaydı üye borcunun iki katını ödemiş görünürdü.
+     *
+     * @param amount tahsil edilen tutar; `null` ise kalan borcun tamamı.
+     *        `isPaid = false` iken yok sayılır.
+     *
+     * ### Tutar neden parametre
+     * Önceden **her zaman** kalan borcun tamamı tahsil ediliyordu ve tutar
+     * hiçbir ekranda gösterilmiyordu. Borç tarih sınırsız hesaplandığı için de
+     * eski aylardan devreden borç bugünkü tahsilata ekleniyordu: marttan kalma
+     * 1.000 TL borcu olan üye ağustosta 1.200 TL'lik paket alıp "Ödendi"
+     * işaretlendiğinde deftere **2.200 TL** giriyordu. Ağustos geliri 1.000 TL
+     * şişiyor, kasa da o kadar açık veriyordu — ve bunu gösteren hiçbir ekran
+     * yoktu.
      */
-    suspend fun updatePaymentStatus(memberId: String, isPaid: Boolean): Result<Unit> = runCatching {
+    suspend fun updatePaymentStatus(
+        memberId: String,
+        isPaid: Boolean,
+        amount: Money? = null,
+    ): Result<Unit> = runCatching {
         database.inTransaction {
             val member = memberDao.getMemberById(memberId)
                 ?: throw IllegalArgumentException("Üye bulunamadı.")
@@ -311,13 +327,26 @@ class MemberRepository(
                 val outstanding = ledgerRepository.outstandingBalance(memberId)
                 if (!outstanding.isPositive) return@inTransaction
 
+                val tahsilat = amount ?: outstanding
+                require(tahsilat.isPositive) {
+                    "Tahsil edilecek tutar sıfırdan büyük olmalı."
+                }
+                require(tahsilat <= outstanding) {
+                    "Tahsilat kalan borcu aşamaz: kalan $outstanding, girilen $tahsilat."
+                }
+
                 ledgerRepository.recordPayment(
-                    amount = outstanding,
+                    amount = tahsilat,
                     method = member.paymentType,
                     description = "${member.fullName} - Paket ödemesi alındı",
                     memberId = memberId,
                     occurredAtMs = nowMs,
                 ).getOrThrow()
+
+                // Kısmi tahsilatta borç sürüyor; üye "Ödendi" sayılmamalı.
+                // Sayılsaydı kalan borç hiçbir listede uyarı üretmez ve
+                // tahsil edilecek para sessizce unutulurdu.
+                if ((outstanding - tahsilat).isPositive) return@inTransaction
 
                 memberDao.updateMember(
                     member.copy(paymentStatus = PaymentState.PAID, paymentDateMs = nowMs, updatedAtMs = nowMs)
@@ -371,7 +400,7 @@ class MemberRepository(
         }
     }
 
-    suspend fun updateMemberInfo(member: MemberEntity) {
+    suspend fun updateMemberInfo(member: MemberEntity): Result<Unit> = runCatching {
         val nowMs = Now.epochMillis()
         database.inTransaction {
             memberDao.updateMember(member.copy(updatedAtMs = nowMs))

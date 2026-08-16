@@ -53,6 +53,8 @@ fun MarketScreen(
                     showCheckoutSheet = false
                     snackbarHostState.showSnackbar("Sipariş tamamlandı (#${event.orderId.take(8)})")
                 }
+                is MarketEvent.ProductSaved ->
+                    snackbarHostState.showSnackbar("Ürün kaydedildi.")
                 is MarketEvent.ProductDeleted ->
                     snackbarHostState.showSnackbar("Ürün silindi.")
                 is MarketEvent.Failed ->

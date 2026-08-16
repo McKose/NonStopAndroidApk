@@ -9,7 +9,6 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Sync
 import com.gymapp.data.sync.SyncState
 import androidx.compose.material3.*
@@ -31,7 +30,6 @@ fun SettingsScreen(
     val syncState by viewModel.syncState.collectAsState()
     val pendingCount by viewModel.pendingCount.collectAsState()
 
-    var showCommissionDialog by remember { mutableStateOf(false) }
     var showSalonInfoDialog by remember { mutableStateOf(false) }
 
     // Çıkışta cihazdaki veri siliniyor; gönderilmemiş kayıt varsa önce soruluyor.
@@ -87,15 +85,14 @@ fun SettingsScreen(
                 onClick = onNavigateToPersonnel
             )
             
-            HorizontalDivider()
-            Text("Finansal Ayarlar", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-
-            SettingsItem(
-                title = "Hakediş Oranları",
-                subtitle = "Özel ders ve MultiSport hakediş oranlarını belirle",
-                icon = Icons.Default.Percent,
-                onClick = { showCommissionDialog = true }
-            )
+            // KALDIRILDI: "Hakediş Oranları". Girilen iki oran yalnızca bu
+            // ekranın kendisi tarafından yazılıp okunuyordu; gerçek hakediş
+            // hesabı `staff.commissionBasisPoints` üzerinden yapılıyor
+            // (`AppointmentRepository`). Yani salon sahibi buradan oranı
+            // değiştirdiğinde hiçbir şey değişmiyor, ama değiştirdiğini
+            // sanıyordu. Çalışıyormuş gibi görünen ama hiçbir etkisi olmayan
+            // bir ayar, olmamasından daha kötü — oran artık personel kartından
+            // giriliyor.
 
             HorizontalDivider()
             Text("Sistem", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
@@ -126,41 +123,6 @@ fun SettingsScreen(
                 icon = Icons.Default.Logout,
                 onClick = { viewModel.requestLogout(onLogout) }
             )
-        }
-
-        if (showCommissionDialog) {
-            ConfigDialog(
-                title = "Hakediş Ayarları",
-                onDismiss = { showCommissionDialog = false }
-            ) {
-                var rateText by remember { mutableStateOf(viewModel.commissionRate.toString()) }
-                var msRateText by remember { mutableStateOf(viewModel.multiSportCommission.toString()) }
-
-                OutlinedTextField(
-                    value = rateText,
-                    onValueChange = { rateText = it },
-                    label = { Text("Eğitmen Hakediş (%)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = msRateText,
-                    onValueChange = { msRateText = it },
-                    label = { Text("MultiSport Hakediş (TL/Ders)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = {
-                        viewModel.updateCommissionRate(rateText.toFloatOrNull() ?: 0f)
-                        viewModel.updateMultiSportCommission(msRateText.toFloatOrNull() ?: 0f)
-                        showCommissionDialog = false
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Kaydet")
-                }
-            }
         }
 
         if (showSalonInfoDialog) {

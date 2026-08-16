@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 /** Bir kez tüketilen kullanıcı bildirimleri (Snackbar). */
 sealed interface MemberEvent {
     data object Deleted : MemberEvent
+    data class Saved(val message: String) : MemberEvent
     data class Failed(val message: String) : MemberEvent
 }
 
@@ -334,13 +335,19 @@ class MemberViewModel(
                 leg = leg,
                 arm = arm,
                 notes = notes,
+            ).fold(
+                onSuccess = { _events.send(MemberEvent.Saved("Ölçüm kaydedildi.")) },
+                onFailure = { _events.send(MemberEvent.Failed(it.message ?: "Ölçüm kaydedilemedi.")) },
             )
         }
     }
 
     fun updateMember(member: MemberEntity) {
         viewModelScope.launch {
-            repository.updateMemberInfo(member)
+            repository.updateMemberInfo(member).fold(
+                onSuccess = { _events.send(MemberEvent.Saved("Bilgiler güncellendi.")) },
+                onFailure = { _events.send(MemberEvent.Failed(it.message ?: "Güncellenemedi.")) },
+            )
         }
     }
 
@@ -361,9 +368,22 @@ class MemberViewModel(
         _formState.update { it.copy(submitError = null) }
     }
 
-    fun markAsPaid(memberId: String) {
+    /** Üyenin kalan borcu — tahsilat diyaloğu açılmadan önce okunur. */
+    suspend fun outstandingBalance(memberId: String): Money = repository.outstandingBalance(memberId)
+
+    /**
+     * Tahsilat yazar.
+     *
+     * [amount] `null` ise kalan borcun tamamı. Ekran tutarı gösterip
+     * değiştirilebilir kıldığı için normalde açıkça veriliyor; önceden tutar
+     * hiç görünmüyor ve her zaman tamamı tahsil ediliyordu.
+     */
+    fun markAsPaid(memberId: String, amount: Money? = null) {
         viewModelScope.launch {
-            repository.updatePaymentStatus(memberId, true)
+            repository.updatePaymentStatus(memberId, isPaid = true, amount = amount).fold(
+                onSuccess = { _events.send(MemberEvent.Saved("Tahsilat kaydedildi.")) },
+                onFailure = { _events.send(MemberEvent.Failed(it.message ?: "Tahsilat kaydedilemedi.")) },
+            )
         }
     }
 }

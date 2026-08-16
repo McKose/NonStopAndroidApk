@@ -44,19 +44,11 @@ class SettingsViewModel(
         sync.requestSync()
     }
 
-    var commissionRate by mutableStateOf(prefs.commissionRate)
-    var multiSportCommission by mutableStateOf(prefs.multiSportCommission)
+    // KALDIRILDI: `commissionRate` / `multiSportCommission`. Yalnızca Ayarlar
+    // ekranının kendisi yazıp okuyordu; gerçek hakediş `staff.commissionBasisPoints`
+    // üzerinden hesaplanıyor. Kullanıcı oranı değiştirdiğini sanıyor, hiçbir
+    // hesap değişmiyordu.
     var salonName by mutableStateOf(prefs.salonName)
-
-    fun updateCommissionRate(value: Float) {
-        commissionRate = value
-        prefs.commissionRate = value
-    }
-
-    fun updateMultiSportCommission(value: Float) {
-        multiSportCommission = value
-        prefs.multiSportCommission = value
-    }
 
     fun updateSalonName(value: String) {
         salonName = value
