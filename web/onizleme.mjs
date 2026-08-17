@@ -38,7 +38,35 @@ const govde = oku("index.html")
   .replace(/^[\s\S]*<main id="uygulama">/, '<main id="uygulama">')
   .replace(/<\/main>[\s\S]*$/, "</main>");
 
-const betik = birlestir(["domain.js", "ozet.js", "suzme.js", "demo.js", "app.js"])
+/**
+ * Birleştirmeye giren dosyalar, bağımlılık sırasıyla.
+ *
+ * `app.js` en sonda: diğerlerinin tanımlarını kullanıyor.
+ *
+ * `supabase.js` önizlemede hiç **çağrılmıyor** (demo moduna sabitlenmiş) ama
+ * listeye giriyor: `app.js` onu import ediyor ve dışarıda bırakmak, önizlemenin
+ * yalnızca üçlü operatörün o dalı hiç değerlendirilmediği için çalışması demek
+ * olurdu. Şansa bağlı çalışan bir şey, çalışmıyor sayılır.
+ *
+ * Bu liste elle tutuluyor ve **eksik kalması sessiz bir hata**: unutulan modülün
+ * fonksiyonları önizlemede tanımsız olur, sayfa da yalnızca o sekmeye
+ * basıldığında bozulur. `onizleme.test.js` bu yüzden listeyi koddaki
+ * `import`larla karşılaştırıyor — yeni bir modül eklenip buraya yazılmazsa test
+ * düşüyor. (Bu tam olarak `stok.js` ve `roller.js` eklenirken yaşandı.)
+ */
+export const BIRLESTIRILEN = [
+  "supabase.js",
+  "domain.js",
+  "ozet.js",
+  "suzme.js",
+  "roller.js",
+  "sekmeler.js",
+  "stok.js",
+  "demo.js",
+  "app.js",
+];
+
+const betik = birlestir(BIRLESTIRILEN)
   // Önizleme her zaman demo: `demoMu()` adres çubuğuna bakıyor, burada
   // bakılacak bir adres yok.
   .replace(/function demoMu\(\)[\s\S]*?\n}/, "function demoMu() {\n  return true;\n}");

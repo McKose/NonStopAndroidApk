@@ -179,6 +179,16 @@ export class SupabaseClient {
       return { tur: "hata", mesaj: `${tablo} okunamadı (${yanit.status}): ${govde.slice(0, 200)}` };
     }
 
-    return { tur: "tamam", satirlar: await yanit.json().catch(() => []) };
+    const satirlar = await yanit.json().catch(() => []);
+
+    // `kesildi`: sunucu sınıra dayandı mı, yani daha fazla satır olabilir mi?
+    //
+    // Liste göstermek için önemsiz (birkaç yüz satırdan sonrasını kimse
+    // okumuyor), ama TOPLAMA girecek veri için kritik: 500 hareketin ilk
+    // 500'ünden hesaplanmış bir stok sayısı, doğru bir stok sayısından ayırt
+    // edilemez. Çağıran taraf bunu bilmeden toplam alırsa sessizce yanlış bir
+    // sayı gösterir. Stok sekmesi bu yüzden kesildiğinde sayı yerine "?"
+    // gösteriyor.
+    return { tur: "tamam", satirlar, kesildi: satirlar.length >= limit };
   }
 }

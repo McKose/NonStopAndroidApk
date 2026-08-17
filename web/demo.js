@@ -17,18 +17,23 @@ const simdi = Date.now();
 const kimlik = (onEk, n) => `${onEk}-demo-${n}`;
 
 const UYELER = [
-  ["Ayşe Yılmaz", "+905321112233", 12 * GUN, 8, 240000, "ACTIVE"],
-  ["Mehmet Kaya", "+905321112244", 45 * GUN, null, 480000, "ACTIVE"],
-  ["Zeynep Demir", "+905321112255", 3 * GUN, 2, 180000, "ACTIVE"],
-  ["Ali Şahin", "+905321112266", -8 * GUN, 0, 180000, "ACTIVE"],
-  ["Elif Arslan", "+905321112277", 20 * GUN, 10, 300000, "FROZEN"],
-  ["Burak Öztürk", "+905321112288", 6 * GUN, 4, 240000, "ACTIVE"],
-  ["Selin Aydın", "+905321112299", -30 * GUN, 0, 150000, "ARCHIVED"],
-].map(([ad, tel, bitisFark, kalan, odenen, durum], i) => ({
+  ["Ayşe Yılmaz", "+905321112233", 12 * GUN, 8, 240000, "ACTIVE", "ayse@ornek.com"],
+  ["Mehmet Kaya", "+905321112244", 45 * GUN, null, 480000, "ACTIVE", "mehmet@ornek.com"],
+  ["Zeynep Demir", "+905321112255", 3 * GUN, 2, 180000, "ACTIVE", "zeynep@ornek.com"],
+  ["Ali Şahin", "+905321112266", -8 * GUN, 0, 180000, "ACTIVE", null],
+  ["Elif Arslan", "+905321112277", 20 * GUN, 10, 300000, "FROZEN", "elif@ornek.com"],
+  ["Burak Öztürk", "+905321112288", 6 * GUN, 4, 240000, "ACTIVE", null],
+  ["Selin Aydın", "+905321112299", -30 * GUN, 0, 150000, "ARCHIVED", "selin@ornek.com"],
+].map(([ad, tel, bitisFark, kalan, odenen, durum, eposta], i) => ({
   id: kimlik("uye", i),
   tenant_id: "demo",
   full_name: ad,
   phone: tel,
+  // Panel bu alanda arama yapıyor ve şemada var (`gym_members.email`), ama demo
+  // verisi taşımıyordu: önizlemede e-posta aramasını denemek mümkün değildi.
+  // Bir kısmı bilinçli olarak `null` — alan şemada isteğe bağlı ve arama boş
+  // değerde çökmemeli.
+  email: eposta,
   status: durum,
   end_date_ms: simdi + bitisFark,
   start_date_ms: simdi + bitisFark - 90 * GUN,
@@ -69,6 +74,9 @@ const RANDEVULAR = Array.from({ length: 8 }, (_, i) => ({
   start_time_ms: simdi - i * GUN,
   end_time_ms: simdi - i * GUN + 60 * 60 * 1000,
   state: ["COMPLETED", "COMPLETED", "SCHEDULED", "NO_SHOW"][i % 4],
+  // Panel randevu notlarında arama yapıyor; alan şemada isteğe bağlı, o yüzden
+  // bir kısmı bilinçli olarak `null` — arama boş değerde çökmemeli.
+  notes: [null, "Sakatlık sonrası dönüş", null, "Haber vermeden gelmedi"][i % 4],
   session_value_minor: 20000,
   settled_at_ms: i % 4 < 2 ? simdi - i * GUN : null,
   created_at_ms: simdi - (i + 5) * GUN,
@@ -96,11 +104,112 @@ const DEFTER = [
   reverses_id: null,
 }));
 
+const URUNLER = [
+  ["Su 0.5L", "DRINK", 1500],
+  ["Protein Bar", "SNACK", 4500],
+  ["Shaker", "EQUIPMENT", 12000],
+  ["Havlu", "EQUIPMENT", 8000],
+  ["İzotonik", "DRINK", 3000],
+].map(([ad, kat, fiyat], i) => ({
+  id: kimlik("urun", i),
+  tenant_id: "demo",
+  name: ad,
+  category: kat,
+  price_minor: fiyat,
+  image_url: null,
+  is_active: true,
+  created_at_ms: simdi - 150 * GUN,
+  updated_at_ms: simdi - 10 * GUN,
+  deleted_at_ms: null,
+}));
+
+/**
+ * Stok hareketleri: her ürün farklı bir duruma denk geliyor.
+ *
+ * Bilinçli olarak "hepsi bol" değil — ekranın tükenen, azalan ve **negatif**
+ * durumları nasıl gösterdiği demo üzerinden görülebilsin. Negatif stok gerçek
+ * bir veri sorunu (fazla satış ya da eksik alım kaydı) ve panelin onu gizlemek
+ * yerine göstermesi bilinçli bir karar; demoda karşılığı olmasa o karar hiç
+ * görünmezdi.
+ *
+ * `İzotonik`in hiç hareketi yok: hiç hareketi olmayan ürün sıfır sayılıyor.
+ */
+const STOK_HAREKETLERI = [
+  ["urun-demo-0", 48, "PURCHASE", 20],
+  ["urun-demo-0", -6, "SALE", 3],
+  ["urun-demo-0", -2, "SALE", 1],
+  ["urun-demo-1", 24, "PURCHASE", 30],
+  ["urun-demo-1", -21, "SALE", 5],
+  ["urun-demo-2", 6, "PURCHASE", 40],
+  ["urun-demo-2", -6, "SALE", 2],
+  ["urun-demo-3", 2, "PURCHASE", 60],
+  ["urun-demo-3", -5, "SALE", 4],
+].map(([urun, delta, sebep, gunOnce], i) => ({
+  id: kimlik("stok", i),
+  tenant_id: "demo",
+  product_id: urun,
+  quantity_delta: delta,
+  reason: sebep,
+  order_id: sebep === "SALE" ? kimlik("siparis", i % 4) : null,
+  note: null,
+  occurred_at_ms: simdi - gunOnce * GUN,
+  created_at_ms: simdi - gunOnce * GUN,
+}));
+
+const SIPARISLER = [
+  [0, 9000, 0, "CASH", "PAID", "POST_DELIVERY", 1],
+  [1, 4500, 500, "CARD", "PAID", "POST_DELIVERY", 2],
+  [2, 12000, 0, "CARD", "PENDING", "PRE_DELIVERY", 4],
+  [null, 3000, 0, "CASH", "PAID", "POST_DELIVERY", 6],
+].map(([uyeIndex, tutar, indirim, yontem, odeme, teslim, gunOnce], i) => ({
+  id: kimlik("siparis", i),
+  tenant_id: "demo",
+  // Üyesiz satış gerçek bir durum: salona gelen misafir de ürün alıyor.
+  member_id: uyeIndex === null ? null : kimlik("uye", uyeIndex),
+  total_price_minor: tutar,
+  discount_minor: indirim,
+  final_price_minor: tutar - indirim,
+  payment_method: yontem,
+  payment_status: odeme,
+  delivery_status: teslim,
+  date_ms: simdi - gunOnce * GUN,
+  notes: i === 2 ? "Sipariş edildi, gelince teslim" : null,
+  created_at_ms: simdi - gunOnce * GUN,
+  updated_at_ms: simdi - gunOnce * GUN,
+  deleted_at_ms: null,
+}));
+
+const PERSONEL = [
+  ["Cağatay Köse", "Salon sahibi", "ADMIN", "Merkez", 0, 0, "cagatay"],
+  ["Deniz Yıldız", "Müdür", "MANAGER", "Merkez", 500, 3500000, "deniz"],
+  ["Emre Tan", "Eğitmen", "TRAINER", "Merkez", 4000, 0, "emre"],
+  ["Naz Kılıç", "Reformer eğitmeni", "TRAINER", "Merkez", 3500, 1200000, "naz"],
+].map(([ad, unvan, rol, sube, hakedis, maas, takma], i) => ({
+  id: kimlik("personel", i),
+  tenant_id: "demo",
+  full_name: ad,
+  title: unvan,
+  role: rol,
+  branch: sube,
+  commission_basis_points: hakedis,
+  monthly_salary_minor: maas,
+  phone: `+90532999${String(i).padStart(4, "0")}`,
+  nickname: takma,
+  is_active: true,
+  created_at_ms: simdi - 300 * GUN,
+  updated_at_ms: simdi - 20 * GUN,
+  deleted_at_ms: null,
+}));
+
 const TABLOLAR = {
   gym_members: UYELER,
   gym_packages: PAKETLER,
   appointments: RANDEVULAR,
   ledger_entries: DEFTER,
+  products: URUNLER,
+  stock_movements: STOK_HAREKETLERI,
+  orders: SIPARISLER,
+  staff: PERSONEL,
 };
 
 /**
@@ -140,7 +249,12 @@ export function demoIstemcisi() {
 
     async oku(tablo) {
       if (!oturum) return { tur: "oturumsuz" };
-      return { tur: "tamam", satirlar: TABLOLAR[tablo] ?? [] };
+      // `kesildi` gerçek istemcideki alanın karşılığı ve demoda her zaman
+      // `false`: örnek veri sınıra dayanmıyor. Alanın burada da bulunması
+      // gerekiyor çünkü app.js iki istemciyi ayırt etmiyor; eksik olsaydı
+      // `undefined` gelir ve stok sekmesi demoda gerçekte olmayan bir yoldan
+      // geçerdi.
+      return { tur: "tamam", satirlar: TABLOLAR[tablo] ?? [], kesildi: false };
     },
   };
 }
