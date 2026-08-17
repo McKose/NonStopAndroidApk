@@ -63,7 +63,12 @@ kendi anahtarını üretiyordu; `INSTALL_FAILED_UPDATE_INCOMPATIBLE` alıp
 Göçü denemek için gereken eski veri, denemeye başlamadan yok oluyordu.
 
 Anahtar gizli değil (şifresi `android`, Android'in kendi varsayılanı) ve yalnızca
-hata ayıklama yapısını imzalıyor. Yayın imzası bundan tamamen ayrı.
+hata ayıklama yapısını imzalıyor. Yayın imzası bundan tamamen ayrı —
+bkz. [`docs/yayin.md`](docs/yayin.md).
+
+> **Dikkat:** Hata ayıklama ve yayın APK'ları **farklı** anahtarlarla imzalı,
+> dolayısıyla biri diğerinin üzerine kurulamaz. Yayın sürümüne geçerken bir kez
+> kaldırmak gerekiyor ve o uygulama verisini siler.
 
 > **Göçü denemek için:** önce **eski** sürümün APK'sını kurup veri girin, sonra
 > yeni APK'yı `adb install -r` ile üzerine kurun. Uygulama açılıyor ve veriler

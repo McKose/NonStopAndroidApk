@@ -251,6 +251,82 @@ class SupabaseAuthApiTest {
         assertTrue(!hata.retryable, "Bozuk yanıtı tekrar denemek aynı sonucu verir")
     }
 
+    // ─── Hangi istek düştü ──────────────────────────────────────────────────
+    //
+    // Giriş iki isteğe dayanıyor ve ikisi de aynı biçimde hata üretiyordu.
+    // Gerçek bir kurulumda "Beklenmeyen yanıt (404): Invalid path specified in
+    // request URL" alındı ve hangi çağrının 404 verdiği mesajdan anlaşılamadı —
+    // oysa ikisi tamamen farklı sebeplere işaret ediyor (yanlış sunucu adresi mi,
+    // eksik `gym_users` tablosu mu). Bu yüzden uç nokta mesaja giriyor.
+
+    @Test
+    fun `jeton ucundaki 404 hangi adresin dustugunu soyler`() = runTest {
+        val sonuc = api(
+            jetonDurumu = HttpStatusCode.NotFound,
+            jetonGovdesi = """{"message":"Invalid path specified in request URL"}""",
+        ).signIn("personel@ornek.com", "sifre")
+
+        val hata = assertIs<AuthResult.Failed>(sonuc)
+        assertTrue(hata.reason.contains("404"), hata.reason)
+        assertTrue(
+            hata.reason.contains("https://ornek.supabase.co/auth/v1/token"),
+            "Düşen uç nokta mesajda olmalı: ${hata.reason}",
+        )
+        assertTrue(
+            hata.reason.contains("sunucu adresi yanlış olabilir"),
+            "404 için adres ipucu verilmeli: ${hata.reason}",
+        )
+        assertTrue(!hata.retryable, "Yanlış adresi tekrar denemek aynı sonucu verir")
+    }
+
+    @Test
+    fun `salon ucundaki 404 jeton ucundan ayirt edilebilir`() = runTest {
+        val sonuc = api(
+            salonDurumu = HttpStatusCode.NotFound,
+            salonGovdesi = """{"message":"Invalid path specified in request URL"}""",
+        ).signIn("personel@ornek.com", "sifre")
+
+        val hata = assertIs<AuthResult.Failed>(sonuc)
+        assertTrue(
+            hata.reason.contains("https://ornek.supabase.co/rest/v1/gym_users"),
+            "Salon araması düştüğünde o uç nokta yazmalı: ${hata.reason}",
+        )
+        assertTrue(
+            !hata.reason.contains("/auth/v1/token"),
+            "İki uç nokta karışmamalı: ${hata.reason}",
+        )
+    }
+
+    /**
+     * Kimlik hatasında adres eklenmiyor.
+     *
+     * Orada sorun neredeyse her zaman şifre; teknik ayrıntı yalnızca gürültü
+     * olur ve kullanıcıyı yanlış yere bakmaya gönderir.
+     */
+    @Test
+    fun `kimlik hatasi teknik ayrinti tasimaz`() = runTest {
+        val sonuc = api(
+            jetonDurumu = HttpStatusCode.BadRequest,
+            jetonGovdesi = """{"error_description":"Invalid login credentials"}""",
+        ).signIn("personel@ornek.com", "yanlis")
+
+        val hata = assertIs<AuthResult.InvalidCredentials>(sonuc)
+        assertEquals("Invalid login credentials", hata.reason)
+        assertTrue(!hata.reason.contains("supabase.co"), "Adres kimlik hatasına girmemeli")
+    }
+
+    /** Anahtar ve başlıklar hata mesajına ASLA girmemeli. */
+    @Test
+    fun `hata mesaji anahtari sizdirmaz`() = runTest {
+        val sonuc = api(
+            jetonDurumu = HttpStatusCode.NotFound,
+            jetonGovdesi = """{"message":"Invalid path specified in request URL"}""",
+        ).signIn("personel@ornek.com", "sifre")
+
+        val hata = assertIs<AuthResult.Failed>(sonuc)
+        assertTrue(!hata.reason.contains("anon-anahtar"), "Anahtar mesaja girmiş: ${hata.reason}")
+    }
+
     // ─── Jeton yenileme ─────────────────────────────────────────────────────
 
     @Test

@@ -239,7 +239,55 @@ Panelin ayrıca tek seferlik bir adımı daha var (GitHub Pages'in açılması);
 `web/README.md` → "Tek seferlik kurulum".
 
 Değerler eksikken derlemeyi düşürmemek bilinçli: ayarları olmayan biri de
-uygulamanın ekranlarına bakabilsin diye.
+uygulamanın ekranlarına bakabilsin diye. **Eksik olmak** ile **yanlış olmak** ise
+ayrı: yanlış biçimli bir adres derlemeyi düşürüyor (aşağıya bakın).
+
+### Giriş "404 Invalid path specified in request URL" diyorsa
+
+Bu mesaj **sunucudan** geliyor ve neredeyse her zaman tek bir şey demek:
+`SUPABASE_URL` yanlış. Ayar eksik olsaydı mesaj "sunucu ayarları eksik" olurdu,
+yani değer var ama hatalı.
+
+Doğru değer **yalnızca sunucu adı**, sonunda hiçbir yol olmadan:
+
+```
+https://jvkytncwedjcvssilhih.supabase.co        ✓
+https://jvkytncwedjcvssilhih.supabase.co/       ✗ sondaki eğik çizgi
+https://jvkytncwedjcvssilhih.supabase.co/rest/v1 ✗ yol eklenmiş
+https://supabase.com/dashboard/project/...      ✗ bu PANO adresi, API adresi değil
+```
+
+Son satır en sık yapılan hata: tarayıcıdaki adres çubuğundaki adres kopyalanıyor,
+oysa gereken **Settings → API → Project URL** kutusundaki değer.
+
+**Değeri nasıl kontrol ederim?** GitHub gizli anahtarları **geri okunamıyor** —
+panelde yalnızca üzerine yazabilirsiniz, değerini göremezsiniz. Üç yol var:
+
+1. **CI günlüğüne bakın (en kolay).** Her derlemede "Sunucu ayarlarını yaz"
+   adımı adresin biçimini sınıyor. Yanlışsa iş **düşüyor** ve hangi kuralın
+   bozulduğunu yazıyor (değeri yazdırmadan — gizli anahtarlar günlükte
+   maskelendiği için zaten yazdırmak işe yaramaz).
+
+2. **Elinizdeki APK'nın içine bakın.** Adres derleme sırasında gömülüyor:
+
+   ```bash
+   unzip -p app-debug.apk classes.dex | strings | grep -i 'supabase.co'
+   ```
+
+   Çıkan değer uygulamanın gerçekten kullandığı adres. Yol içeriyorsa ya da
+   `supabase.com/dashboard` ile başlıyorsa sorun bu.
+
+3. **Panelle karşılaştırın.** Panel adresi **birebir aynı biçimde** kuruyor
+   (`web/supabase.js`). Panel çalışıyor ama uygulama çalışmıyorsa iki yerdeki
+   değer farklı demektir: panelin `web/config.js`'i ile depo gizli anahtarını
+   eşitleyin.
+
+Düzelttikten sonra **yeni bir APK üretmek gerekiyor** — adres derleme sırasında
+gömülüyor, elinizdeki APK eski değeri taşımaya devam eder.
+
+> Uygulamanın hata mesajı artık hangi adrese gidildiğini de yazıyor
+> (`[https://.../auth/v1/token]`), yani yeni APK'da sebep doğrudan ekranda
+> görünüyor.
 
 ---
 

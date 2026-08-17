@@ -18,3 +18,14 @@ push_to_github.ps1
 
 # Panelin proje ayarları — kuruluma özgü, depoya girmez.
 web/config.js
+
+# Yayın imzalama anahtarı ve şifreleri — ASLA depoya girmez.
+#
+# `app/debug.keystore` bilinçli olarak depoda ve bu desenlerin dışında: o anahtar
+# gizli değil, yalnızca hata ayıklama yapısını imzalıyor. Yayın anahtarı ise
+# kaybedilirse aynı uygulamayı bir daha güncelleyemezsiniz, sızarsa başkası sizin
+# adınıza sürüm yayınlayabilir.
+keystore.properties
+*.jks
+release.keystore
+app/release.keystore

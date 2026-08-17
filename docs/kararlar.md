@@ -408,6 +408,59 @@ hatalardan biri olduğu için, onu telefonda deneyememek kabul edilebilir değil
 yapısını imzalıyor ve hiçbir mağazaya bir şey yüklemiyor. Yayın imzası buna
 bağlanmayacak — o anahtar depoya değil depo gizli anahtarlarına girer.
 
+## Yayın anahtarı depoda değil, hata ayıklama anahtarı depoda
+
+**Karar:** `app/debug.keystore` depoda; yayın anahtarı depo gizli
+anahtarlarında (CI) ya da `keystore.properties`te (yerel, `.gitignore`'da).
+
+**Neden ayrım:** İkisi aynı türde dosya ama taşıdıkları risk aynı değil. Hata
+ayıklama anahtarı gizli değil — şifresi Android'in varsayılanı, yalnızca test
+yapısını imzalıyor. Yayın anahtarı **kaybedilirse** aynı uygulama bir daha
+güncellenemiyor (Android güncellemeyi yalnızca aynı anahtarla imzalanmışsa kabul
+ediyor; yeni anahtar, kullanıcının uygulamayı kaldırıp yeniden kurması ve
+**verisini kaybetmesi** demek), **sızarsa** başkası aynı uygulama gibi görünen
+bir sürüm yayınlayabiliyor.
+
+**Yayın imzası yoksa hata ayıklama anahtarına DÜŞÜLMÜYOR.** Bu, kolay ve yanlış
+olan seçenekti: debug anahtarıyla imzalı bir "yayın" APK'sı kurulur, çalışır ve
+yayın gibi görünür — ama gerçek yayın anahtarıyla bir daha asla güncellenemez.
+Sessiz ve geri dönüşü olmayan bir hata. Onun yerine imza atlanıyor ve AGP
+çıktıyı `app-release-unsigned.apk` diye adlandırıyor: imzasız olduğu dosya
+adından anlaşılıyor.
+
+**Günlük CI eksik anahtarla düşmüyor, yayın akışı düşüyor.** İkisi farklı iş
+yapıyor: günlük CI derlemenin geçtiğini gösteriyor, yayın akışı ise yalnızca
+imzalı bir APK üretmek için var. İkincisinin imzasız bir çıktıyla "başarılı"
+olması, yayınlanamayacak bir şeyi yayınlanmış göstermek olurdu.
+
+## Sürüm numarası etiketten türer
+
+**Karar:** `versionName` yayın etiketinden geliyor (`-PsurumAdi=1.2.0`),
+`versionCode` ondan hesaplanıyor (`major*10000 + minor*100 + patch`). İkisi de
+elle yazılmıyor.
+
+**Neden:** Sabit yazılıydı (`1` / `"1.0"`). Dağıtımda bu iki sessiz hataya
+açık: aynı `versionCode` ile ikinci bir sürüm yayınlanamıyor (cihaz
+güncellemeyi görmüyor) ve elle artırmak unutulduğunda hiçbir şey şikâyet
+etmiyor. Etiketten türetince APK'nın içindeki sürüm ile yayınlanan sürüm aynı
+kaynaktan geliyor.
+
+**Ara numaralar 100'ün altında kalmalı** ve aşılırsa derleme düşüyor: sessizce
+geriye giden bir `versionCode`, güncellemenin cihazda hiç görünmemesi demek.
+`0.0.0` da reddediliyor — biçime uyuyor ama `versionCode = 0` üretiyor ve
+Android en az 1 istiyor.
+
+**Etiketsiz derlemelerin sürümü `0.0.0-gelistirme`.** Yayın olmadığı APK'nın
+kendisinden anlaşılıyor.
+
+**Yayın akışı türetmenin uygulandığını da doğruluyor:** APK'nın içindeki
+`versionName` `aapt2 dump badging` ile okunup etiketle karşılaştırılıyor.
+`-PsurumAdi` bir yazım hatasıyla düşerse Gradle sessizce varsayılana döner ve
+`v1.2.0` etiketiyle `0.0.0` sürümlü bir APK yayınlanırdı. Aynı sebeple imza da
+`apksigner verify` ile kriptografik olarak doğrulanıyor: `signingConfig` bir
+şekilde boş kalırsa AGP derlemeyi düşürmüyor, yalnızca dosya adına `-unsigned`
+ekliyor.
+
 ## Room şemasının depoda olması sınanıyor
 
 **Karar:** CI, `@Database(version = ...)` değerini okuyup o sürümün şema
