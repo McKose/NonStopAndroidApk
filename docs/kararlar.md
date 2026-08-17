@@ -429,6 +429,15 @@ bakılan bir teşhis turu demekti.
 mümkün olmuyor (bulut depolama adresleri ağ ilkelerince engellenebiliyor —
 bu depoda bizzat yaşandı), ama günlükten kopyalamak her zaman mümkün.
 
+**Kolon sırası geçiş testlerinde sıralı karşılaştırılmıyor.** Room tabloyu
+**ada** göre doğruluyor; `TableInfo` kolonları ada göre eşlenmiş bir küme ve
+sıra eşitliğe girmiyor. Bu, `ALTER TABLE ... ADD COLUMN` kullanan geçişlerde
+gözle görülür bir fark yaratıyor: kolon fiziksel olarak tablonun **sonuna**
+ekleniyor, şema dosyası ise onu alan tanımındaki yerinde listeliyor. İkisini
+sıralı karşılaştırmak, çalışan bir geçişi düşen bir test hâline getirirdi.
+Tabloyu yeniden kuran geçişlerde (ör. kolon silme) sıra birebir tutuyor ve
+orada sıralı karşılaştırma yapılıyor.
+
 ## Senkronizasyon yazma anında tetiklenmez
 
 **Karar:** Tetikleme girişte, oturum geri yüklendiğinde, uygulama önplandayken
