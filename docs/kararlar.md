@@ -166,6 +166,54 @@ anlamsız bir karar dayatmak olurdu.
 **Neden:** `0.1 + 0.2 != 0.3`; toplamlar zamanla sapar. KMP'de `BigDecimal`
 stdlib'de olmadığı için taşınabilir çözüm tam sayı minor unit.
 
+## Fiyat kalemleri de hesabın parçası
+
+**Karar:** `Pricing.breakdown` tutarın kalemlerini (paket fiyatı, uygulanan
+iskonto, ara toplam, vade farkı oranı ve tutarı) tek bir yapıda veriyor.
+`finalPrice` bu yapının yalnızca toplamını döndüren bir kabuk; `PriceBreakdown.total`
+saklanmıyor, kalemlerden türetiliyor.
+
+**Neden:** Önceden yalnızca toplam hesaplanıyordu, kalemleri ekran kendisi
+üretiyordu. İkisi ayrıştı: iskonto satırı kullanıcının **yazdığı ham metni**
+basıyor, toplam ise paket fiyatına kırpılmış değerle hesaplanıyordu. Paket 1.000
+TL iken 5.000 TL iskonto yazan biri şunu görüyordu:
+
+```
+Paket Fiyatı        ₺1.000
+İskonto             -₺5.000
+Ödenecek Tutar      ₺0,00
+```
+
+Kart, kendi içinde tutarsız bir aritmetik gösteriyordu. Vade farkı ise hiçbir
+satırda yazmıyordu: taksit seçilince toplam sebepsiz yükseliyor görünüyordu.
+
+**Kırpma duruyor ama görünür.** Sessizce kırpmak yerine ekran "en fazla şu kadar
+uygulandı" diyor — market sepeti bunu zaten doğru yapıyordu, üyelik formu
+yapmıyordu.
+
+**Ekran önizlemesi ayrı bir yol değil.** TL (`Double`) üzerinden hesaplayan
+`previewPrice` kaldırıldı; gösterilen ile kaydedilen arasında artık dönüşüm
+farkı bile yok.
+
+**Türetilmiş değer, saklanan değil.** Önizleme fiyatı bir alan olarak
+tutulduğunda, fiyatı etkileyen dört ayrı işleyicinin her biri onu yeniden
+hesaplamakla yükümlüydü; beşincisini eklemek ya da birinde unutmak ekranda eski
+tutarın kalması demekti. Kalemler artık form durumundan türetiliyor.
+
+## Ekrana yazılan sayı da uygulamanın biçimini kullanır
+
+**Karar:** Yüzde değerleri `Rate.percentLabel` ile yazılıyor: ayıraç virgül,
+gereksiz ondalık yok. Para `Money.toString()` ile. Formlara hazır yazılan
+değerler de bu biçimi kullanıyor, `Double.toString()` değil.
+
+**Neden:** Görünen sebep tutarsızlıktı — "%40.0" ve "2500.0", hem klavyenin
+ürettiği ayıraçla hem uygulamanın geri kalanıyla çelişiyordu. Asıl sebep ise
+geri okunamamaları: `Double.toString()` 10.000.000'dan itibaren bilimsel
+gösterime geçiyor ve `Decimals` ayrıştırıcısı "1.0E7" değerini **1.0E8** olarak
+okuyor. O büyüklükte maaşı olan bir personel kartı açılıp maaş alanına hiç
+dokunulmadan kaydedildiğinde maaş on katına çıkıyordu. Biçim bir görünüm
+ayrıntısı değil; kutuya yazılan metin aynı zamanda geri okunacak veri.
+
 ## Ondalık girdi: tek ayrıştırıcı
 
 **Karar:** Kullanıcının yazdığı her ondalık sayı `Decimals.parseOrNull` üzerinden
@@ -300,6 +348,47 @@ gösterilir; hangi ekranla başlanacağı ondan sonra belirlenir.
 yüklenince altından değişirdi — kullanıcı o sırada e-postasını yazmaya başlamış
 olabilirdi. Okuma yerel ve şifre çözme dışında iş yapmıyor, yani bekleme gözle
 görülür değil.
+
+## Çağrılmayan kod tutulmuyor
+
+**Karar:** Hiçbir yerden çağrılmayan sorgu, depo metodu, bileşen ve yardımcı
+siliniyor; yerine neden silindiğini söyleyen bir not bırakılıyor.
+
+**Neden not bırakılıyor:** Silinen şeylerin çoğu bir kez düşünülmüş ve yazılmış
+şeyler. Sessizce silmek, aynı sorunun altı ay sonra yeniden çözülmesi demek —
+notlar "bu denenmişti, şu yüzden kalktı" diyor.
+
+**Neden tutulmuyor:** Çağrılmayan kod derlendiği için doğru sanılıyor ama hiç
+koşmadığı için doğruluğu sınanmıyor. Somut örnekler:
+
+- `LedgerRepository`'nin dönem toplamları "ciro"nun **ikinci tanımıydı**. Bugün
+  ekranın tanımıyla aynı sonucu veriyordu; bunun sürmesini kimse garanti
+  etmiyordu. Biri değişince sessizce ayrışacaktı.
+- `StaffDao.findByAuthUserId`, rol tek kaynağa taşınırken kalkan bir çağrı
+  yerine hizmet ediyordu. Belgesi hâlâ artık var olmayan bir akışı anlatıyordu.
+- İki benzer ölçüm bileşeninden biri ölüydü: sonraki değişikliğin yanlış olanda
+  yapılması an meselesiydi.
+
+**Ölü belge de ölü koddur.** `LedgerDao`'da üst üste iki KDoc bloğu duruyordu;
+Kotlin yalnızca en yakınını bağladığı için üstteki hiçbir yere bağlı değildi ve
+alttakinin **tersini** söylüyordu ("MARKET kayıtları hariç" — oysa geçerli kural
+market borcunu sayıyor). Kod okuyup belgeye güvenen biri yanlış sonuca varırdı.
+
+## Yarım kalmış giriş alanı da bir hata
+
+**Karar:** Durumu, işleyicisi ve kaydı yazılmış ama ekranda kutusu olmayan
+alanlar tamamlandı: üye e-postası, sipariş notu. Ölçüm silme de aynı biçimde
+depoda vardı, ekranda yoktu.
+
+**Neden:** Bunlar "eksik özellik" gibi görünmüyor çünkü kod tamam görünüyor.
+Sonucu ise sessiz: her üye boş e-postayla, her sipariş notsuz kaydediliyordu ve
+yanlış girilen bir ölçüm kayıtta sonsuza kadar kalıyordu. Ölçüm geçmişi zamanla
+karşılaştırmak için tutulduğundan, silinemeyen hatalı bir satır geçmişi kalıcı
+olarak yanlış gösteriyordu.
+
+**İlgili:** Düzeltilen bir eksiğin uyarısı ekranda kalmamalı. "Paket seçiniz"
+hatası yalnızca gönderimde siliniyordu; paket seçildiği anda siliniyor — ad ve
+telefon alanları bunu zaten doğru yapıyordu.
 
 ## Senkronizasyon yazma anında tetiklenmez
 

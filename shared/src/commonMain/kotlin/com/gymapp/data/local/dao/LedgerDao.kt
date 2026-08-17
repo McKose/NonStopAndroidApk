@@ -41,38 +41,15 @@ interface LedgerDao {
     """)
     fun observeForMember(tenantId: String, memberId: String): Flow<List<LedgerEntryEntity>>
 
-    /**
-     * Bir dönemdeki net tutar.
-     *
-     * Ters kayıtlar ve iptal ettikleri kayıtlar birbirini götürsün diye,
-     * ters kaydı bulunan kayıtlar toplamdan düşülür.
-     */
-    @Query("""
-        SELECT COALESCE(SUM(e.amountMinor), 0) FROM ledger_entries e
-        WHERE e.tenantId = :tenantId
-          AND e.type = :type
-          AND e.occurredAtMs >= :startMs AND e.occurredAtMs < :endMs
-          AND e.reversesId IS NULL
-          AND NOT EXISTS (
-              SELECT 1 FROM ledger_entries r WHERE r.reversesId = e.id
-          )
-    """)
-    fun observeNetTotal(tenantId: String, type: String, startMs: Long, endMs: Long): Flow<Long>
+    // KALDIRILDI: `observeNetTotal`. Dönem toplamlarını SQL'de hesaplıyordu ama
+    // hiç çağrılmıyordu; finans ekranı toplamları, gösterdiği listenin aynı
+    // kalemlerinden türetiyor (bkz. `LedgerRepository` içindeki not).
+    //
+    // KALDIRILDI: bu satırın **eski KDoc bloğu**. Aşağıdaki bloğun üstünde
+    // ikinci bir KDoc duruyordu; Kotlin yalnızca en yakınını bağladığı için
+    // ölü belgeydi ve dahası altındakiyle çelişiyordu — "MARKET kayıtları
+    // hariç" diyordu, oysa geçerli kural market **borcunu** sayıyor.
 
-    /**
-     * Üyenin bakiyesi (kuruş): tahakkuk − tahsilat.
-     *
-     * Pozitif değer borcu gösterir. Ödeme durumu artık ayrı bir kolonda
-     * saklanmıyor; defterden türetiliyor.
-     *
-     * MARKET kayıtları hariç. Market satışı kasada anında kapanıyor ve hiç
-     * CHARGE üretmiyor, yalnızca PAYMENT üretiyor; üyeye bağlı bir market
-     * tahsilatı buraya girseydi üyenin **paket borcunu** azaltırdı. Yani üye
-     * 100 TL'lik protein bar aldığında paket borcu 100 TL düşerdi.
-     * [activePaymentsForMember] ile aynı süzgeci kullanmak zorunda: biri
-     * diğerinden farklı bir kayıt kümesine baksaydı "ödemeyi geri al"
-     * sonrasında bakiye eski hâline dönmezdi.
-     */
     /**
      * Üyenin kalan borcu.
      *

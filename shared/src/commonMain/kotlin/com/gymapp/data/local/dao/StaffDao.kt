@@ -37,31 +37,26 @@ interface StaffDao {
     // yapmaktı; kimlik doğrulama Supabase Auth'a taşındı. Çakışma kontrolü
     // aşağıdaki `findByNicknameIncludingDeleted` ile yapılıyor ve o duruyor.
 
+    // KALDIRILDI: `findByAuthUserId`. Aşağıdaki akış hâlinin tek seferlik
+    // eşleniğiydi ve yalnızca giriş anında çağrılıyordu; o çağrı yeri
+    // (`prefs.currentUserId = ...`) rol tek kaynağa taşınırken kalktı.
+    // Tek seferlik okuma zaten yetmiyordu — sebebi aşağıda.
+
     /**
      * Giriş yapan Supabase kullanıcısının personel kaydı — yalnızca **aktif**.
      *
-     * Kimlik doğrulama sunucuda yapıldığı için giriş anında elimizde yalnızca
-     * `auth.users.id` oluyor; randevu ve hakediş kayıtları ise yerel `staff.id`
-     * değerine bakıyor. Bu sorgu iki kimliği birbirine bağlıyor.
+     * Kimlik doğrulama sunucuda yapıldığı için elimizde yalnızca `auth.users.id`
+     * oluyor; randevu ve hakediş kayıtları ise yerel `staff.id` değerine bakıyor.
+     * Bu sorgu iki kimliği birbirine bağlıyor.
      *
      * Silinmiş personel dönmüyor: hesabı hâlâ açık olan eski bir çalışan giriş
      * yapabilir ama kendini personel listesinde bulamamalı.
-     */
-    @Query("""
-        SELECT * FROM staff
-        WHERE tenantId = :tenantId AND authUserId = :authUserId AND deletedAtMs IS NULL
-        LIMIT 1
-    """)
-    suspend fun findByAuthUserId(tenantId: String, authUserId: String): StaffEntity?
-
-    /**
-     * Aynı bağlantının **akış** hâli; oturum boyunca dinlenir.
      *
-     * Tek seferlik okuma yetmiyordu: bağlantı girişte bir kez kuruluyor,
-     * kurulamazsa oturum boyunca kurulamıyordu. Oysa personel kartı sonradan
-     * doldurulabiliyor ve satır senkronizasyon turuyla sonradan inebiliyor —
-     * ikisinde de kullanıcı çıkıp yeniden girene kadar kendi derslerini
-     * göremiyordu. Bkz. [com.gymapp.data.auth.CurrentUser].
+     * **Neden akış:** Bağlantı girişte bir kez kurulup kurulamazsa oturum
+     * boyunca kurulamıyordu. Oysa personel kartı sonradan doldurulabiliyor ve
+     * satır senkronizasyon turuyla sonradan inebiliyor — ikisinde de kullanıcı
+     * çıkıp yeniden girene kadar kendi derslerini göremiyordu.
+     * Bkz. [com.gymapp.data.auth.CurrentUser].
      */
     @Query("""
         SELECT * FROM staff

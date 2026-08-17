@@ -14,7 +14,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
-import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.PaymentState
@@ -90,6 +89,19 @@ fun RegisterMemberScreen(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 prefix = { Text("+90 ") }
+            )
+
+            // E-posta alanı formda **yoktu**: durum, işleyici, kayıt ve
+            // yenilemede geri yükleme yazılmıştı ama girilecek kutu hiç
+            // eklenmemişti. Her üye boş e-postayla kaydediliyordu. Zorunlu
+            // değil — telefon zaten zorunlu ve tekillik onun üzerinden.
+            OutlinedTextField(
+                value = formState.email,
+                onValueChange = viewModel::onEmailChange,
+                label = { Text("E-posta") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
             )
 
             // ─── Sağlık Bilgileri ──────────────────────────────────────────
@@ -271,7 +283,14 @@ fun RegisterMemberScreen(
             }
 
             // ─── Fiyat Önizlemesi ──────────────────────────────────────────
-            if (formState.previewPrice > 0.0 || formState.selectedPackage != null) {
+            //
+            // Kalemlerin tamamı `Pricing.breakdown` içinden geliyor: gösterilen
+            // aritmetik ile kaydedilen tutar aynı hesabın çıktısı. Önceden
+            // iskonto satırı kullanıcının yazdığı **ham** metni basıyordu; paket
+            // fiyatını aşan bir iskontoda kart "1.000 − 5.000 = 0" gibi kendi
+            // içinde tutarsız bir hesap gösteriyordu.
+            if (formState.selectedPackage != null) {
+                val fiyat = formState.breakdown
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -284,15 +303,26 @@ fun RegisterMemberScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("Paket Fiyatı")
-                            Text("₺${Money(formState.selectedPackage?.basePriceMinor ?: 0L)}")
+                            Text("₺${fiyat.basePrice}")
                         }
-                        if ((Decimals.parseOrDefault(formState.discount)) > 0.0) {
+                        if (fiyat.discount.isPositive) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text("İskonto", color = MaterialTheme.colorScheme.error)
-                                Text("-₺${formState.discount}", color = MaterialTheme.colorScheme.error)
+                                Text("-₺${fiyat.discount}", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                        // Vade farkı önceden hiçbir yerde yazmıyordu: kullanıcı
+                        // taksit seçince toplam sebepsiz yükseliyor görünüyordu.
+                        if (fiyat.surcharge.isPositive) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Vade Farkı (%${fiyat.surchargeRate.percentLabel})")
+                                Text("+₺${fiyat.surcharge}")
                             }
                         }
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -303,10 +333,18 @@ fun RegisterMemberScreen(
                         ) {
                             Text("Ödenecek Tutar", fontWeight = FontWeight.Bold)
                             Text(
-                                text = "₺${"%.2f".format(formState.previewPrice)}",
+                                text = "₺${fiyat.total}",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        if (formState.discountCapped) {
+                            Text(
+                                text = "İskonto paket fiyatını aşamaz; en fazla ₺${fiyat.basePrice} uygulandı.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(top = 8.dp)
                             )
                         }
                     }

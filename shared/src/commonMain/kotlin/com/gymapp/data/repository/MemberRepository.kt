@@ -54,18 +54,11 @@ class MemberRepository(
     private val tenantId: String
         get() = tenants.requireTenantId()
 
-    /**
-     * Ekranda gösterilen fiyat önizlemesi.
-     *
-     * Kaydedilen tutar [Pricing.finalPrice] ile **kuruş** üzerinden hesaplanır;
-     * bu metot yalnızca aynı kuralın TL karşılığını gösterir.
-     */
-    fun calculateFinalPrice(
-        packagePrice: Double,
-        discount: Double,
-        paymentType: PaymentMethod,
-        installmentCount: Int,
-    ): Double = Pricing.previewPrice(packagePrice, discount, paymentType, installmentCount)
+    // KALDIRILDI: `calculateFinalPrice`. Ekran önizlemesini TL (`Double`)
+    // üzerinden veren bir sarmalayıcıydı; kayıt ise kuruş üzerinden
+    // hesaplanıyordu. Ekran artık kalemleri doğrudan `Pricing.breakdown` ile
+    // kuruş cinsinden alıyor, yani gösterilen ile kaydedilen arasında dönüşüm
+    // farkı bile kalmadı.
 
     suspend fun registerMember(
         fullName: String,

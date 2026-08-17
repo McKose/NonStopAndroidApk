@@ -1,12 +1,11 @@
 package com.gymapp.domain
 
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.test.Test
 
 class PricingTest {
-
-    private val delta = 0.001
 
     private fun price(
         base: Double,
@@ -73,19 +72,90 @@ class PricingTest {
         assertEquals(Money(34_333), price(333.33, 0.0, PaymentMethod.CARD, 2))
     }
 
-    // ─── Ekran önizlemesi ───────────────────────────────────────────────────
+    // ─── Kırılım: ekranın gösterdiği kalemler ───────────────────────────────
+    //
+    // Fiyat kartı bu kalemleri tek tek yazıyor. Önceden yalnızca toplam
+    // hesaplanıyor, kalemleri ekran kendisi üretiyordu; testler de yalnızca
+    // toplamı sınıyordu. Aradaki boşluk gerçek bir hataya yol açtı: iskonto
+    // satırı kullanıcının yazdığı ham değeri basıyor, toplam ise kırpılmış
+    // değerle hesaplanıyordu.
 
     @Test
-    fun `onizleme gecersiz sayilarda firlatmaz`() {
-        assertEquals(0.0, Pricing.previewPrice(Double.NaN, 0.0, PaymentMethod.CASH, 1), delta)
-        assertEquals(1000.0, Pricing.previewPrice(1000.0, Double.NaN, PaymentMethod.CASH, 1), delta)
+    fun `kalemlerin toplami odenecek tutari verir`() {
+        val k = Pricing.breakdown(
+            basePrice = Money.ofMajor(1000.0),
+            discount = Money.ofMajor(200.0),
+            paymentType = PaymentMethod.CARD,
+            installmentCount = 6,
+        )
+        assertEquals(Money.ofMajor(1000.0), k.basePrice)
+        assertEquals(Money.ofMajor(200.0), k.discount)
+        assertEquals(Money.ofMajor(800.0), k.net)
+        assertEquals(Money.ofMajor(80.0), k.surcharge)
+        // Kalemler toplamı ile gösterilen toplam ayrışamaz.
+        assertEquals(k.net + k.surcharge, k.total)
+        assertEquals(Money.ofMajor(880.0), k.total)
     }
 
     @Test
-    fun `onizleme ile kaydedilen tutar ayni kuraldan gelir`() {
-        val preview = Pricing.previewPrice(1000.0, 200.0, PaymentMethod.CARD, 6)
-        val stored = price(1000.0, 200.0, PaymentMethod.CARD, 6)
-        assertEquals(stored.asDouble, preview, delta)
+    fun `kirilim ile kaydedilen tutar ayni hesaptan gelir`() {
+        Pricing.installmentOptions.forEach { taksit ->
+            listOf(PaymentMethod.CASH, PaymentMethod.CARD, PaymentMethod.MULTISPORT).forEach { yontem ->
+                val k = Pricing.breakdown(Money.ofMajor(777.77), Money.ofMajor(33.33), yontem, taksit)
+                assertEquals(price(777.77, 33.33, yontem, taksit), k.total)
+            }
+        }
+    }
+
+    /**
+     * Regresyon: iskonto paket fiyatını aşınca kart "1.000 − 5.000 = 0" gibi
+     * kendi içinde tutarsız bir aritmetik gösteriyordu. Kırpma duruyor ama
+     * kırpıldığı **görülebilir** — ekran bunu yazmak için kullanıyor.
+     */
+    @Test
+    fun `asiri iskonto kirpilir ve kirpildigi bildirilir`() {
+        val yazilan = Money.ofMajor(5000.0)
+        val k = Pricing.breakdown(Money.ofMajor(1000.0), yazilan, PaymentMethod.CASH, 1)
+
+        assertEquals(Money.ofMajor(1000.0), k.discount)
+        assertEquals(Money.ZERO, k.total)
+        assertTrue(k.discountWasCapped(yazilan))
+    }
+
+    @Test
+    fun `kirpilmayan iskonto bildirilmez`() {
+        val yazilan = Money.ofMajor(200.0)
+        val k = Pricing.breakdown(Money.ofMajor(1000.0), yazilan, PaymentMethod.CASH, 1)
+
+        assertEquals(yazilan, k.discount)
+        assertFalse(k.discountWasCapped(yazilan))
+    }
+
+    /** Negatif iskonto sıfıra çekilir; "kırpıldı" uyarısı da çıkmaz. */
+    @Test
+    fun `negatif iskonto kirpildi sayilmaz`() {
+        val yazilan = Money.ofMajor(-500.0)
+        val k = Pricing.breakdown(Money.ofMajor(1000.0), yazilan, PaymentMethod.CASH, 1)
+
+        assertEquals(Money.ZERO, k.discount)
+        assertEquals(Money.ofMajor(1000.0), k.total)
+        assertFalse(k.discountWasCapped(yazilan))
+    }
+
+    @Test
+    fun `vade farki yalnizca kartli taksitte gorunur`() {
+        val nakit = Pricing.breakdown(Money.ofMajor(1000.0), Money.ZERO, PaymentMethod.CASH, 12)
+        assertEquals(Rate.ZERO, nakit.surchargeRate)
+        assertEquals(Money.ZERO, nakit.surcharge)
+
+        val tekCekim = Pricing.breakdown(Money.ofMajor(1000.0), Money.ZERO, PaymentMethod.CARD, 1)
+        assertEquals(Rate.ZERO, tekCekim.surchargeRate)
+        assertEquals(Money.ZERO, tekCekim.surcharge)
+
+        // Ekranda yazan oran, tutara uygulanan oranın kendisi olmalı.
+        val taksitli = Pricing.breakdown(Money.ofMajor(1000.0), Money.ZERO, PaymentMethod.CARD, 12)
+        assertEquals(Rate.ofPercent(20.0), taksitli.surchargeRate)
+        assertEquals(taksitli.net.applyRate(taksitli.surchargeRate), taksitli.surcharge)
     }
 
     @Test

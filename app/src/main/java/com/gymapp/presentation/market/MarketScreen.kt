@@ -189,6 +189,7 @@ fun MarketScreen(
                 onPaymentStatusSelect = viewModel::setPaymentStatus,
                 onDeliveryStatusSelect = viewModel::setDeliveryStatus,
                 onDiscountChange = { viewModel.setDiscount(Decimals.parseOrDefault(it)) },
+                onNotesChange = viewModel::setNotes,
                 // Sheet burada kapatılmaz: sonuç OrderCompleted olayıyla gelince kapanır,
                 // böylece başarısız sipariş sessizce "başarılı" gibi görünmez.
                 onConfirm = viewModel::checkout
@@ -207,6 +208,7 @@ fun CheckoutContent(
     onPaymentStatusSelect: (PaymentState) -> Unit,
     onDeliveryStatusSelect: (String) -> Unit,
     onDiscountChange: (String) -> Unit,
+    onNotesChange: (String) -> Unit,
     onConfirm: () -> Unit
 ) {
     var memberExpanded by remember { mutableStateOf(false) }
@@ -303,6 +305,18 @@ fun CheckoutContent(
                 )
             }
         }
+
+        // Sipariş notu alanı formda **yoktu**: durum, işleyici ve kayda yazma
+        // (`orders.notes`) zaten vardı, yalnızca girilecek kutu eklenmemişti.
+        // Her sipariş notsuz kaydediliyordu.
+        OutlinedTextField(
+            value = uiState.notes,
+            onValueChange = onNotesChange,
+            label = { Text("Sipariş Notu") },
+            placeholder = { Text("Örn: kasadan teslim alınacak") },
+            modifier = Modifier.fillMaxWidth(),
+            maxLines = 3
+        )
 
         Spacer(Modifier.height(16.dp))
 

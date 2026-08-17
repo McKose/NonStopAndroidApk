@@ -13,7 +13,6 @@ import com.gymapp.domain.LedgerType
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 
 /**
  * Finans defteri üzerinde tip güvenli işlemler.
@@ -198,34 +197,21 @@ class LedgerRepository(
 
     // ─── Okuma ──────────────────────────────────────────────────────────────
 
-    /** Dönem kayıtları — yarı açık aralık `[startMs, endMs)`. */
-    fun observeBetween(
-        startMs: Long,
-        endMs: Long,
-        tenantId: String = tenants.requireTenantId(),
-    ): Flow<List<LedgerEntryEntity>> = ledgerDao.observeBetween(tenantId, startMs, endMs)
-
-    /**
-     * Dönem tahsilatı.
-     *
-     * Ciro **tahsilat** üzerinden hesaplanır (nakit esaslı): tahakkuk eden ama
-     * henüz ödenmemiş tutar ciroya girmez.
-     */
-    fun observeIncome(
-        startMs: Long,
-        endMs: Long,
-        tenantId: String = tenants.requireTenantId(),
-    ): Flow<Money> = ledgerDao
-        .observeNetTotal(tenantId, LedgerType.PAYMENT.name, startMs, endMs)
-        .map { Money(it) }
-
-    fun observeExpense(
-        startMs: Long,
-        endMs: Long,
-        tenantId: String = tenants.requireTenantId(),
-    ): Flow<Money> = ledgerDao
-        .observeNetTotal(tenantId, LedgerType.EXPENSE.name, startMs, endMs)
-        .map { Money(it) }
+    // KALDIRILDI: `observeBetween`, `observeIncome`, `observeExpense`.
+    //
+    // Üçü de hiç çağrılmıyordu: finans okumaları `FinanceRepository` üzerinden
+    // geçiyor ve dönem toplamları `FinanceViewModel` içinde, ekranda gösterilen
+    // listenin **aynı** kalemlerinden hesaplanıyor.
+    //
+    // Bugün iki yol aynı sonucu veriyor (`observeNetTotal` da ters kayıtları
+    // düşüyor, `type` süzgeci de tahakkuku ciro dışında tutuyor). Sorun bunun
+    // sürmesini kimsenin garanti etmemesi: "ciro"nun ikinci bir tanımı, biri
+    // değişince sessizce ayrışacak biçimde duruyordu. Toplamlar zaten listeden
+    // türetilmek zorunda — ekran o listeyi göstermek için yüklüyor — dolayısıyla
+    // ikinci tanımın kazandırdığı bir şey de yoktu.
+    //
+    // Dayandıkları `LedgerDao.observeNetTotal` sorgusu da bunlarla birlikte
+    // kalktı; üye bakiyesi ayrı bir sorgudan (`outstandingBalanceMinor`) geliyor.
 
     fun observeForMember(
         memberId: String,
