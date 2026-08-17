@@ -1,0 +1,274 @@
+/* Açılış sayfasının görünümü.
+ *
+ * Tek dosya, çerçeve yok — panelle aynı tercih: site herhangi bir statik
+ * sunucuya olduğu gibi konabilsin diye derleme adımı bilinçli olarak yok.
+ *
+ * ### Palet nereden geliyor
+ * Salonun kendi fotoğraflarından ve tanıtım metnindeki "altın ve siyahın güçlü
+ * estetiği" ifadesinden. Corona şablonu görsel referans olarak kullanıldı
+ * (kart düzeni, boşluk ritmi) ama rengi alınmadı: onun ana rengi mavi
+ * (#0090e7) ve salonun duvarlarındaki sıcak altın ışıkla çakışıyordu.
+ *
+ * ### Neden tek tema
+ * Panel açık/koyu temayı destekliyor çünkü salonda ekran gün boyu açık kalıyor.
+ * Tanıtım sayfası ise markanın kendisi: siyah zemin ve altın vurgu bir tercih
+ * değil, salonun görünümü. Açık temaya çevrilseydi marka kaybolurdu.
+ */
+
+:root {
+  /* Zeminler: fotoğraftaki siyah kauçuk ve dokulu duvarlardan */
+  --zemin: #0b0b0d;
+  --zemin-2: #121317;
+  --yuzey: #17181d;
+  --kenar: #26282f;
+
+  /* Altın: duvar yıkama aydınlatmasının rengi. Üç ton — düz yüzey, vurgu ve
+     üzerine gelince parlayan hâli. */
+  --altin: #d9a441;
+  --altin-parlak: #f0c46a;
+  --altin-koyu: #a97c22;
+
+  --metin: #f2f3f5;
+  --soluk: #a2a7b0;
+
+  --en-genis: 1180px;
+  --yuvarlak: 14px;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--zemin);
+  color: var(--metin);
+  font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+img { max-width: 100%; display: block; }
+
+a { color: var(--altin); }
+
+/* ─── Üst çubuk ─────────────────────────────────────────────────────────── */
+/* Yapışkan: sayfa uzun ve giriş düğmeleri her an erişilebilir olmalı — ziyaretçi
+   üye girişini aramak için başa dönmek zorunda kalmasın. */
+.ust {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 24px;
+  background: color-mix(in srgb, var(--zemin) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--kenar);
+}
+
+.marka { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--metin); }
+.marka img { height: 40px; width: auto; }
+.marka-ad { font-size: 17px; letter-spacing: .04em; text-transform: uppercase; }
+.marka-ad strong { color: var(--altin); }
+
+.ust-baglantilar { display: flex; gap: 22px; margin-inline-start: auto; }
+.ust-baglantilar a {
+  color: var(--soluk);
+  text-decoration: none;
+  font-size: 15px;
+}
+.ust-baglantilar a:hover { color: var(--metin); }
+
+.ust-girisler { display: flex; gap: 10px; }
+
+/* Dar ekranda bölüm bağlantıları düşüyor, GİRİŞ DÜĞMELERİ kalıyor: sayfanın
+   asıl işi onlar. Hepsini gizlemek telefonda üye girişini erişilemez yapardı. */
+@media (max-width: 860px) {
+  .ust-baglantilar { display: none; }
+  .ust-girisler { margin-inline-start: auto; }
+  .marka-ad { display: none; }
+}
+
+/* ─── Düğmeler ──────────────────────────────────────────────────────────── */
+.dugme {
+  display: inline-block;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .18s ease, border-color .18s ease, color .18s ease;
+}
+.dugme-buyuk { padding: 13px 24px; font-size: 15px; }
+
+.dugme-birincil { background: var(--altin); color: #17130a; }
+.dugme-birincil:hover { background: var(--altin-parlak); }
+
+.dugme-ikincil { border: 1px solid var(--kenar); color: var(--metin); }
+.dugme-ikincil:hover { border-color: var(--altin); color: var(--altin); }
+
+.dugme:focus-visible { outline: 2px solid var(--altin-parlak); outline-offset: 3px; }
+
+/* ─── Karşılama ─────────────────────────────────────────────────────────── */
+.kahraman { position: relative; min-height: 74vh; display: grid; align-items: center; }
+
+/* Fotoğraf mutlak konumda ve karartılıyor: metnin okunabilirliği fotoğrafın
+   parlaklığına bağlı kalmasın. Gradyan sağdan sola koyulaşıyor çünkü metin
+   solda ve fotoğrafın ilgi çekici kısmı (tabela) sağ üstte. */
+.kahraman-foto {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(.55) saturate(1.05);
+}
+.kahraman::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg,
+    var(--zemin) 8%,
+    color-mix(in srgb, var(--zemin) 70%, transparent) 46%,
+    transparent 100%);
+}
+
+.kahraman-icerik {
+  position: relative;
+  z-index: 1;
+  max-width: var(--en-genis);
+  margin: 0 auto;
+  padding: 84px 24px;
+  width: 100%;
+}
+
+.ust-baslik {
+  margin: 0 0 10px;
+  color: var(--altin);
+  font-size: 13px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+}
+
+.kahraman h1 {
+  margin: 0 0 16px;
+  max-width: 16ch;
+  font-size: clamp(34px, 6vw, 60px);
+  line-height: 1.08;
+  letter-spacing: -.015em;
+}
+.altin { color: var(--altin); }
+
+.slogan {
+  margin: 0 0 14px;
+  max-width: 46ch;
+  font-size: clamp(17px, 2.2vw, 20px);
+  color: var(--metin);
+  font-style: italic;
+}
+.kahraman-metin { margin: 0 0 30px; max-width: 52ch; color: var(--soluk); }
+
+.kahraman-dugmeler { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* ─── Bölümler ──────────────────────────────────────────────────────────── */
+.bolum { max-width: var(--en-genis); margin: 0 auto; padding: 76px 24px; }
+.bolum-koyu { max-width: none; background: var(--zemin-2); border-block: 1px solid var(--kenar); }
+.bolum-koyu > * { max-width: var(--en-genis); margin-inline: auto; }
+
+.bolum-baslik {
+  margin: 0 0 8px;
+  font-size: clamp(24px, 3.4vw, 34px);
+  letter-spacing: -.01em;
+}
+.bolum-alt { margin: 0 0 34px; color: var(--soluk); }
+
+/* ─── Kartlar ───────────────────────────────────────────────────────────── */
+.kartlar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(268px, 1fr));
+  gap: 18px;
+}
+
+.kart {
+  padding: 26px 24px;
+  background: var(--yuzey);
+  border: 1px solid var(--kenar);
+  border-radius: var(--yuvarlak);
+}
+/* Üstteki ince altın çizgi kartı markaya bağlıyor; renkli bir çerçevenin
+   tamamı fazla gürültülü olurdu. */
+.kart { border-top: 2px solid var(--altin-koyu); }
+.kart h3 { margin: 0 0 10px; font-size: 19px; }
+.kart p { margin: 0; color: var(--soluk); }
+
+.kart-tarih {
+  display: inline-block;
+  margin-bottom: 10px;
+  color: var(--altin);
+  font-size: 13px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.kart-gorsel {
+  width: 100%;
+  height: 170px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+
+/* ─── Geniş fotoğraf ────────────────────────────────────────────────────── */
+.genis-foto { margin: 42px 0 0; }
+.genis-foto img {
+  width: 100%;
+  max-height: 520px;
+  object-fit: cover;
+  border-radius: var(--yuvarlak);
+  border: 1px solid var(--kenar);
+}
+.genis-foto figcaption { margin-top: 10px; color: var(--soluk); font-size: 14px; }
+
+/* ─── İletişim ──────────────────────────────────────────────────────────── */
+.iletisim-kutular {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+.iletisim-kutu {
+  display: grid;
+  gap: 4px;
+  padding: 22px;
+  background: var(--yuzey);
+  border: 1px solid var(--kenar);
+  border-radius: var(--yuvarlak);
+  text-decoration: none;
+  color: var(--metin);
+}
+a.iletisim-kutu:hover { border-color: var(--altin); }
+.iletisim-etiket { color: var(--soluk); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; }
+.iletisim-deger { font-size: 19px; }
+.iletisim-not { color: var(--altin); font-size: 14px; }
+.iletisim-not a { text-decoration: none; }
+
+/* ─── Alt bilgi ─────────────────────────────────────────────────────────── */
+.alt-bilgi {
+  max-width: var(--en-genis);
+  margin: 0 auto;
+  padding: 34px 24px 56px;
+  color: var(--soluk);
+  font-size: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+.alt-bilgi p { margin: 0; }
+.alt-bilgi-baglantilar a { color: var(--soluk); text-decoration: none; }
+.alt-bilgi-baglantilar a:hover { color: var(--altin); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; animation: none !important; }
+}

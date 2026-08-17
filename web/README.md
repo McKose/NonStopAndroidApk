@@ -232,11 +232,19 @@ Derleme adımı yok; dosyalar olduğu gibi kopyalanıyor. İş akışının yapt
 Anahtarlar tanımlı değilse panel yine yayınlanıyor, yalnızca "Kurulum
 tamamlanmamış" diyor; `?demo` ile yine açılıyor.
 
-Yayınlanan dosyalar tek tek sayılıyor, `web/` olduğu gibi kopyalanmıyor: testler,
-örnek ayar dosyası ve önizleme üreticisi siteye ait değil.
+Yayınlanan dosyalar `index.html`lerden başlanıp importlar izlenerek **türetiliyor**
+(`web/yayin-dosyalari.mjs`), elle sayılmıyor. Testler, örnek ayar dosyası ve
+önizleme üreticisi siteye ait değil; hiçbir şey onları içe almadığı için listeye
+kendiliğinden girmiyorlar.
 
-Başka bir yere koymak isterseniz panel statik: `web` klasörünü herhangi bir HTTP
-sunucusunun kök dizinine kopyalamak ve yanına `config.js` eklemek yeterli.
+Eskiden liste elle sayılıyordu ve tam olarak beklenen şey oldu: panele dört yeni
+modül eklendi, listeye yazılmadı ve yayınlanan panel bomboş açıldı. Bir ES modülü
+importu 404 alırsa onu içe alan dosya tamamen yüklenmiyor — eksik tek dosya bütün
+paneli düşürüyor. CI ise yeşildi, çünkü testler depodaki dosyaları okuyor,
+yayınlananları değil.
+
+Başka bir yere koymak isterseniz panel statik: `web/panel` klasörünü herhangi bir
+HTTP sunucusuna kopyalamak ve yanına `config.js` eklemek yeterli.
 
 ### Panelin herkese açık olması sorun mu
 

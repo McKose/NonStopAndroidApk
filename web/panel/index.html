@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NonStop Studio — Yönetim Paneli</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Ayarlar depoya işlenmiyor; config.js kurulum sırasında oluşturuluyor.
+       Dosya yoksa panel bunu fark edip ne yapılması gerektiğini söylüyor. -->
+  <script>window.NONSTOP_CONFIG = null;</script>
+  <script src="config.js" onerror="window.__configYok = true"></script>
+
+  <main id="uygulama">
+    <section id="giris" class="kart" hidden>
+      <h1>NonStop Studio</h1>
+      <p class="alt">Yönetim paneli</p>
+
+      <form id="giris-formu">
+        <label>E-posta
+          <input type="email" name="eposta" autocomplete="username" required>
+        </label>
+        <label>Şifre
+          <input type="password" name="sifre" autocomplete="current-password" required>
+        </label>
+        <button type="submit" id="giris-dugmesi">Giriş yap</button>
+      </form>
+
+      <p id="giris-hata" class="hata" hidden></p>
+    </section>
+
+    <section id="panel" hidden>
+      <header class="baslik">
+        <div>
+          <h1 id="salon-adi">Salon</h1>
+          <p class="alt"><span id="kullanici"></span> · <span id="rol"></span></p>
+        </div>
+        <button id="cikis" class="ikincil">Çıkış</button>
+      </header>
+
+      <nav class="sekmeler" id="sekmeler">
+        <!-- Sekme görünürlüğü rolle değişiyor ve karar `roller.js`te; buradaki
+             sıra yalnızca gösterim. Düğmeler `hidden` ile gizleniyor. -->
+        <button data-sekme="ozet" class="secili">Özet</button>
+        <button data-sekme="uyeler">Üyeler</button>
+        <button data-sekme="paketler">Paketler</button>
+        <button data-sekme="randevular">Randevular</button>
+        <button data-sekme="market">Market</button>
+        <button data-sekme="satislar">Satışlar</button>
+        <button data-sekme="personel">Personel</button>
+        <button data-sekme="finans">Finans</button>
+      </nav>
+
+      <p id="panel-hata" class="hata" hidden></p>
+      <p id="yukleniyor" class="alt" hidden>Yükleniyor…</p>
+
+      <div id="icerik"></div>
+    </section>
+
+    <section id="ayar-eksik" class="kart" hidden>
+      <h1>Kurulum tamamlanmamış</h1>
+      <p>
+        Panelin bağlanacağı proje bilgisi yok. Bu dosyaların yanına
+        <code>config.js</code> adında bir dosya ekleyin:
+      </p>
+      <pre>window.NONSTOP_CONFIG = {
+  url: "https://&lt;proje-ref&gt;.supabase.co",
+  anonKey: "&lt;anon public anahtarı&gt;",
+};</pre>
+      <p class="alt">
+        Örneği <code>config.example.js</code> dosyasında. Anahtar gizli değil:
+        tek başına hiçbir veriye erişemez, her sorgu giriş yapan kişiye göre
+        süzülür.
+      </p>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

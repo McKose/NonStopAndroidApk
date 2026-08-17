@@ -4,6 +4,6 @@
   "type": "module",
   "description": "Salon yönetim paneli. Bağımlılık yok, derleme adımı yok: dosyalar herhangi bir statik sunucuya olduğu gibi konabilir. Buradaki package.json yalnızca Node'a .js dosyalarının ES modülü olduğunu söylüyor; npm install gerektirmiyor.",
   "scripts": {
-    "test": "TZ=Europe/Istanbul node --test *.test.js"
+    "test": "TZ=Europe/Istanbul node --test 'panel/*.test.js' '*.test.js'"
   }
 }

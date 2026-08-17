@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const burada = dirname(fileURLToPath(import.meta.url));
-const MIGRASYON_DIZINI = join(burada, "..", "supabase", "migrations");
+const MIGRASYON_DIZINI = join(burada, "..", "..", "supabase", "migrations");
 
 /**
  * Tablo adı → kolon adları kümesi.
