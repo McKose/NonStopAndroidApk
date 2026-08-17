@@ -107,7 +107,19 @@ export function yayinDosyalari(kok = BURADA, girisler = girisNoktalari(kok)) {
     const dizin = posix.dirname(ad);
 
     for (const m of icerik.matchAll(desen)) {
-      const hedef = posix.normalize(posix.join(dizin === "." ? "" : dizin, m[1]));
+      const ham = m[1];
+
+      // Dizine giden bağlantılar (`panel/`, `uye/`) YÜZEYLER ARASI GEZİNME,
+      // varlık değil. Her yüzey zaten kendi giriş noktası olarak taranıyor;
+      // burada izlenirlerse betik bir dizini dosya sanıp okumaya çalışıyor ve
+      // `EISDIR` ile çöküyor. Bu tam olarak yaşandı: açılış sayfasına "Admin
+      // Paneli" düğmesi eklendiği anda.
+      if (ham.endsWith("/")) continue;
+
+      // Sayfa içi çapa, e-posta ve telefon bağlantıları da dosya değil.
+      if (ham.startsWith("#") || ham.startsWith("mailto:") || ham.startsWith("tel:")) continue;
+
+      const hedef = posix.normalize(posix.join(dizin === "." ? "" : dizin, ham));
       if (hedef.startsWith("..")) {
         eksik.push(`${hedef} (${ad} içinden — kök dizinin dışı)`);
         continue;

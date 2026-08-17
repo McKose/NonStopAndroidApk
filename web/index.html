@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Non Stop GYM — Kartepe | Reformer Pilates, Fitness, Fonksiyonel Antrenman</title>
+  <meta name="description" content="Kartepe'de Reformer Pilates, fitness ve fonksiyonel antrenman. Non Stop GYM'de altın ve siyahın estetiğiyle tasarlanmış modern alanda üst düzey antrenman deneyimi.">
+
+  <!-- Sosyal medyada paylaşıldığında görünen kart. Olmadığında bağlantı çıplak
+       bir adres olarak görünüyor ve tıklanma oranı belirgin düşüyor. -->
+  <meta property="og:title" content="Non Stop GYM — Kartepe">
+  <meta property="og:description" content="Denge, güç ve akışın buluştuğu nokta. Reformer Pilates, fitness ve fonksiyonel antrenman.">
+  <meta property="og:image" content="varliklar/salon-ic.jpg">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="tr_TR">
+
+  <link rel="icon" href="varliklar/nonstop-gym.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="site.css">
+
+  <!-- Ayarlar depoya işlenmiyor; panelle aynı desen. Dosya yoksa etkinlik
+       bölümü sessizce gizleniyor — sayfanın geri kalanı sunucu olmadan da
+       çalışıyor, çünkü tanıtım içeriği sabit. -->
+  <script>window.NONSTOP_CONFIG = null;</script>
+  <script src="config.js" onerror="window.__configYok = true"></script>
+</head>
+<body>
+
+<header class="ust">
+  <a class="marka" href="#" aria-label="Non Stop GYM ana sayfa">
+    <img src="varliklar/nonstop-gym-beyaz.svg" alt="Non Stop GYM" width="44" height="54">
+    <span class="marka-ad">Non Stop <strong>GYM</strong></span>
+  </a>
+
+  <nav class="ust-baglantilar">
+    <a href="#branslar">Branşlar</a>
+    <a href="#etkinlikler">Etkinlikler</a>
+    <a href="#iletisim">İletişim</a>
+  </nav>
+
+  <div class="ust-girisler">
+    <a class="dugme dugme-ikincil" href="panel/">Admin Paneli</a>
+    <a class="dugme dugme-birincil" href="uye/">Üye Girişi</a>
+  </div>
+</header>
+
+<main>
+  <!-- ─── Karşılama ─────────────────────────────────────────────────────── -->
+  <section class="kahraman">
+    <img class="kahraman-foto" src="varliklar/salon-ic.jpg"
+         alt="Non Stop GYM salon içi: siyah dokulu duvarlar, ışıklı tabela ve ekipmanlar"
+         width="1024" height="1536" fetchpriority="high">
+    <div class="kahraman-icerik">
+      <p class="ust-baslik">Kartepe</p>
+      <h1>Denge, Güç ve <span class="altin">Akışın</span> Buluştuğu Nokta</h1>
+      <p class="slogan">
+        Sadece bir stüdyo değil; disiplin, estetik ve gelişimin adresi.
+      </p>
+      <p class="kahraman-metin">
+        Klasik spor salonu deneyiminin ötesine geçerek, altın ve siyahın güçlü
+        estetiğiyle tasarlanmış modern alanımızda üst düzey bir antrenman
+        deneyimi sunuyoruz.
+      </p>
+      <div class="kahraman-dugmeler">
+        <a class="dugme dugme-birincil dugme-buyuk" href="#iletisim">Bize ulaşın</a>
+        <a class="dugme dugme-ikincil dugme-buyuk" href="#branslar">Branşları gör</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Branşlar ──────────────────────────────────────────────────────── -->
+  <section id="branslar" class="bolum">
+    <h2 class="bolum-baslik">Öne Çıkan Branşlarımız</h2>
+    <p class="bolum-alt">Hedefinize göre seçin; programı birlikte kuralım.</p>
+
+    <div class="kartlar">
+      <article class="kart">
+        <h3>Reformer Pilates</h3>
+        <p>
+          Bireysel (PT), düet ve butik grup seanslarıyla duruşunuzu düzeltin;
+          esneklik ve çekirdek (core) kuvveti kazanın.
+        </p>
+      </article>
+
+      <article class="kart">
+        <h3>Fitness Antrenmanı</h3>
+        <p>
+          Kas gelişimi, form tutma ve kuvvet odaklı çalışmalar; modern
+          ekipmanlarla hedefe yönelik programlar.
+        </p>
+      </article>
+
+      <article class="kart">
+        <h3>Fonksiyonel Antrenman</h3>
+        <p>
+          Günlük yaşam hareketlerini temel alan güç, dayanıklılık, mobilite ve
+          yüksek kondisyon odaklı programlar.
+        </p>
+      </article>
+    </div>
+
+    <figure class="genis-foto">
+      <img src="varliklar/reformer.jpg"
+           alt="Reformer pilates salonu: ahşap zemin, altın duvar aydınlatması ve reformer yatakları"
+           width="1200" height="1600" loading="lazy">
+      <figcaption>Reformer salonumuz</figcaption>
+    </figure>
+  </section>
+
+  <!-- ─── Etkinlikler ───────────────────────────────────────────────────── -->
+  <!--
+    İçerik sunucudan geliyor ve panelden giriliyor. Giriş YAPILMADAN okunuyor:
+    `announcements` tablosunda yalnızca yayınlanmış ve yayın penceresi açık
+    satırlar herkese açık (migrasyon 0005).
+
+    Bölüm varsayılan olarak GİZLİ: duyuru yoksa ya da sunucuya ulaşılamazsa boş
+    bir başlık göstermek, sayfayı bozuk gösterirdi.
+  -->
+  <section id="etkinlikler" class="bolum" hidden>
+    <h2 class="bolum-baslik">Etkinlikler ve Duyurular</h2>
+    <div id="duyuru-listesi" class="kartlar"></div>
+  </section>
+
+  <!-- ─── İletişim ──────────────────────────────────────────────────────── -->
+  <section id="iletisim" class="bolum bolum-koyu">
+    <h2 class="bolum-baslik">İletişim</h2>
+
+    <div class="iletisim-kutular">
+      <a class="iletisim-kutu" href="https://maps.app.goo.gl/WT8vUfRpxPUbvBpo8"
+         target="_blank" rel="noopener noreferrer">
+        <span class="iletisim-etiket">Adres</span>
+        <span class="iletisim-deger">Kartepe / Kocaeli</span>
+        <span class="iletisim-not">Haritada aç →</span>
+      </a>
+
+      <a class="iletisim-kutu" href="https://www.instagram.com/nonstopkartepe"
+         target="_blank" rel="noopener noreferrer">
+        <span class="iletisim-etiket">Instagram</span>
+        <span class="iletisim-deger">@nonstopkartepe</span>
+        <span class="iletisim-not">Takip edin →</span>
+      </a>
+
+      <div class="iletisim-kutu">
+        <span class="iletisim-etiket">Üyelerimize</span>
+        <span class="iletisim-deger">Üye Girişi</span>
+        <span class="iletisim-not">
+          <a href="uye/">Paket durumunuzu ve ölçümlerinizi görün →</a>
+        </span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="alt-bilgi">
+  <p>© <span id="yil">2026</span> Non Stop Studio — Kartepe</p>
+  <p class="alt-bilgi-baglantilar">
+    <a href="panel/">Personel paneli</a> ·
+    <a href="uye/">Üye girişi</a>
+  </p>
+</footer>
+
+<script type="module" src="site.js"></script>
+</body>
+</html>
