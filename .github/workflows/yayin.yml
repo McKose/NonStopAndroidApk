@@ -144,9 +144,17 @@ jobs:
             echo "Bunlar olmadan üretilen yayın APK'sı kurulur ama sunucuya bağlanamaz."
             exit 1
           fi
+
+          # Yayında biçim kontrolü daha da önemli: yanlış adresle imzalanmış bir
+          # APK yayınlanır, kullanıcılar indirir ve hiçbiri giriş yapamaz.
+          if ! tools/supabase_url_kontrol.sh "$SUPABASE_URL"; then
+            echo "::error::SUPABASE_URL biçimi geçersiz — ayrıntı yukarıda."
+            exit 1
+          fi
+
           printf 'supabase.url=%s\nsupabase.anonKey=%s\n' \
             "$SUPABASE_URL" "$SUPABASE_ANON_KEY" >> local.properties
-          echo "Sunucu ayarları yazıldı."
+          echo "Sunucu ayarları yazıldı ve adres biçimi doğrulandı."
 
       # Yayın öncesi testler. Yayınlanan bir APK'nın testleri geçmiş olması
       # gerekiyor; etiket atmak testleri atlamanın yolu olmamalı.

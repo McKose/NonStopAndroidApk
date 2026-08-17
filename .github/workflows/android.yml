@@ -139,9 +139,20 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            # Adresin BİÇİMİ sınanıyor. Yanlış bir adresle üretilen APK
+            # derlenir, kurulur ve yalnızca giriş denendiğinde "404 Invalid path
+            # specified in request URL" der — yani hata üretimden saatler sonra,
+            # tamamen başka bir yerde görünüyor. Bir kez tam olarak bu yaşandı.
+            #
+            # Kural betikte, iki iş akışında kopya durmasın diye.
+            if ! tools/supabase_url_kontrol.sh "$SUPABASE_URL"; then
+              echo "::error::SUPABASE_URL biçimi geçersiz — ayrıntı yukarıda."
+              exit 1
+            fi
+
             printf 'supabase.url=%s\nsupabase.anonKey=%s\n' \
               "$SUPABASE_URL" "$SUPABASE_ANON_KEY" >> local.properties
-            echo "Sunucu ayarları yazıldı; APK doğrudan projeye bağlanacak."
+            echo "Sunucu ayarları yazıldı ve adres biçimi doğrulandı."
           else
             echo "UYARI: SUPABASE_URL / SUPABASE_ANON_KEY tanımlı değil."
             echo "APK derlenecek ama giriş ekranında 'sunucu ayarları eksik' diyecek."
