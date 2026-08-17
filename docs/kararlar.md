@@ -408,6 +408,80 @@ hatalardan biri olduğu için, onu telefonda deneyememek kabul edilebilir değil
 yapısını imzalıyor ve hiçbir mağazaya bir şey yüklemiyor. Yayın imzası buna
 bağlanmayacak — o anahtar depoya değil depo gizli anahtarlarına girer.
 
+## Panelin rol görünürlüğü uygulamayla aynı kaynaktan sınanıyor
+
+**Karar:** Panelin sekme görünürlüğü `roller.js`te ve `roller.test.js` bunu
+Kotlin dosyasını (`RoleAccess.kt`) **okuyup** karşılaştırıyor.
+
+**Neden:** Panel Finans sekmesini her role gösteriyordu; uygulama ise onu
+eğitmene göstermiyor (`AppDestination.FINANCE`). Aynı ürün, aynı soruya iki
+farklı cevap veriyordu. Bu, "Ekran görünürlüğü de tek kaynakta" kararında
+düzeltilen hatanın panele taşınmış hâliydi — üçüncü kopya.
+
+Kopyayı silmek mümkün değil: biri Kotlin, biri JavaScript. Ama kopyanın
+**sapması** sınanabilir. Test Kotlin'deki `when (this)` gövdesini ayrıştırıp
+hedef → rol eşlemesini çıkarıyor ve panelin tablosuyla karşılaştırıyor.
+
+**Ayrıştırma bozulursa test düşüyor, geçmiyor.** Kırılgan bir ayrıştırıcının en
+kötü davranışı "okuyamadım, o hâlde geçtim" olurdu: kural sanki sınanıyor
+görünür, gerçekte hiçbir şey sınanmaz. Bu yüzden hedef bulunamazsa, gövde
+okunamazsa ya da hiç eşleşme çıkmazsa test açıkça düşüyor. Dört bozma senaryosu
+(panel değişti, Kotlin değişti, yeni ekran eklendi, biçim tanınmaz oldu) elle
+denenip yakalandığı doğrulandı.
+
+**Ters yön de sınanıyor:** uygulamada olup panelde olmayan bir hedef varsa test
+düşüyor — bilinçli atlananlar (`SETTINGS`) listede gerekçesiyle yazılı.
+
+## Stok panelde hareketlerden türüyor, eksik veriden sayı üretilmiyor
+
+**Karar:** Panel eldeki stoğu `stock_movements` toplamından hesaplıyor
+(`StockMovementDao.onHand` ile birebir aynı kural). Toplama girecek veri eksik
+olabiliyorsa sayı **gösterilmiyor**, `?` yazıyor.
+
+**Neden toplama panelde yapılabiliyor:** Panelin kuralı "sayma ve düz toplama
+dışında hesap yok". Stok, tek kolonun toplamı — hakediş ya da bakiye gibi bir iş
+kuralı değil. Ürün üzerinde mutlak sayaç tutulmamasının sebebi ayrı ve
+uygulamada yazılı: iki cihaz aynı anda satış yaptığında bir satış sessizce
+kaybolurdu.
+
+**Neden eksik veride sayı gösterilmiyor:** Bir stok sayısı ekranda tek başına
+duruyor ve doğru görünüyor. 500 hareketin ilk 500'ünden hesaplanmış bir toplam,
+doğru bir toplamdan **ayırt edilemez** — yanlış olduğunu gösteren hiçbir iz
+taşımaz, salon sahibi ona bakıp sipariş verir. Bu yüzden okuma sınırına
+dayanıldığında (`oku` artık `kesildi` döndürüyor) ve okunamayan bir hareket
+olduğunda sayı yerine `?` çıkıyor.
+
+Aynı sebeple `Number()` doğrudan kullanılmıyor: `Number(null)`, `Number("")` ve
+`Number(false)` **sıfır** veriyor, yani eksik bir alan sessizce "0 adet hareket"
+olarak toplanır. Bu tuzağa yazarken düşüldü, testi de o yüzden var.
+
+**Negatif stok ayrı bir durum,** tükenmenin daha kötüsü değil: fazla satış ya da
+eksik alım kaydı demek. Aynı rozeti vermek sebebini araştırılmaz kılardı.
+Sayaçlar ve rozetler **aynı** sınıflandırmayı kullanıyor (`stokDurumu`); ayrı
+yazıldıklarında ayrıştılar ve kutuda "3 tükendi" yazarken tabloda 2 rozet
+görünüyordu.
+
+## Panelin kolon adları SQL şemasıyla sınanıyor
+
+**Karar:** Sekmelerin veri tanımı ayrı bir dosyada (`sekmeler.js`) ve
+`sekmeler.test.js` her kolon adını `supabase/migrations` içindeki gerçek şemayla
+karşılaştırıyor.
+
+**Neden:** Tanımlar 20'den fazla kolon adı taşıyor ve üç yazım hatası türünün
+hepsi sessiz — `order`da hata sunucudan 400 aldırıp sekmeyi boş açar, `ara`da
+hata aramayı o alanda çalıştırmaz, `tarihAlani`nda hata süzgeci işlevsiz kılar.
+Üçü de yalnızca o sekmeye basıp elle deneyerek fark edilir.
+
+**Neden demo verisi yerine SQL:** Demo verisi de bir kopya; kopyayı kopyayla
+karşılaştırmak ikisinin **birlikte** yanlış olmasını yakalamıyor. Panelin
+sorguları sunucuya gidiyor, yani doğruyu söyleyen şey migrasyonlar.
+
+Demo verisi ayrıca sınanıyor ama farklı bir soru için: şemada olmayan bir alan
+taşımıyor mu (taşırsa panel ona güvenir, gerçek veride tanımsız gelir) ve panelin
+aradığı alanları taşıyor mu (taşımazsa o arama önizlemede denenemez). İkinci
+kontrol iki eksik buldu: `gym_members.email` ve `appointments.notes` şemada
+vardı, demo verisinde yoktu.
+
 ## Yayın anahtarı depoda değil, hata ayıklama anahtarı depoda
 
 **Karar:** `app/debug.keystore` depoda; yayın anahtarı depo gizli

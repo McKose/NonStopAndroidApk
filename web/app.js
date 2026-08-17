@@ -11,6 +11,9 @@ import { tutarYaz, tarihYaz, uyelikDurumu, durumEtiketi, silinmemisler } from ".
 import { ayBasi, uyeDagilimi, yaklasanBitisler, defterToplami } from "./ozet.js";
 import { demoIstemcisi, demoMu } from "./demo.js";
 import { suz } from "./suzme.js";
+import { stokHaritasi, stokYaz, stokUyarilari, stokDurumu } from "./stok.js";
+import { sekmeGorunur } from "./roller.js";
+import { SEKME_VERISI } from "./sekmeler.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -21,6 +24,9 @@ const ayar = window.NONSTOP_CONFIG;
 const istemci = demoMu() ? demoIstemcisi() : new SupabaseClient(ayar?.url, ayar?.anonKey);
 
 let aktifSekme = "ozet";
+
+/** Giriş yapan kişinin rolü; sekme görünürlüğü buna bağlı. */
+let aktifRol = null;
 
 /**
  * Sunucudan gelen ham satırlar, açık olan sekme için.
@@ -83,8 +89,44 @@ function paneliAc(oturum) {
   $("salon-adi").textContent = oturum.gym_name || "Salon";
   $("kullanici").textContent = oturum.email || "";
   $("rol").textContent = rolEtiketi(oturum.role);
+  aktifRol = oturum.role;
+  sekmeleriRoleGoreAyarla();
   goster("panel");
   sekmeYukle(aktifSekme);
+}
+
+/**
+ * Rolün görmediği sekmeleri gizler.
+ *
+ * Kural `roller.js`te ve orası uygulamadaki `AppDestination` kuralının
+ * sınanan kopyası: panel kendi kararını vermiyor. Daha önce veriyordu — Finans
+ * sekmesi her role açıktı, oysa uygulama onu eğitmene göstermiyor. Aynı ürün
+ * iki farklı cevap veriyordu.
+ *
+ * Gizleme bir güvenlik sınırı DEĞİL: sunucu okumayı salona bağlı her role açıyor
+ * (migrasyon `0004`) ve paneli kandıran biri veriyi API'den yine okuyabilir.
+ * Gerçek sınır yazma tarafında ve o sunucuda.
+ */
+function sekmeleriRoleGoreAyarla() {
+  let aktifGizlendi = false;
+
+  for (const dugme of $("sekmeler").querySelectorAll("button[data-sekme]")) {
+    const gorunur = sekmeGorunur(dugme.dataset.sekme, aktifRol);
+    dugme.hidden = !gorunur;
+    if (!gorunur && dugme.dataset.sekme === aktifSekme) aktifGizlendi = true;
+  }
+
+  // Açık sekme bu rolde görünmüyorsa ilk görünür sekmeye dönülüyor. Aksi hâlde
+  // rol değişen bir oturumda (ya da eski bir sekme hatırlandığında) panel boş
+  // kalır ve kullanıcı sebebini anlamaz.
+  if (aktifGizlendi) {
+    const ilk = [...$("sekmeler").querySelectorAll("button[data-sekme]")]
+      .find((d) => !d.hidden);
+    aktifSekme = ilk ? ilk.dataset.sekme : "ozet";
+    for (const d of $("sekmeler").querySelectorAll("button[data-sekme]")) {
+      d.classList.toggle("secili", d.dataset.sekme === aktifSekme);
+    }
+  }
 }
 
 function rolEtiketi(rol) {
@@ -108,38 +150,60 @@ $("sekmeler").addEventListener("click", (olay) => {
   sekmeYukle(aktifSekme);
 });
 
-// `ara`: arama kutusunun hangi kolonlarda baktığı. Bilinçli olarak dar
-// tutuluyor — her kolonda aramak, "notlar" gibi uzun alanlar yüzünden alakasız
-// eşleşmeler üretirdi.
-//
-// `tarihAlani`: tarih aralığının süzdüğü kolon. Tablo başına farklı ve anlamı
-// da farklı: randevuda "ne zaman yapıldı", defterde "ne zaman gerçekleşti",
-// üyede "ne zaman bitiyor".
-const SEKMELER = {
+/**
+ * Sekmenin veri tanımı + çizim işi.
+ *
+ * Veri kısmı (tablo, sıra, aranan kolonlar) `sekmeler.js`te ve orada olmasının
+ * sebebi test: o tanımlar 20'den fazla kolon adı taşıyor, bir yazım hatası
+ * sessizce arama ya da süzgeci bozuyor ve `sekmeler.test.js` her adı SQL
+ * şemasıyla karşılaştırıyor. Buradaki `ciz`/`ozel` işleri DOM'a dokunduğu için
+ * Node'da koşamıyor, o yüzden ayrı duruyor.
+ *
+ * Çizim tablosu ile veri tablosunun aynı sekmeleri tanıdığı da sınanıyor
+ * (aşağıdaki kontrol): biri güncellenip diğeri unutulursa sekme ya tanımsız
+ * veriyle açılır ya hiç çizilmez.
+ */
+const CIZIMLER = {
   ozet: { ozel: ozetYukle },
-  uyeler: {
-    tablo: "gym_members", order: "full_name.asc", ciz: uyeleriCiz,
-    ara: ["full_name", "phone", "email"],
-    tarihAlani: "end_date_ms", tarihEtiketi: "Üyelik bitişi",
-  },
-  paketler: {
-    tablo: "gym_packages", order: "name.asc", ciz: paketleriCiz,
-    ara: ["name", "type", "category"],
-  },
-  randevular: {
-    tablo: "appointments", order: "start_time_ms.desc", ciz: randevulariCiz,
-    ara: ["training_type", "state", "notes"],
-    tarihAlani: "start_time_ms", tarihEtiketi: "Randevu tarihi",
-  },
-  finans: {
-    tablo: "ledger_entries", order: "occurred_at_ms.desc", ciz: finansiCiz,
-    ara: ["description", "type", "category", "payment_method"],
-    tarihAlani: "occurred_at_ms", tarihEtiketi: "İşlem tarihi",
-  },
+  uyeler: { ciz: uyeleriCiz },
+  paketler: { ciz: paketleriCiz },
+  randevular: { ciz: randevulariCiz },
+  market: { ozel: marketYukle },
+  satislar: { ciz: satislariCiz },
+  personel: { ciz: personeliCiz },
+  finans: { ciz: finansiCiz },
 };
+
+const SEKMELER = Object.fromEntries(
+  Object.entries(SEKME_VERISI).map(([ad, veri]) => [ad, { ...veri, ...CIZIMLER[ad] }]),
+);
+
+// İki tablonun ayrışması sessiz bir hata olurdu: çizimi olmayan sekme boş açılır,
+// verisi olmayan sekme tanımsız tabloyu okumaya çalışır. Açılışta bir kez
+// kontrol ediliyor — testte de var, ama burada olması gerçek bir kurulumda
+// (ör. birleştirilmiş önizlemede) de yakalanmasını sağlıyor.
+for (const ad of Object.keys(SEKME_VERISI)) {
+  if (!CIZIMLER[ad]) console.error(`Sekme çizimi eksik: ${ad}`);
+}
+for (const ad of Object.keys(CIZIMLER)) {
+  if (!SEKME_VERISI[ad]) console.error(`Sekme verisi eksik: ${ad}`);
+}
 
 async function sekmeYukle(ad) {
   const tanim = SEKMELER[ad];
+
+  // Düğmeyi gizlemek yeterli değil: gizli bir düğme DOM'dan tetiklenebilir ve
+  // sekme adı başka bir yoldan da (ör. hatırlanan durum) gelebilir. Kural tek
+  // yerde uygulanmalı, yoksa "gizli ama çalışan" bir yol kalır — bu projede
+  // daha önce tam olarak bu olmuştu: bir ekranda görünmeyen düğme, başka bir
+  // ekrandan herkese açıktı.
+  if (!tanim || !sekmeGorunur(ad, aktifRol)) {
+    $("icerik").innerHTML = "";
+    hataYaz("panel-hata", "Bu bölüm rolünüzde açık değil.");
+    $("yukleniyor").hidden = true;
+    return;
+  }
+
   $("icerik").innerHTML = "";
   hataYaz("panel-hata", null);
   $("yukleniyor").hidden = false;
@@ -348,6 +412,163 @@ async function ozetYukle(ad) {
   }
 
   $("icerik").appendChild(kap);
+}
+
+// ─── Market ─────────────────────────────────────────────────────────────────
+
+/**
+ * Market sekmesi: ürünler ve **hareketlerden türeyen** eldeki stok.
+ *
+ * Ürün tablosunda stok kolonu yok ve bu bilinçli: mutlak bir sayaç olsaydı iki
+ * cihaz aynı anda satış yaptığında bir satış sessizce kaybolurdu. Stok,
+ * `stock_movements` toplamı — kural uygulamadaki `StockMovementDao.onHand` ile
+ * birebir aynı ve `stok.js` içinde yazılı.
+ *
+ * ### Kesik liste durumunda sayı gösterilmiyor
+ * Hareket sayısı okuma sınırına dayanırsa toplam eksik hesaplanır ve sonuç
+ * tamamen makul bir sayı gibi görünür — 500 hareketin ilk 500'ünden çıkan bir
+ * stok, doğru stoktan ayırt edilemez. O yüzden kesildiğinde sayı yerine "?"
+ * yazıyor ve sebebi ekranda açıkça söyleniyor. Sınır ürün tablosundan çok daha
+ * yüksek tutuluyor: bir ürün yüzlerce hareket taşıyabiliyor.
+ */
+async function marketYukle(ad) {
+  const [urunSonuc, stokSonuc] = await Promise.all([
+    istemci.oku("products", { order: "name.asc" }),
+    istemci.oku("stock_movements", { order: "occurred_at_ms.desc", limit: 10000 }),
+  ]);
+
+  for (const sonuc of [urunSonuc, stokSonuc]) {
+    if (sonuc.tur === "oturumsuz") {
+      hataYaz("giris-hata", "Oturumunuzun süresi doldu, tekrar giriş yapın.");
+      return goster("giris");
+    }
+    if (sonuc.tur !== "tamam") return hataYaz("panel-hata", sonuc.mesaj);
+  }
+
+  if (ad !== aktifSekme) return;
+
+  const urunler = silinmemisler(urunSonuc.satirlar);
+  // Hareketlerde tombstone yok (tablo yalnızca eklenen); süzmek ölü kod olurdu.
+  const harita = stokHaritasi(stokSonuc.satirlar);
+  const hepsiOkundu = !stokSonuc.kesildi;
+
+  const kap = document.createElement("div");
+
+  if (!hepsiOkundu) {
+    const uyari = document.createElement("p");
+    uyari.className = "hata";
+    uyari.textContent =
+      "Stok hareketleri okuma sınırına dayandı; eldeki stok eksik hesaplanacağı " +
+      "için sayı gösterilmiyor.";
+    kap.appendChild(uyari);
+  }
+
+  // Sayaçlar ve tablodaki rozetler AYNI sınıflandırmadan geliyor (`stokDurumu`).
+  // Ayrı yazıldıklarında gerçekten ayrıştılar: sayaç negatif stoğu "tükendi"
+  // sayarken tablo ona ayrı bir rozet veriyordu ve kutudaki sayı tablodaki rozet
+  // sayısıyla tutmuyordu.
+  const gruplar = stokUyarilari(urunler, harita);
+  const say = (ad) => (hepsiOkundu ? String(gruplar[ad].length) : "?");
+
+  kap.appendChild(kutular([
+    ["Ürün", String(urunler.length)],
+    ["Tükendi", say("tukendi")],
+    ["Azalıyor", say("azaliyor")],
+    ["Eksi stok", say("eksi")],
+    ["Bilinmiyor", say("bilinmiyor")],
+  ]));
+
+  if (urunler.length === 0) {
+    const bos = document.createElement("p");
+    bos.className = "alt";
+    bos.textContent = "Ürün yok.";
+    kap.appendChild(bos);
+    $("icerik").appendChild(kap);
+    return;
+  }
+
+  kap.appendChild(tabloYap(
+    ["Ürün", "Kategori", "Fiyat", "Eldeki stok", "Durum"],
+    urunler.map((u) => [
+      u.name,
+      u.category,
+      tutarYaz(u.price_minor),
+      stokYaz(harita, u.id, hepsiOkundu),
+      stokRozeti(harita, u.id, hepsiOkundu),
+    ]),
+  ));
+
+  $("icerik").appendChild(kap);
+}
+
+/**
+ * Stok durumunun rozeti.
+ *
+ * Negatif stok "tükendi" değil **ayrı** bir durum: fazla satış ya da eksik alım
+ * kaydı demek, yani veri sorunu. Aynı etiketi vermek onu sıradan bir tükenme
+ * gibi gösterir ve kimse sebebini araştırmaz.
+ */
+const STOK_ETIKETLERI = {
+  yeterli: "Yeterli",
+  azaliyor: "Azalıyor",
+  tukendi: "Tükendi",
+  eksi: "Eksi stok",
+  bilinmiyor: "Bilinmiyor",
+};
+
+function stokRozeti(harita, urunId, hepsiOkundu) {
+  const durum = hepsiOkundu ? stokDurumu(harita, urunId) : "bilinmiyor";
+  return { rozet: `stok-${durum}`, metin: STOK_ETIKETLERI[durum] };
+}
+
+function satislariCiz(satirlar) {
+  return tabloYap(
+    ["Tarih", "Tutar", "İndirim", "Ödenen", "Yöntem", "Ödeme", "Teslim"],
+    satirlar.map((s) => [
+      tarihYaz(s.date_ms),
+      tutarYaz(s.total_price_minor),
+      // Sıfır indirim "—" değil "₺0,00": indirim yok demek, bilinmiyor demek değil.
+      tutarYaz(s.discount_minor),
+      tutarYaz(s.final_price_minor),
+      s.payment_method,
+      s.payment_status,
+      s.delivery_status === "PRE_DELIVERY" ? "Teslim edilmedi" : "Teslim edildi",
+    ]),
+  );
+}
+
+/**
+ * Personel listesi.
+ *
+ * Maaş ve hakediş oranı gösteriliyor. Bu yeni bir açığa çıkarma **değil**:
+ * uygulamadaki personel kartı da ikisini gösteriyor (`PersonnelScreen`) ve o
+ * ekran eğitmene açık (`AppDestination.PERSONNEL`). Panel burada uygulamadan
+ * farklı bir karar vermiyor — verseydi aynı ürün iki farklı cevap verirdi.
+ *
+ * Hakediş sunucuda on binde (`basis_points`) tutuluyor; yüzdeye çevrim yalnızca
+ * gösterim anında, tam sayı bölmesiyle değil.
+ */
+function personeliCiz(satirlar) {
+  return tabloYap(
+    ["Ad Soyad", "Ünvan", "Rol", "Şube", "Hakediş", "Maaş", "Telefon"],
+    satirlar.map((p) => [
+      p.full_name,
+      p.title,
+      rolEtiketi(p.role),
+      p.branch,
+      hakedisYaz(p.commission_basis_points),
+      tutarYaz(p.monthly_salary_minor),
+      p.phone,
+    ]),
+  );
+}
+
+/** On binde cinsinden oranı yüzde olarak yazar. */
+function hakedisYaz(basisPoints) {
+  const sayi = Number(basisPoints);
+  if (!Number.isFinite(sayi)) return "—";
+  // 4000 → %40 ; 350 → %3,5
+  return `%${(sayi / 100).toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
 }
 
 function kutular(ciftler) {

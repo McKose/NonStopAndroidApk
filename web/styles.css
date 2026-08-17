@@ -149,6 +149,25 @@ tbody tr:hover { background: var(--yuzey); }
 .rozet-suresi_doldu { color: var(--hata); background: color-mix(in srgb, var(--hata) 12%, transparent); }
 .rozet-donduruldu, .rozet-arsivde { color: var(--uyari); background: color-mix(in srgb, var(--uyari) 15%, transparent); }
 
+/* Stok durumları. Üyelik rozetlerinin sınıfları yeniden kullanılmıyor: aynı
+   rengi paylaşsalar da anlamları farklı ve birini değiştirmek diğerini sessizce
+   bozardı ("süresi dolmuş üye" ile "tükenen ürün" aynı şey değil).
+
+   `eksi` ayrı bir durum, `tukendi`nin daha kötüsü değil: negatif stok fazla
+   satış ya da eksik alım kaydı demek, yani veri sorunu. Aynı rozeti vermek onu
+   sıradan bir tükenme gibi gösterir ve sebebi araştırılmazdı. */
+.rozet-stok-yeterli { color: var(--iyi); background: color-mix(in srgb, var(--iyi) 15%, transparent); }
+.rozet-stok-azaliyor { color: var(--uyari); background: color-mix(in srgb, var(--uyari) 15%, transparent); }
+.rozet-stok-tukendi { color: var(--hata); background: color-mix(in srgb, var(--hata) 12%, transparent); }
+.rozet-stok-eksi {
+  color: var(--hata);
+  background: color-mix(in srgb, var(--hata) 22%, transparent);
+  font-weight: 600;
+}
+/* Bilinmeyen stok bilinçli olarak nötr: yeşil "yeterli", kırmızı "sorun" derdi.
+   İkisi de yanlış — bilmediğimiz şey hakkında renkle iddiada bulunmuyoruz. */
+.rozet-stok-bilinmiyor { color: var(--soluk); }
+
 pre {
   padding: 12px;
   overflow-x: auto;
