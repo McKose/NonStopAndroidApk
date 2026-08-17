@@ -20,7 +20,7 @@ import { SEKME_ROLLERI, SEKME_HEDEFI, sekmeGorunur, gorunurSekmeler } from "./ro
 const buradan = dirname(fileURLToPath(import.meta.url));
 const KOTLIN_YOLU = join(
   buradan,
-  "..", "shared", "src", "commonMain", "kotlin", "com", "gymapp", "data", "access", "RoleAccess.kt",
+  "..", "..", "shared", "src", "commonMain", "kotlin", "com", "gymapp", "data", "access", "RoleAccess.kt",
 );
 
 /**

@@ -115,13 +115,26 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
-            cat > _site/config.js <<EOF
+            # Hedef, `config.js`i ARAYAN dizinlerden türetiliyor; sabit
+            # `_site/config.js` değil. Panel `/panel/` altına taşınınca eski
+            # sabit yol sessizce yanlış oldu: dosya kökte kalır, panel onu
+            # `panel/config.js` diye arar ve "Kurulum tamamlanmamış" der. Üstelik
+            # yayın yeşil görünür.
+            hedefler=$(node web/yayin-dosyalari.mjs --uretilen)
+            if [ -z "$hedefler" ]; then
+              echo "::error::config.js'i arayan hiçbir yüzey yok — beklenmedik."
+              exit 1
+            fi
+            for hedef in $hedefler; do
+            mkdir -p "_site/$(dirname "$hedef")"
+            cat > "_site/$hedef" <<EOF
           window.NONSTOP_CONFIG = {
             url: "$SUPABASE_URL",
             anonKey: "$SUPABASE_ANON_KEY",
           };
           EOF
-            echo "config.js yazıldı."
+              echo "config.js yazıldı: $hedef"
+            done
           else
             echo "UYARI: SUPABASE_URL / SUPABASE_ANON_KEY tanımlı değil."
             echo "Panel yayınlanacak ama 'Kurulum tamamlanmamış' diyecek."

@@ -15,14 +15,23 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { yayinDosyalari } from "./yayin-dosyalari.mjs";
+import { yayinDosyalari, girisNoktalari } from "./yayin-dosyalari.mjs";
 
 const BURADA = dirname(fileURLToPath(import.meta.url));
 
-test("giriş noktası ve panelin çekirdek dosyaları listede", () => {
+test("her yüzeyin giriş noktası bulunuyor", () => {
+  const girisler = girisNoktalari();
+  assert.ok(girisler.includes("panel/index.html"), `panel girişi bulunamadı: ${girisler}`);
+  assert.ok(girisler.length > 0, "hiç giriş noktası yok");
+});
+
+test("panelin çekirdek dosyaları listede", () => {
   const { dosyalar } = yayinDosyalari();
 
-  for (const gerekli of ["index.html", "styles.css", "app.js", "supabase.js", "domain.js"]) {
+  for (const gerekli of [
+    "panel/index.html", "panel/styles.css", "panel/app.js",
+    "panel/supabase.js", "panel/domain.js",
+  ]) {
     assert.ok(dosyalar.includes(gerekli), `${gerekli} yayın listesinde yok`);
   }
 });
@@ -35,7 +44,7 @@ test("giriş noktası ve panelin çekirdek dosyaları listede", () => {
  * bir modül eklenirse bu test onu da kapsıyor.
  */
 test("app.js'in bütün importları yayın listesinde", () => {
-  const kaynak = readFileSync(join(BURADA, "app.js"), "utf8");
+  const kaynak = readFileSync(join(BURADA, "panel", "app.js"), "utf8");
   const importlar = [...kaynak.matchAll(/from\s+["']\.\/([^"']+)["']/g)].map((m) => m[1]);
 
   assert.ok(importlar.length >= 5, `app.js'te beklenenden az import bulundu: ${importlar.length}`);
@@ -43,7 +52,7 @@ test("app.js'in bütün importları yayın listesinde", () => {
   const { dosyalar } = yayinDosyalari();
   for (const modul of importlar) {
     assert.ok(
-      dosyalar.includes(modul),
+      dosyalar.includes(`panel/${modul}`),
       `app.js "${modul}" modülünü içe alıyor ama yayın listesinde yok — ` +
         `yayınlanan panel bu modül yüzünden hiç açılmaz`,
     );
@@ -74,11 +83,12 @@ test("test ve kurulum dosyaları yayına girmiyor", () => {
   }
 
   for (const girmemeli of [
-    "config.example.js",   // örnek ayar; gerçek config.js iş akışında üretiliyor
-    "onizleme.mjs",        // önizleme üreticisi, panelin parçası değil
-    "sema.js",             // yalnızca testler için (kendi başlığında yazılı)
+    "panel/config.example.js",  // örnek ayar; gerçek config.js iş akışında üretiliyor
+    "panel/onizleme.mjs",       // önizleme üreticisi, panelin parçası değil
+    "panel/sema.js",            // yalnızca testler için (kendi başlığında yazılı)
     "package.json",
     "README.md",
+    "yayin-dosyalari.mjs",      // yayın aracının kendisi
   ]) {
     assert.ok(!dosyalar.includes(girmemeli), `${girmemeli} yayına girmemeli`);
   }
@@ -94,10 +104,10 @@ test("test ve kurulum dosyaları yayına girmiyor", () => {
 test("config.js üretilen dosya olarak ayrı tutuluyor", () => {
   const { dosyalar, uretilen, eksik } = yayinDosyalari();
 
-  assert.ok(!dosyalar.includes("config.js"), "config.js kopyalanacak listede olmamalı");
-  assert.ok(uretilen.includes("config.js"), "config.js üretilenler arasında olmalı");
+  assert.ok(!dosyalar.includes("panel/config.js"), "config.js kopyalanacak listede olmamalı");
+  assert.ok(uretilen.includes("panel/config.js"), `config.js üretilenler arasında olmalı: ${uretilen}`);
   assert.ok(
-    !eksik.some((e) => e.startsWith("config.js")),
+    !eksik.some((e) => e.includes("config.js")),
     "config.js eksik sayılmamalı — yoksa her yayın düşer",
   );
 });
