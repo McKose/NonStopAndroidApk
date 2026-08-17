@@ -2,8 +2,12 @@ package com.gymapp.presentation.members
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gymapp.data.access.AppDestination
+import com.gymapp.data.auth.CurrentUser
+import com.gymapp.data.auth.StaffLink
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.PackageEntity
+import com.gymapp.data.repository.AppointmentRepository
 import com.gymapp.data.repository.MemberRepository
 import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
@@ -12,6 +16,7 @@ import com.gymapp.domain.PaymentState
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Pricing
 import com.gymapp.domain.SessionCarryOver
+import com.gymapp.domain.StaffRole
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -26,11 +31,34 @@ sealed interface MemberEvent {
 
 // ─── UI State ────────────────────────────────────────────────────────────────
 
+/**
+ * Üye listesinin kapsamı.
+ *
+ * Eğitmen için varsayılan [MINE]: panonun sayaçları baştan beri "kendi üyelerim"
+ * diyordu, liste ise salonun tamamını gösteriyordu. Aynı ekranda iki farklı
+ * cevap veren bir uygulamada hangisinin doğru olduğu anlaşılmıyor.
+ *
+ * Seçim **görünür**, çünkü sessiz süzme bu ekranda gerçek bir işi bozardı:
+ * eğitmenin yeni kaydettiği üyenin henüz randevusu yok, yani "benim üyem"
+ * sayılmaz ve listeden kaybolurdu. Kullanıcı da onu bir daha bulamazdı.
+ * Yönetici rollerinde seçim hiç gösterilmiyor; onlar için kapsam zaten salon.
+ */
+enum class MemberScope { MINE, ALL }
+
 data class MemberListUiState(
     val members: List<MemberEntity> = emptyList(),
     val isLoading: Boolean = false,
-    val searchQuery: String = ""
-)
+    val searchQuery: String = "",
+    val role: StaffRole = StaffRole.TRAINER,
+    val kapsam: MemberScope = MemberScope.ALL,
+    /** Kapsam seçimi yalnızca kapsamı tanımlı olan eğitmene gösteriliyor. */
+    val kapsamSecilebilir: Boolean = false,
+    /** Eğitmen giriş yaptı ama personel kaydına bağlı değil; "benim üyelerim" tanımsız. */
+    val personelBaglantisiYok: Boolean = false,
+) {
+    /** Çekmecedeki hedeflerin görünürlüğü tek kaynaktan. */
+    fun gorebilir(destination: AppDestination): Boolean = destination.isVisibleTo(role)
+}
 
 data class RegisterFormState(
     val fullName: String = "",
@@ -74,7 +102,9 @@ data class RegisterFormState(
 
 class MemberViewModel(
     private val repository: MemberRepository,
-    private val packageRepository: com.gymapp.data.repository.PackageRepository
+    private val packageRepository: com.gymapp.data.repository.PackageRepository,
+    private val appointmentRepository: AppointmentRepository,
+    currentUser: CurrentUser,
 ) : ViewModel() {
 
     /**
@@ -95,29 +125,71 @@ class MemberViewModel(
     private val _searchQuery = MutableStateFlow("")
     private val _isLoading = MutableStateFlow(false)
 
+    /**
+     * Kapsam seçimi. Varsayılan [MemberScope.MINE]; yönetici rollerinde zaten
+     * yok sayılıyor, dolayısıyla ayrı bir başlangıç değerine gerek yok.
+     */
+    private val _kapsam = MutableStateFlow(MemberScope.MINE)
+
+    private val oturum = combine(currentUser.role, currentUser.staffLink, ::Pair)
+
     @OptIn(FlowPreview::class)
-    val listUiState: StateFlow<MemberListUiState> =
-        _searchQuery
-            .debounce(300)
-            .flatMapLatest { query ->
-                if (query.isBlank()) repository.getAllMembers()
-                else repository.searchMembers(query)
-            }
-            .combine(_isLoading) { members, loading ->
-                MemberListUiState(
-                    members = members,
-                    isLoading = loading,
-                    searchQuery = _searchQuery.value
-                )
-            }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = MemberListUiState(isLoading = true)
-            )
+    private val aramaSonucu = _searchQuery
+        .debounce(300)
+        .flatMapLatest { query ->
+            if (query.isBlank()) repository.getAllMembers()
+            else repository.searchMembers(query)
+        }
+
+    val listUiState: StateFlow<MemberListUiState> = combine(
+        aramaSonucu,
+        _isLoading,
+        _kapsam,
+        oturum,
+        appointmentRepository.observeAll(),
+    ) { members, loading, kapsam, oturumBilgisi, appointments ->
+        val (role, link) = oturumBilgisi
+        val staffId = (link as? StaffLink.Linked)?.staffId
+        val isTrainer = role == StaffRole.TRAINER
+
+        // Kapsam yalnızca "benim" tanımlıysa uygulanabilir. Bağlantısı olmayan
+        // eğitmende süzmek, listeyi sessizce boşaltmak olurdu; ekran bunun
+        // yerine sebebini yazıyor ve salonun listesini gösteriyor. Sunucu
+        // tarafında da okuma zaten salona bağlı herkese açık.
+        val kapsamSecilebilir = isTrainer && staffId != null
+        val kendiUyeleri = kapsamSecilebilir && kapsam == MemberScope.MINE
+
+        val gosterilecek = if (kendiUyeleri) {
+            val memberIds = appointments
+                .filter { it.staffId == staffId }
+                .map { it.memberId }
+                .toSet()
+            members.filter { it.id in memberIds }
+        } else {
+            members
+        }
+
+        MemberListUiState(
+            members = gosterilecek,
+            isLoading = loading,
+            searchQuery = _searchQuery.value,
+            role = role,
+            kapsam = if (kapsamSecilebilir) kapsam else MemberScope.ALL,
+            kapsamSecilebilir = kapsamSecilebilir,
+            personelBaglantisiYok = isTrainer && link is StaffLink.Unlinked,
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = MemberListUiState(isLoading = true)
+    )
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
+    }
+
+    fun onKapsamChange(kapsam: MemberScope) {
+        _kapsam.value = kapsam
     }
 
     private val _formState = MutableStateFlow(RegisterFormState())

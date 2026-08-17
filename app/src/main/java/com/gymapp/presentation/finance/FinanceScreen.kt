@@ -25,10 +25,44 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import com.gymapp.presentation.common.ReadOnlyNotice
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import java.text.SimpleDateFormat
 import java.util.*
+
+/**
+ * Finans ekranına yetkisiz gelindiğinde gösterilen ekran.
+ *
+ * Boş bir liste ya da sıfır dolu bir özet göstermek daha kötü olurdu: eğitmen
+ * salonun hiç geliri olmadığını sanırdı.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun YetkiYokEkrani(onNavigateBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Finansal Durum", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Box(
+            modifier = Modifier.padding(padding).fillMaxSize().padding(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            ReadOnlyNotice(
+                "Finans ekranı salon sahibi ve yöneticiye açık. Kendi hakediş " +
+                    "kayıtlarınızı üye ve randevu ekranlarından görebilirsiniz."
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,8 +71,16 @@ fun FinanceScreen(
     viewModel: FinanceViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val gorebilir by viewModel.gorebilir.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Yetkisi olmayana defter hiç çizilmiyor. Giriş noktalarının gizlenmesine
+    // ek bir kat: gizlenmiş düğme kural değil, yalnızca görüntü.
+    if (!gorebilir) {
+        YetkiYokEkrani(onNavigateBack)
+        return
+    }
 
     // Kayıt sonucu her durumda kullanıcıya bildirilir.
     LaunchedEffect(Unit) {

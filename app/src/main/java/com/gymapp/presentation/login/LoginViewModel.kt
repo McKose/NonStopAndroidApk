@@ -4,8 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.auth.AuthResult
 import com.gymapp.data.auth.SessionManager
-import com.gymapp.data.local.dao.StaffDao
-import com.gymapp.data.local.preferences.AppPreferences
 import com.gymapp.data.sync.ArkaPlanSenkronizasyonu
 import com.gymapp.data.sync.SyncCoordinator
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,8 +32,6 @@ import kotlinx.coroutines.launch
  */
 class LoginViewModel(
     private val sessions: SessionManager,
-    private val staffDao: StaffDao,
-    private val prefs: AppPreferences,
     private val sync: SyncCoordinator,
     private val arkaPlan: ArkaPlanSenkronizasyonu,
 ) : ViewModel() {
@@ -55,7 +51,12 @@ class LoginViewModel(
             try {
                 when (val sonuc = sessions.signIn(email, password)) {
                     is AuthResult.Success -> {
-                        oturumuKur(sonuc)
+                        // Oturumdan türeyen yerel durum yazılmıyor: rol ve
+                        // personel kimliği artık `CurrentUser` üzerinden
+                        // doğrudan oturumdan okunuyor. Buradaki kopyalama, geri
+                        // yüklenen oturumlarda hiç çalışmadığı için rolün
+                        // sunucudakinden sapabildiği yerdi.
+                        //
                         // Girişten önce çevrimdışı biriken değişiklikler var
                         // olabilir; oturum açılır açılmaz gönderilmeye başlansın.
                         // Beklenmiyor: kullanıcıyı kuyruk boşalana kadar giriş
@@ -86,21 +87,4 @@ class LoginViewModel(
         }
     }
 
-    /**
-     * Oturumdan türeyen yerel durumu yazar.
-     *
-     * Rol **sunucudan** geliyor (`gym_users.role`), cihazdaki bir tercihten değil.
-     *
-     * Personel kimliği ise yerel `staff` satırından: randevu ve hakediş kayıtları
-     * `staff.id` değerine bakıyor, oturumdan gelen kimlik ise `auth.users.id`.
-     * Bağlı bir satır yoksa kimlik boş kalıyor ve "bugün benim derslerim" listesi
-     * boş görünüyor — salon sahibi gibi ders vermeyen bir kullanıcı için doğru
-     * sonuç bu. Giriş bu yüzden engellenmiyor.
-     */
-    private suspend fun oturumuKur(sonuc: AuthResult.Success) {
-        val oturum = sonuc.session
-        prefs.currentUserRole = oturum.role
-        prefs.currentUserId =
-            staffDao.findByAuthUserId(oturum.tenantId, oturum.userId)?.id.orEmpty()
-    }
 }

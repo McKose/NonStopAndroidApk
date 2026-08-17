@@ -2,6 +2,8 @@ package com.gymapp.di
 
 import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.db.createGymDatabase
+import com.gymapp.data.auth.CurrentUser
+import com.gymapp.data.auth.SessionManager
 import com.gymapp.data.local.preferences.AppPreferences
 import com.gymapp.data.sync.ArkaPlanSenkronizasyonu
 import com.gymapp.data.repository.AppointmentRepository
@@ -62,6 +64,15 @@ val databaseModule = module {
  */
 val appModule = module {
     single { AppPreferences(androidContext()) }
+
+    /**
+     * Oturumdaki rolün ve personel bağlantısının tek kaynağı.
+     *
+     * `singleOf` yerine elle yazılıyor çünkü kurucu `SessionManager`'ın
+     * tamamını değil yalnızca oturum akışını alıyor — dar bağımlılık bilinçli,
+     * bkz. `CurrentUser`.
+     */
+    single { CurrentUser(session = get<SessionManager>().session, staffDao = get()) }
     single { ArkaPlanSenkronizasyonu(androidContext()) }
 
     singleOf(::LedgerRepository)
