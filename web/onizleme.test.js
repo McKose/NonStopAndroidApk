@@ -78,6 +78,9 @@ test("dizindeki her modül ya birleştirmede ya bilinçli dışında", () => {
     "onizleme.mjs",      // birleştirmeyi yapan betiğin kendisi
     "config.example.js", // örnek ayar; kuruluma özgü `config.js` üretmek için
     "sema.js",           // yalnızca testler için: SQL migrasyonlarını okuyor
+    // Yayın listesini modül grafiğinden türeten araç. Panelin çalışma zamanına
+    // ait değil — yayın akışı ve testler çağırıyor, tarayıcı hiç görmüyor.
+    "yayin-dosyalari.mjs",
   ]);
 
   for (const ad of readdirSync(burada)) {

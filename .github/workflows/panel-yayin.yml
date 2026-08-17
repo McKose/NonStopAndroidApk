@@ -74,23 +74,35 @@ jobs:
       - name: Pages'i hazırla
         uses: actions/configure-pages@v5
 
-      # Yayınlanacak dosyalar TEK TEK sayılıyor, `web/` olduğu gibi
-      # kopyalanmıyor. Sebebi: o dizinde testler, örnek ayar dosyası ve
-      # önizleme üreticisi de var. Hepsini yayınlamak zararsız görünür ama
-      # `config.example.js` gibi bir dosyanın site kökünde durması kafa
-      # karıştırıcı, testler ise oraya hiç ait değil.
+      # Yayınlanacak dosyalar `index.html`ten başlayıp importlar izlenerek
+      # TÜRETİLİYOR, elle sayılmıyor.
+      #
+      # Eskiden elle sayılıyordu ve tam olarak beklenen şey oldu: panele dört
+      # yeni modül eklendi, listeye yazılmadı ve yayınlanan panel bomboş açıldı.
+      # Sebebi de görünmüyordu — bir ES modülü importu 404 alırsa onu içe alan
+      # dosya TAMAMEN yüklenmiyor, yani eksik tek dosya bütün paneli düşürüyor.
+      # Üstelik CI yeşildi: testler depodaki dosyaları okuyor, yayınlananları
+      # değil.
+      #
+      # Elle listenin gerekçesi geçerliydi ve korunuyor: `web/` altında testler,
+      # `config.example.js` ve önizleme üreticisi de var; onlar yayına ait değil.
+      # Türetme bunu kendiliğinden sağlıyor — hiçbir şey onları içe almıyor.
       - name: Yayınlanacak dosyaları topla
         run: |
           mkdir -p _site
-          cp web/index.html   _site/
-          cp web/styles.css   _site/
-          cp web/app.js       _site/
-          cp web/domain.js    _site/
-          cp web/ozet.js      _site/
-          cp web/suzme.js     _site/
-          cp web/supabase.js  _site/
-          cp web/demo.js      _site/
-          echo "Yayınlanacak dosyalar:"; ls -1 _site
+          # Betik referans verilip bulunamayan bir dosya görürse sıfırdan farklı
+          # kodla çıkıyor; `set -e` ile zincir orada kesilir.
+          node web/yayin-dosyalari.mjs > /tmp/yayin-listesi.txt
+          if [ ! -s /tmp/yayin-listesi.txt ]; then
+            echo "::error::Yayın listesi boş — giriş noktası bulunamadı."
+            exit 1
+          fi
+          while IFS= read -r dosya; do
+            [ -n "$dosya" ] || continue
+            mkdir -p "_site/$(dirname "$dosya")"
+            cp "web/$dosya" "_site/$dosya"
+          done < /tmp/yayin-listesi.txt
+          echo "Yayınlanacak dosyalar:"; (cd _site && find . -type f | sort)
 
       # Ayarlar depoda tutulmuyor; APK'daki desenin aynısı.
       #
