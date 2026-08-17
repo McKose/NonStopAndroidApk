@@ -48,8 +48,27 @@ adb shell getprop ro.build.version.sdk # → 33
 |------|-------|
 | `unauthorized` | Cihazda "Her zaman izin ver" seç, `adb kill-server && adb start-server` |
 | `INSTALL_FAILED_USER_RESTRICTED` | "USB üzerinden yüklemeye izin ver" toggle'ını aç/kapat |
-| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | `adb uninstall com.gymapp` ile eski sürümü kaldır |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | İmzalar farklı. **Artık çıkmaması gerekiyor** — aşağıdaki nota bakın |
 | `insufficient permissions` | Linux'ta: `sudo adb devices` veya udev kuralı ekle |
+
+### Hata ayıklama imzası sabit — üzerine kurmak veriyi silmiyor
+
+Hata ayıklama yapısı depodaki `app/debug.keystore` ile imzalanıyor. Yani hangi
+makinede ya da hangi CI koşusunda derlendiği fark etmiyor: **imza her zaman
+aynı** ve yeni APK eskisinin üzerine kurulabiliyor.
+
+Bu, veritabanı göçünü gerçek veriyle denemenin ön koşulu. Önceden her CI koşusu
+kendi anahtarını üretiyordu; `INSTALL_FAILED_UPDATE_INCOMPATIBLE` alıp
+`adb uninstall` yapmak gerekiyordu ve o komut **uygulama verisini de siliyordu**.
+Göçü denemek için gereken eski veri, denemeye başlamadan yok oluyordu.
+
+Anahtar gizli değil (şifresi `android`, Android'in kendi varsayılanı) ve yalnızca
+hata ayıklama yapısını imzalıyor. Yayın imzası bundan tamamen ayrı.
+
+> **Göçü denemek için:** önce **eski** sürümün APK'sını kurup veri girin, sonra
+> yeni APK'yı `adb install -r` ile üzerine kurun. Uygulama açılıyor ve veriler
+> yerindeyse göç doğru çalışmış demektir. Açılışta çöküyorsa `adb logcat`'te
+> "Migration didn't properly handle" satırını arayın.
 
 ---
 
@@ -66,7 +85,8 @@ Toolbar'dan hedef cihazı seç:
 ▶ Run  (veya Shift+F10)
 ```
 
-**Build variant:** `debug` (geliştirme için yeterli, imzasız APK)
+**Build variant:** `debug` (geliştirme için yeterli; depodaki sabit hata ayıklama
+anahtarıyla imzalanır, yayın anahtarıyla değil)
 
 ---
 

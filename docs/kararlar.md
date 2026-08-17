@@ -390,6 +390,45 @@ olarak yanlış gösteriyordu.
 hatası yalnızca gönderimde siliniyordu; paket seçildiği anda siliniyor — ad ve
 telefon alanları bunu zaten doğru yapıyordu.
 
+## Hata ayıklama imzası sabit ve depoda
+
+**Karar:** Hata ayıklama yapısı depodaki `app/debug.keystore` ile imzalanıyor;
+AGP'nin her makinede kendi ürettiği anahtar kullanılmıyor.
+
+**Neden:** CI koşucusu her tur sıfırdan başlıyor, yani her koşu **farklı** bir
+imza üretiyordu. Sonucu telefonda görünüyor: yeni APK eskisinin üzerine
+kurulamıyor (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), tek çıkış yolu kaldırıp
+yeniden kurmak ve o da **uygulama verisini siliyor**. Yani iki CI koşusu arasında
+veritabanı göçünü gerçek veriyle denemek mümkün değildi: denenecek eski veri her
+kurulumda yok oluyordu. Göç hatası bu projede yapılabilecek en pahalı
+hatalardan biri olduğu için, onu telefonda deneyememek kabul edilebilir değil.
+
+**Anahtarın depoda olması bilinçli.** Gizli değil ve gizli olması beklenmiyor:
+şifresi Android'in kendi varsayılanıyla aynı (`android`), yalnızca hata ayıklama
+yapısını imzalıyor ve hiçbir mağazaya bir şey yüklemiyor. Yayın imzası buna
+bağlanmayacak — o anahtar depoya değil depo gizli anahtarlarına girer.
+
+## Room şemasının depoda olması sınanıyor
+
+**Karar:** CI, `@Database(version = ...)` değerini okuyup o sürümün şema
+JSON'unun depoda ve güncel olduğunu doğruluyor; değilse iş düşüyor.
+
+**Neden:** Şema dosyası derleme sırasında `shared/schemas/` altına yazılıyor ama
+depoya işlenmesi elle yapılıyor. İşlenmediğinde hiçbir şey şikâyet etmiyordu:
+sürüm artırılıyor, CI yeşil kalıyor ve eksiklik ancak birisi geçiş testi yazmaya
+çalıştığında ortaya çıkıyordu. Geçiş testleri eski ve yeni şemayı bu
+dosyalardan okuyor, `MigrationTestHelper` da eski sürümün veritabanını onlardan
+kuruyor — yani eksik bir şema dosyası, yazılamayan bir geçiş testi demek.
+
+**Üretilmedi ile işlenmedi ayrı raporlanıyor.** Adım önce derlemenin dosyayı
+gerçekten ürettiğini doğruluyor; üretmemişse sorun "işlenmemiş dosya" değil,
+adımın KSP'den önce koşması olur. İkisini aynı mesaja sıkıştırmak, yanlış yere
+bakılan bir teşhis turu demekti.
+
+**Düşerken dosyanın içeriğini de yazdırıyor.** Yapıtı indirmek her ortamda
+mümkün olmuyor (bulut depolama adresleri ağ ilkelerince engellenebiliyor —
+bu depoda bizzat yaşandı), ama günlükten kopyalamak her zaman mümkün.
+
 ## Senkronizasyon yazma anında tetiklenmez
 
 **Karar:** Tetikleme girişte, oturum geri yüklendiğinde, uygulama önplandayken

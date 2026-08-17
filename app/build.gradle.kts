@@ -45,6 +45,33 @@ android {
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${ayar("supabase.anonKey")}\"")
     }
 
+    // ---------------------------------------------------------------------
+    // Hata ayıklama imzası: SABİT ve depoda
+    // ---------------------------------------------------------------------
+    // Varsayılan davranışta AGP, `~/.android/debug.keystore` yoksa kendisi
+    // üretiyor. Geliştiricinin makinesinde bu dosya bir kez üretilip kalıyor,
+    // ama CI koşucusu her tur sıfırdan başlıyor: her koşu **farklı** bir imza
+    // üretiyordu.
+    //
+    // Sonucu telefonda görünüyor: yeni APK'yı eskisinin üzerine kurmak
+    // `INSTALL_FAILED_UPDATE_INCOMPATIBLE` ile düşüyor ve tek çıkış yolu
+    // kaldırıp yeniden kurmak — o da **uygulama verisini siliyor**. Yani iki CI
+    // koşusu arasında veritabanı göçünü telefonda denemek mümkün değildi:
+    // denenecek eski veri her kurulumda yok oluyordu.
+    //
+    // Anahtar gizli değil ve gizli olması da beklenmiyor: yalnızca hata ayıklama
+    // yapısını imzalıyor, Play Store'a hiçbir şey yüklemiyor ve şifresi
+    // Android'in kendi varsayılanıyla aynı ("android"). Yayın imzası buna
+    // bağlanmayacak; o anahtar depoya değil depo gizli anahtarlarına girer.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
