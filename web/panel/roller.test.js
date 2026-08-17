@@ -15,7 +15,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import { SEKME_ROLLERI, SEKME_HEDEFI, sekmeGorunur, gorunurSekmeler } from "./roller.js";
+import {
+  SEKME_ROLLERI, SEKME_HEDEFI, PANEL_OZEL, PANEL_OZEL_GEREKCE,
+  sekmeGorunur, gorunurSekmeler,
+} from "./roller.js";
 
 const buradan = dirname(fileURLToPath(import.meta.url));
 const KOTLIN_YOLU = join(
@@ -71,6 +74,19 @@ test("panelin rol tablosu Kotlin'deki AppDestination ile aynı", () => {
     const hedef = SEKME_HEDEFI[sekme];
     assert.ok(hedef, `\`${sekme}\` sekmesi SEKME_HEDEFI içinde eşlenmemiş.`);
 
+    // Panele özgü bölümlerin uygulamada karşılığı yok; karşılaştırılacak bir
+    // şey de yok. Ama muafiyet GEREKÇESİZ olamıyor: aksi hâlde `PANEL_OZEL`
+    // yazmak, gerçekten unutulmuş bir eşleşmeyi gizlemenin kolay yolu olurdu.
+    if (hedef === PANEL_OZEL) {
+      const gerekce = PANEL_OZEL_GEREKCE[sekme];
+      assert.ok(
+        gerekce && gerekce.length > 30,
+        `\`${sekme}\` panele özgü işaretlenmiş ama PANEL_OZEL_GEREKCE içinde ` +
+          `doyurucu bir gerekçe yok.`,
+      );
+      continue;
+    }
+
     const beklenen = kotlin[hedef];
     assert.ok(
       beklenen,
@@ -108,6 +124,66 @@ test("uygulamadaki her hedef ya panelde var ya bilinçli atlanmış", () => {
       `Uygulamada \`${hedef}\` ekranı var, panelde karşılığı yok. Ya sekme ` +
         `eklenmeli ya da bu test içindeki \`bilincliAtlanan\` listesine ` +
         `gerekçesiyle yazılmalı.`,
+    );
+  }
+});
+
+/**
+ * Panele özgü bölümler yalnızca bilinçli olarak işaretlenmiş olanlar.
+ *
+ * Ters yön: `PANEL_OZEL` yazılan her sekme gerçekten uygulamada karşılığı
+ * olmayan bir sekme mi? Bir gün `uyeler` sekmesi yanlışlıkla böyle
+ * işaretlenirse uygulamayla tutarlılık kontrolü sessizce devre dışı kalırdı.
+ */
+test("panele özgü bölümler sınırlı ve gerekçeli", () => {
+  const ozel = Object.entries(SEKME_HEDEFI)
+    .filter(([, hedef]) => hedef === PANEL_OZEL)
+    .map(([sekme]) => sekme)
+    .sort();
+
+  assert.deepEqual(
+    ozel,
+    ["duyurular", "uye-hesaplari"],
+    "Panele özgü bölümlerin listesi değişmiş. Yeni bir bölüm gerçekten " +
+      "uygulamada karşılığı olmayan bir bölüm mü, yoksa eşleşme mi unutuldu?",
+  );
+
+  for (const sekme of ozel) {
+    assert.ok(PANEL_OZEL_GEREKCE[sekme], `${sekme} için gerekçe yok`);
+  }
+});
+
+/**
+ * Panele özgü bölümlerin rolleri SUNUCUDAKİ yazma kurallarıyla aynı olmalı.
+ *
+ * Bu bölümlerin Kotlin karşılığı olmadığı için tek doğru kaynak migrasyon
+ * `0005`. Panel sunucudan geniş bir kapı açsaydı kullanıcı formu doldurup
+ * "kaydet" der, sunucu sessizce reddederdi — kullanıcının göreceği tek şey
+ * hiçbir şeyin olmaması olurdu.
+ */
+test("panele özgü bölümlerin rolleri sunucudaki kuralla aynı", () => {
+  const sql = readFileSync(
+    join(buradan, "..", "..", "supabase", "migrations",
+         "0005_public_site_and_member_access.sql"),
+    "utf8",
+  );
+
+  // `announcements_insert` ve `member_accounts_insert` kurallarının rolleri.
+  for (const [sekme, kuralAdi] of [
+    ["duyurular", "announcements_insert"],
+    ["uye-hesaplari", "member_accounts_insert"],
+  ]) {
+    const bas = sql.indexOf(`create policy ${kuralAdi}`);
+    assert.ok(bas > 0, `${kuralAdi} kuralı migrasyonda bulunamadı`);
+
+    const govde = sql.slice(bas, sql.indexOf(";", bas));
+    const roller = [...govde.matchAll(/'(ADMIN|MANAGER|TRAINER)'/g)].map((m) => m[1]);
+    assert.ok(roller.length > 0, `${kuralAdi} içindeki roller okunamadı`);
+
+    assert.deepEqual(
+      [...SEKME_ROLLERI[sekme]].sort(),
+      [...new Set(roller)].sort(),
+      `\`${sekme}\` sekmesinin rolleri sunucudaki \`${kuralAdi}\` ile aynı değil.`,
     );
   }
 });
