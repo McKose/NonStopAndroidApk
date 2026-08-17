@@ -74,6 +74,58 @@ jobs:
             exit 1
           fi
 
+      # Room'un dışa aktardığı şema anlık görüntüsü depoda olmalı.
+      #
+      # Derleme `shared/schemas/` altına güncel sürümün JSON'unu yazıyor. O dosya
+      # işlenmezse iki şey kaybediliyor: geçiş testleri eski/yeni şemayı okuyacak
+      # bir kaynaktan yoksun kalıyor ve `MigrationTestHelper` hiç kullanılamıyor.
+      #
+      # Bu tam olarak sessizce olan bir kayıptı: `@Database(version = ...)`
+      # artırıldığında hiçbir şey şikâyet etmiyor, CI yeşil kalıyor ve eksiklik
+      # ancak birisi geçiş testi yazmaya çalıştığında ortaya çıkıyor. Bu adım onu
+      # gürültülü hâle getiriyor.
+      #
+      # Düşerken dosyanın kendisini de yazdırıyor: yapıtı indirmek her ortamda
+      # mümkün olmuyor (bulut depolama adresleri kurumsal ağ ilkelerince
+      # engellenebiliyor), ama günlükten kopyalamak her zaman mümkün.
+      - name: Şema anlık görüntüsü depoda mı
+        run: |
+          db="shared/src/commonMain/kotlin/com/gymapp/data/local/db/GymDatabase.kt"
+          surum=$(grep -oE 'version[[:space:]]*=[[:space:]]*[0-9]+' "$db" | grep -oE '[0-9]+' | head -1)
+          if [ -z "$surum" ]; then
+            echo "::error::@Database sürümü $db içinden okunamadı."
+            exit 1
+          fi
+          echo "Veritabanı sürümü: $surum"
+
+          # Derlemenin şemayı gerçekten ürettiğini doğrula. Üretmediyse sorun
+          # "işlenmemiş dosya" değil, bu adımın yanlış yerde koşması olur —
+          # ikisini ayırmak, yanıltıcı bir hata mesajını önlüyor.
+          uretilen=$(find shared/schemas -name "$surum.json" | head -1)
+          if [ -z "$uretilen" ]; then
+            echo "::error::Derleme $surum.json üretmedi. Bu adım KSP'den önce koşuyor olabilir."
+            find shared/schemas -name '*.json' | sort
+            exit 1
+          fi
+
+          if git diff --quiet --exit-code -- shared/schemas \
+             && [ -z "$(git ls-files --others --exclude-standard -- shared/schemas)" ]; then
+            echo "Şema depoda ve güncel: $uretilen"
+            exit 0
+          fi
+
+          echo "::error::Room şeması depoda güncel değil — aşağıdaki dosyaları işleyin."
+          git status --porcelain -- shared/schemas
+
+          echo ""
+          echo "── İçerik (gzip+base64; çözmek için: base64 -d | gunzip) ──"
+          git status --porcelain -- shared/schemas | awk '{ print $NF }' | while read -r f; do
+            echo ""
+            echo "=== $f ==="
+            gzip -9 -c "$f" | base64 -w 100
+          done
+          exit 1
+
       - name: Uygulama birim testleri
         run: ./gradlew --no-daemon :app:testDebugUnitTest
 
@@ -189,9 +241,9 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-      # Room'un ürettiği şema anlık görüntüleri. Depoda tutulmadıkları sürece
-      # migration testi yazmak mümkün değil: MigrationTestHelper eski sürümün
-      # veritabanını bu JSON'lardan kuruyor. Şu an hiçbiri işlenmiş değil.
+      # Room'un ürettiği şema anlık görüntüleri. Depoda tutuluyorlar (bkz. yukarıdaki
+      # "Şema anlık görüntüsü depoda mı" adımı); bu yapıt, yeni bir sürümün JSON'unu
+      # depoya işlemek gerektiğinde indirme kolaylığı için duruyor.
       - name: Şema anlık görüntülerini yükle
         if: always()
         uses: actions/upload-artifact@v4

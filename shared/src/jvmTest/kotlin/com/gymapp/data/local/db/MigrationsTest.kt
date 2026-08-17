@@ -38,11 +38,25 @@ import kotlin.test.fail
  * açılışta "Migration didn't properly handle" diye çöker ve bu, cihazdaki
  * veriyle birlikte gelen, geri dönüşü olmayan bir hatadır.
  *
+ * ### Her geçişin hedef şeması artık depoda
+ * `4.json`, `5.json` ve `6.json` işlenmiş durumda, yani her geçiş **hedef**
+ * sürümün gerçek şemasıyla karşılaştırılıyor; hiçbiri türetilen bir beklentiye
+ * dayanmıyor. Dosyanın depoda kalmaya devam etmesi CI'da sınanıyor: derleme
+ * `@Database` sürümünün JSON'unu üretiyor ve işlenmemişse iş düşüyor. Önceden
+ * bu sessizdi — sürüm artırılır, hiçbir şey şikâyet etmez ve eksiklik ancak
+ * geçiş testi yazılmaya çalışılınca ortaya çıkardı (`6.json` tam bu yüzden
+ * aylarca eksik kaldı).
+ *
  * ### Neyi hâlâ kapsamıyor
- * Room'un `MigrationTestHelper` aracını. Şema dosyalarının ikisi de artık
- * mevcut, yani o kapı açık; bu testin kapsamadığı tek şey Room'un kendi
- * doğrulama koduyla aynı yoldan geçmek. Buradaki iddialar aynı soruları
- * (kolonlar, sıraları, indeksler, veri) doğrudan SQLite'a sorarak yanıtlıyor.
+ * Room'un `MigrationTestHelper` aracını. Kapsamadığı tek şey Room'un kendi
+ * doğrulama koduyla aynı yoldan geçmek; buradaki iddialar aynı soruları
+ * (kolonlar, indeksler, veri) doğrudan SQLite'a sorarak yanıtlıyor — üstelik
+ * daha açık biçimde: hangi kolonun neden beklendiği tek tek yazıyor.
+ *
+ * `MigrationTestHelper`ın ekleyeceği tek şey Room'un `TableInfo`
+ * karşılaştırmasını birebir kullanmak olurdu. Bunun bir farkı var ve burada
+ * kayıtlı: Room kolonları **ada göre** doğruluyor, sıraya bakmıyor. v5→v6
+ * testi tam bu ayrımın üzerinde duruyor.
  */
 class MigrationsTest {
 
@@ -188,10 +202,22 @@ class MigrationsTest {
      * Önceden bu iş `enqueuedAtMs`e yükleniyordu ama o damga bilinçli olarak
      * sabit (FIFO sırası ona dayanıyor), yani koruma hiç çalışmıyordu.
      *
-     * Hedef şema dosyası (`6.json`) henüz depoda değil — derleme sırasında
-     * üretiliyor. Bu yüzden beklenti v5'ten türetiliyor: sonuç tam olarak "v5
-     * artı bir kolon" olmalı. `4.json` eklenmeden önce v4→v5 testi de böyle
-     * yazılmıştı.
+     * Sonuç artık `6.json` ile karşılaştırılıyor — v4→v5 testinin `5.json`'a
+     * bağlanmasıyla aynı sebep: türetilen bir beklenti yalnızca geçişin *benim
+     * kafamdaki* sonucu ürettiğini gösterir, Room'un v6'da gerçekte ne
+     * beklediğini ise ancak hedef şema söyleyebilir.
+     *
+     * ### Kolon SIRASI bilinçli olarak sıralı karşılaştırılmıyor
+     * `ALTER TABLE ... ADD COLUMN` yeni kolonu tablonun **sonuna** koyuyor;
+     * `6.json` ise `revision`'ı alan tanımındaki yerinde, `enqueuedAtMs` ile
+     * `attemptCount` arasında listeliyor. Yani fiziksel sıra ile şemadaki sıra
+     * ayrı — ve bu **sorun değil**, çünkü Room tabloyu ada göre doğruluyor
+     * (`TableInfo` kolonları bir ada göre eşlenmiş küme; sıra eşitliğe girmiyor).
+     *
+     * Bu yüzden burada iki ayrı iddia var: kolon **kümesi** hedef şemayla aynı
+     * olmalı (Room'un baktığı şey), fiziksel sıra ise "v5 sırası artı sona
+     * eklenen kolon" olmalı (`ALTER TABLE`ın yaptığı şey). v4→v5 testinde sıra
+     * birebir karşılaştırılabiliyor çünkü o geçiş tabloyu yeniden kuruyor.
      */
     @Test
     fun `v5 to v6 kuyruga revision ekler, bekleyen kayitlar korunur`() = sqliteIle { baglanti ->
@@ -213,11 +239,34 @@ class MigrationsTest {
 
         MIGRATION_5_6.migrate(baglanti)
 
-        // 1) Kolon listesi: v5 artı `revision`.
+        val v6Kuyruk = surumSemasi(6).tablo("sync_outbox")
+        val sonucKolonlar = kolonlar(baglanti, "sync_outbox")
+
+        // 1a) Kolon kümesi HEDEF şemayla aynı olmalı — Room'un doğruladığı şey bu.
+        assertEquals(
+            v6Kuyruk.kolonlar.sorted(),
+            sonucKolonlar.sorted(),
+            "Geçişin sonucu v6 şemasındaki kolonları vermeli",
+        )
+
+        // 1b) Fiziksel sıra: `ALTER TABLE` sona ekler. Şemadaki sırayla
+        //     ayrışması beklenen ve zararsız bir fark (bkz. testin belgesi);
+        //     ama ayrışmanın **bu** biçimde olduğu sabitleniyor: tabloyu
+        //     yeniden kuran bir geçişe dönerse burası uyarır.
         assertEquals(
             kuyruk.kolonlar + "revision",
-            kolonlar(baglanti, "sync_outbox"),
-            "Geçiş yalnızca `revision` eklemeli",
+            sonucKolonlar,
+            "`ALTER TABLE ADD COLUMN` kolonu sona eklemeli",
+        )
+
+        // 1c) Kurgunun gerçekten bir şey sınadığının kontrolü — iki ŞEMA
+        //     dosyası karşılaştırılıyor: aralarındaki tek fark `revision`
+        //     olmalı. Aynı olsalardı yukarıdaki iddialar boş kalırdı.
+        assertFalse("revision" in kuyruk.kolonlar, "Kurgu bozuk: v5'te kolon olmamalıydı")
+        assertEquals(
+            (kuyruk.kolonlar + "revision").sorted(),
+            v6Kuyruk.kolonlar.sorted(),
+            "v5 ile v6 arasındaki tek fark `revision` olmalıydı",
         )
 
         // 2) Bekleyen kayıt duruyor ve alanları bozulmamış. Kuyruk kaydını
@@ -242,9 +291,9 @@ class MigrationsTest {
         //    kuyruğa alma tam ona dayanıyor: düşerse aynı satır için birden çok
         //    kayıt birikir ve revizyon sayacı anlamsızlaşır.
         assertEquals(
-            kuyruk.indeksAdlari.sorted(),
+            v6Kuyruk.indeksAdlari.sorted(),
             indeksler(baglanti, "sync_outbox").sorted(),
-            "Geçişten sonra kuyruk indeksleri kaybolmuş",
+            "Geçişten sonra kuyruk indeksleri v6'daki hâliyle ayakta olmalı",
         )
     }
 
