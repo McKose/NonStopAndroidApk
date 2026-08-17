@@ -303,6 +303,16 @@ jobs:
       - name: Appetize yükleyicisi testleri
         run: python3 tools/appetize_runner_test.py
 
+      # Sunucu adresi doğrulayıcısı burada sınanıyor, `build` işinde değil:
+      # Gradle ile ilgisi yok ve bu iş dört dakika önce sonuç veriyor.
+      #
+      # Betiğin kendisi her derlemenin kapısında duruyor, yani iki yönde de
+      # sessizce bozulabilir: bir kural kaybolursa hatalı adres yine geçer
+      # (koruma yanıltıcı olur), fazla katı olursa geçerli bir adres reddedilir
+      # ve bütün derlemeler durur. İkisi de sınanıyor.
+      - name: Sunucu adresi doğrulayıcısı testleri
+        run: tools/supabase_url_kontrol_test.sh
+
   # Sunucu şeması ve erişim kuralları. Ubuntu koşucusu, 1x ücret.
   #
   # Salon yalıtımı yalnızca satır bazlı güvenlik kurallarına dayanıyor ve yanlış
