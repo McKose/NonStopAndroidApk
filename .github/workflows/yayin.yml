@@ -1,0 +1,297 @@
+name: Yayın (imzalı APK)
+
+# Sürüm etiketiyle tetiklenir: `git tag v1.2.0 && git push origin v1.2.0`
+#
+# Etiketin kendisi sürümün tek kaynağı: APK'nın içindeki `versionName` ondan
+# türüyor (`-PsurumAdi`). Elle girilen bir sürüm alanı olsaydı etiketle
+# ayrışabilirdi ve hangisinin doğru olduğu ancak APK kurulduğunda anlaşılırdı.
+on:
+  push:
+    tags: ['v*']
+  # Elle tetikleme: anahtarların ve akışın çalıştığını gerçek bir sürüm
+  # yayınlamadan denemek için. `yayinla: false` ile APK üretilip doğrulanıyor
+  # ama GitHub Release oluşturulmuyor.
+  workflow_dispatch:
+    inputs:
+      surum:
+        description: 'Sürüm (ör. 1.2.0) — etiket olmadan denemek için'
+        required: true
+        default: '0.0.1'
+      yayinla:
+        description: 'GitHub Release oluştur'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: yayin-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # GitHub Release oluşturmak için
+
+jobs:
+  imzali-apk:
+    name: İmzalı APK derle ve yayınla
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Sürüm numarasını tek yerde belirle: etiketten ya da elle tetikleme
+      # girdisinden. `v` öneki APK'nın içine girmemeli (`versionName` "1.2.0"
+      # olmalı, "v1.2.0" değil).
+      - name: Sürümü belirle
+        id: surum
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            ham="${GITHUB_REF#refs/tags/}"
+            surum="${ham#v}"
+            yayinla=true
+          else
+            surum="${{ inputs.surum }}"
+            yayinla="${{ inputs.yayinla }}"
+          fi
+
+          # Biçimi burada da sınıyoruz. Gradle zaten reddediyor ama hata orada
+          # yığın izinin içinde çıkıyor; burada tek satır ve okunur.
+          if ! printf '%s' "$surum" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Sürüm 'X.Y.Z' biçiminde olmalı, alınan: '$surum'"
+            exit 1
+          fi
+
+          # "0.0.0" biçime uyuyor ama versionCode 0 üretiyor; Android en az 1
+          # istiyor. Gradle da reddediyor, burada tek satır ve okunur.
+          if [ "$surum" = "0.0.0" ]; then
+            echo "::error::Sürüm en az '0.0.1' olmalı."
+            exit 1
+          fi
+
+          echo "surum=$surum" >> "$GITHUB_OUTPUT"
+          echo "yayinla=$yayinla" >> "$GITHUB_OUTPUT"
+          echo "Sürüm: $surum (yayınla: $yayinla)"
+
+      - name: JDK 17 kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK kur
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle kur (cache dahil)
+        uses: gradle/actions/setup-gradle@v4
+
+      # Yayın anahtarı depoda değil; base64 olarak gizli anahtarlarda duruyor.
+      #
+      # Depo AĞACININ DIŞINA yazılıyor ($RUNNER_TEMP): ağacın içinde olsaydı bir
+      # sonraki adımda yanlışlıkla bir yapıta ya da commit'e girebilirdi.
+      #
+      # Burada eksik anahtar derlemeyi DÜŞÜRÜYOR — günlük CI'daki desenin tersi.
+      # Sebebi: bu iş yalnızca imzalı APK üretmek için var. İmzasız bir çıktıyla
+      # "başarılı" olması, yayınlanamayacak bir şeyi yayınlanmış göstermek olurdu.
+      - name: Yayın anahtarını hazırla
+        env:
+          YAYIN_KEYSTORE_BASE64: ${{ secrets.YAYIN_KEYSTORE_BASE64 }}
+          YAYIN_KEYSTORE_SIFRESI: ${{ secrets.YAYIN_KEYSTORE_SIFRESI }}
+          YAYIN_ANAHTAR_ADI: ${{ secrets.YAYIN_ANAHTAR_ADI }}
+          YAYIN_ANAHTAR_SIFRESI: ${{ secrets.YAYIN_ANAHTAR_SIFRESI }}
+        run: |
+          eksik=""
+          [ -z "$YAYIN_KEYSTORE_BASE64" ] && eksik="$eksik YAYIN_KEYSTORE_BASE64"
+          [ -z "$YAYIN_KEYSTORE_SIFRESI" ] && eksik="$eksik YAYIN_KEYSTORE_SIFRESI"
+          [ -z "$YAYIN_ANAHTAR_ADI" ]     && eksik="$eksik YAYIN_ANAHTAR_ADI"
+          [ -z "$YAYIN_ANAHTAR_SIFRESI" ] && eksik="$eksik YAYIN_ANAHTAR_SIFRESI"
+
+          if [ -n "$eksik" ]; then
+            echo "::error::Yayın anahtarı gizli değerleri eksik:$eksik"
+            echo "Kurulum adımları: docs/yayin.md"
+            exit 1
+          fi
+
+          printf '%s' "$YAYIN_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+
+          # base64 bozuksa `base64 -d` her zaman hata vermiyor; anahtarın
+          # gerçekten okunabildiğini keytool'a sorarak doğrula.
+          if ! keytool -list -keystore "$RUNNER_TEMP/release.keystore" \
+                 -storepass "$YAYIN_KEYSTORE_SIFRESI" > /dev/null 2>&1; then
+            echo "::error::Anahtar deposu okunamadı — base64 bozuk ya da şifre yanlış."
+            exit 1
+          fi
+
+          # Alias gerçekten bu depoda mı? Yanlış alias, derlemenin sonunda
+          # anlaşılmaz bir hatayla düşer.
+          if ! keytool -list -keystore "$RUNNER_TEMP/release.keystore" \
+                 -storepass "$YAYIN_KEYSTORE_SIFRESI" -alias "$YAYIN_ANAHTAR_ADI" > /dev/null 2>&1; then
+            echo "::error::'$YAYIN_ANAHTAR_ADI' takma adı anahtar deposunda yok."
+            exit 1
+          fi
+
+          echo "Anahtar hazır ve okunabilir."
+
+      # Sunucu ayarları olmadan üretilen yayın APK'sı giriş ekranında "sunucu
+      # ayarları eksik" diyor — kurulabilir ama kullanılamaz. Günlük CI'da bu
+      # kabul edilebilir (amaç derlemenin geçtiğini görmek); yayında değil.
+      - name: Sunucu ayarlarını yaz
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::SUPABASE_URL / SUPABASE_ANON_KEY eksik."
+            echo "Bunlar olmadan üretilen yayın APK'sı kurulur ama sunucuya bağlanamaz."
+            exit 1
+          fi
+          printf 'supabase.url=%s\nsupabase.anonKey=%s\n' \
+            "$SUPABASE_URL" "$SUPABASE_ANON_KEY" >> local.properties
+          echo "Sunucu ayarları yazıldı."
+
+      # Yayın öncesi testler. Yayınlanan bir APK'nın testleri geçmiş olması
+      # gerekiyor; etiket atmak testleri atlamanın yolu olmamalı.
+      - name: Testler
+        run: |
+          ./gradlew --no-daemon :shared:testDebugUnitTest
+          ./gradlew --no-daemon :shared:jvmTest
+          ./gradlew --no-daemon :app:testDebugUnitTest
+
+      - name: İmzalı yayın APK'sı derle
+        env:
+          YAYIN_KEYSTORE_YOLU: ${{ runner.temp }}/release.keystore
+          YAYIN_KEYSTORE_SIFRESI: ${{ secrets.YAYIN_KEYSTORE_SIFRESI }}
+          YAYIN_ANAHTAR_ADI: ${{ secrets.YAYIN_ANAHTAR_ADI }}
+          YAYIN_ANAHTAR_SIFRESI: ${{ secrets.YAYIN_ANAHTAR_SIFRESI }}
+        run: ./gradlew --no-daemon :app:assembleRelease -PsurumAdi=${{ steps.surum.outputs.surum }}
+
+      # ─────────────────────────────────────────────────────────────────────
+      # İmzanın gerçekten atıldığını DOĞRULA
+      # ─────────────────────────────────────────────────────────────────────
+      # Bu adım olmasa akış imzasız bir APK'yı da "yayın" diye yayınlayabilirdi:
+      # `signingConfig` bir şekilde boş kalırsa AGP derlemeyi düşürmüyor,
+      # yalnızca dosya adına `-unsigned` ekliyor ve sonraki adım o dosyayı
+      # bulamadığı için ya boş bir sürüm yayınlanır ya anlaşılmaz bir hata çıkar.
+      #
+      # `apksigner verify` imzayı kriptografik olarak doğruluyor; parmak izini de
+      # yazdırıyor ki yayınlanan APK'nın hangi anahtarla imzalandığı sürüm
+      # kaydında görünsün.
+      - name: İmzayı doğrula
+        id: dogrula
+        run: |
+          apk=$(ls app/build/outputs/apk/release/*.apk 2>/dev/null | head -1)
+          if [ -z "$apk" ]; then
+            echo "::error::Yayın APK'sı üretilmedi."
+            ls -R app/build/outputs/apk || true
+            exit 1
+          fi
+          echo "APK: $apk"
+
+          case "$apk" in
+            *unsigned*)
+              echo "::error::APK İMZASIZ ($apk). İmza yapılandırması uygulanmamış."
+              exit 1
+              ;;
+          esac
+
+          apksigner=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+          if [ -z "$apksigner" ]; then
+            echo "::error::apksigner bulunamadı; imza doğrulanamıyor."
+            exit 1
+          fi
+
+          "$apksigner" verify --verbose --print-certs "$apk"
+          echo "İmza doğrulandı."
+
+          parmak=$("$apksigner" verify --print-certs "$apk" \
+            | grep -i 'SHA-256 digest' | head -1 | awk -F': ' '{ print $2 }')
+          echo "apk=$apk" >> "$GITHUB_OUTPUT"
+          echo "parmak=$parmak" >> "$GITHUB_OUTPUT"
+
+      # APK'nın içindeki sürümün etiketle aynı olduğunu doğrula.
+      #
+      # Sürüm zaten etiketten türüyor ama bu adım türetmenin gerçekten
+      # uygulandığını kanıtlıyor: `-PsurumAdi` bir yazım hatasıyla düşerse Gradle
+      # sessizce "0.0.0-gelistirme" kullanır ve v1.2.0 etiketiyle 0.0.0 sürümlü
+      # bir APK yayınlanırdı.
+      - name: APK içindeki sürümü doğrula
+        run: |
+          aapt=$(find "$ANDROID_HOME/build-tools" -name aapt2 -type f | sort -V | tail -1)
+          if [ -z "$aapt" ]; then
+            echo "::error::aapt2 bulunamadı; APK içindeki sürüm doğrulanamıyor."
+            exit 1
+          fi
+          beklenen="${{ steps.surum.outputs.surum }}"
+          cikti=$("$aapt" dump badging "${{ steps.dogrula.outputs.apk }}")
+          echo "$cikti" | head -3
+
+          gercek=$(printf '%s' "$cikti" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -1)
+          if [ "$gercek" != "$beklenen" ]; then
+            echo "::error::APK içindeki sürüm '$gercek', etiket '$beklenen' — ayrışmış."
+            exit 1
+          fi
+          echo "APK sürümü etiketle aynı: $gercek"
+
+      # İmzalı APK'yı adında sürüm taşıyan bir dosyaya kopyala. `app-release.apk`
+      # her sürümde aynı adı taşıyor; indirilen dosyanın hangi sürüm olduğu
+      # adından anlaşılmalı.
+      - name: APK'yı adlandır
+        id: adlandir
+        run: |
+          hedef="nonstop-${{ steps.surum.outputs.surum }}.apk"
+          cp "${{ steps.dogrula.outputs.apk }}" "$hedef"
+          echo "hedef=$hedef" >> "$GITHUB_OUTPUT"
+          ls -la "$hedef"
+
+      - name: APK'yı yapıt olarak yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: nonstop-yayin-${{ steps.surum.outputs.surum }}
+          path: ${{ steps.adlandir.outputs.hedef }}
+          retention-days: 90
+
+      - name: GitHub Release oluştur
+        if: steps.surum.outputs.yayinla == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SURUM: ${{ steps.surum.outputs.surum }}
+          APK: ${{ steps.adlandir.outputs.hedef }}
+          PARMAK: ${{ steps.dogrula.outputs.parmak }}
+        run: |
+          notlar=$(mktemp)
+          {
+            echo "## NonStop Gym $SURUM"
+            echo ""
+            echo "Kurulum: APK'yı telefona indirip açın. Ayrıntılı adımlar için"
+            echo "\`ADB_DEPLOY_GUIDE.md\`."
+            echo ""
+            echo "Bu APK yayın anahtarıyla imzalandı ve imzası derleme sırasında"
+            echo "\`apksigner\` ile doğrulandı."
+            echo ""
+            echo "- İmza SHA-256: \`$PARMAK\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo ""
+            echo "> Aynı uygulamanın daha eski bir sürümü **farklı** bir anahtarla"
+            echo "> imzalanmışsa (ör. hata ayıklama yapısı) üzerine kurulamaz;"
+            echo "> önce kaldırmak gerekir ve bu uygulama verisini siler."
+          } > "$notlar"
+
+          # `--verify-tag`: etiket gerçekten depoda olmalı. Olmadan sürüm
+          # oluşturmak, hiçbir commit'e bağlı olmayan bir sürüm kaydı bırakırdı.
+          if [ "${{ github.event_name }}" = "push" ]; then
+            gh release create "${GITHUB_REF#refs/tags/}" "$APK" \
+              --title "NonStop Gym $SURUM" --notes-file "$notlar" --verify-tag
+          else
+            gh release create "v$SURUM" "$APK" \
+              --title "NonStop Gym $SURUM" --notes-file "$notlar"
+          fi
+
+      - name: Özet
+        if: always()
+        run: |
+          {
+            echo "## Yayın: ${{ steps.surum.outputs.surum }}"
+            echo ""
+            echo "- APK: \`${{ steps.adlandir.outputs.hedef }}\`"
+            echo "- İmza SHA-256: \`${{ steps.dogrula.outputs.parmak }}\`"
+            echo "- GitHub Release: ${{ steps.surum.outputs.yayinla }}"
+          } >> "$GITHUB_STEP_SUMMARY"
