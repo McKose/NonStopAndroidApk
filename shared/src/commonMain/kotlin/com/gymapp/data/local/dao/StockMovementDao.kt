@@ -41,12 +41,10 @@ interface StockMovementDao {
     """)
     fun observeOnHandByProduct(tenantId: String): Flow<List<ProductStock>>
 
-    @Query("""
-        SELECT * FROM stock_movements
-        WHERE tenantId = :tenantId AND productId = :productId
-        ORDER BY occurredAtMs DESC
-    """)
-    fun observeForProduct(tenantId: String, productId: String): Flow<List<StockMovementEntity>>
+    // KALDIRILDI: `observeForProduct`. Tek ürünün hareket dökümünü verecek bir
+    // ekran hiç olmadı; sorgu yazıldığı günden beri çağrılmıyordu. Böyle bir
+    // ekran gerektiğinde geri eklemek tek satır — çağrılmayan bir sorguyu
+    // tutmak ise onu her şema değişikliğinde güncel sanmak demek.
 
     /**
      * Sunucudan gelen satırı yazar: yoksa ekler, varsa üzerine yazar.

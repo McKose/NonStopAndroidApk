@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -311,6 +310,9 @@ fun HealthProfileTab(member: MemberEntity, viewModel: MemberViewModel = koinView
 fun MeasurementsTab(member: MemberEntity, viewModel: MemberViewModel = koinViewModel()) {
     val measurements by viewModel.getMeasurements(member.id).collectAsState(initial = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
+    // Silinecek ölçüm; onay istemeden silmiyoruz çünkü geri alma yolu yok.
+    var silinecek by remember { mutableStateOf<com.gymapp.data.local.entity.MeasurementEntity?>(null) }
+    val tarihBicimi = remember { SimpleDateFormat("dd MMMM yyyy", Locale("tr")) }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
@@ -333,7 +335,10 @@ fun MeasurementsTab(member: MemberEntity, viewModel: MemberViewModel = koinViewM
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                 items(measurements) { measurement ->
-                    MeasurementHistoryItem(measurement)
+                    MeasurementHistoryItem(
+                        measurement = measurement,
+                        onDelete = { silinecek = measurement },
+                    )
                 }
             }
         }
@@ -359,19 +364,57 @@ fun MeasurementsTab(member: MemberEntity, viewModel: MemberViewModel = koinViewM
             }
         )
     }
+
+    silinecek?.let { olcum ->
+        AlertDialog(
+            onDismissRequest = { silinecek = null },
+            title = { Text("Ölçümü sil") },
+            text = {
+                Text("${tarihBicimi.format(Date(olcum.dateMs))} tarihli ölçüm silinecek. Bu işlem geri alınamaz.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteMeasurement(olcum.id)
+                    silinecek = null
+                }) {
+                    Text("Sil", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { silinecek = null }) { Text("Vazgeç") }
+            }
+        )
+    }
 }
 
 @Composable
-fun MeasurementHistoryItem(measurement: com.gymapp.data.local.entity.MeasurementEntity) {
+fun MeasurementHistoryItem(
+    measurement: com.gymapp.data.local.entity.MeasurementEntity,
+    onDelete: () -> Unit,
+) {
     val sdf = remember { SimpleDateFormat("dd MMMM yyyy", Locale("tr")) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(sdf.format(Date(measurement.dateMs)), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Text("${measurement.weight} kg / ${measurement.height} cm", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${measurement.weight} kg / ${measurement.height} cm", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Ölçümü sil",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(12.dp))
             HorizontalDivider(thickness = 0.5.dp)
@@ -566,16 +609,9 @@ private fun LedgerRow(
     }
 }
 
-@Composable
-fun MeasurementCard(label: String, value: String, icon: ImageVector, modifier: Modifier) {
-    Card(modifier = modifier) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-            Text(label, style = MaterialTheme.typography.labelMedium)
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        }
-    }
-}
+// KALDIRILDI: `MeasurementCard`. Hiçbir yerden çağrılmıyordu; ölçüm kalemleri
+// `MeasurementLabelValue` ile çiziliyor. İki benzer bileşenden birinin ölü
+// olması, sonraki değişikliğin yanlış olanda yapılması riski demekti.
 
 @Composable
 fun LoadingState() {

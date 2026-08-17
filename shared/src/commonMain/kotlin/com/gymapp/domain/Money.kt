@@ -63,7 +63,9 @@ value class Money(val minor: Long) : Comparable<Money> {
     companion object {
         val ZERO = Money(0)
 
-        fun ofMinor(minor: Long): Money = Money(minor)
+        // KALDIRILDI: `ofMinor`. Yapıcının (`Money(minor)`) birebir kopyasıydı;
+        // aynı şeyi yapan iki yol, okuyanı "aralarında bir fark var mı?"
+        // sorusuyla baş başa bırakıyordu.
 
         /** TL cinsinden değeri kuruşa çevirir (yarıyı yukarı yuvarlar). */
         fun ofMajor(amount: Double): Money =
@@ -113,9 +115,25 @@ value class Rate(val basisPoints: Int) : Comparable<Rate> {
     val asPercent: Double get() = basisPoints / 100.0
     val asFraction: Double get() = basisPoints / SCALE.toDouble()
 
+    /**
+     * Gösterim için yüzde metni — ayıraç virgül, gereksiz ondalık yok.
+     *
+     * [asPercent] bir `Double` olduğu için ekrana doğrudan yazıldığında tam sayı
+     * oranlar da ondalıklı çıkıyordu: "%20.0". Hem ayıraç yanlıştı (uygulamanın
+     * geri kalanı virgül kullanıyor, bkz. [Money.toString]) hem de tabloda
+     * yazmayan bir hassasiyet ima ediyordu.
+     */
+    val percentLabel: String
+        get() {
+            val whole = basisPoints / 100
+            val frac = basisPoints % 100
+            if (frac == 0) return whole.toString()
+            return "$whole,${frac.toString().padStart(2, '0').trimEnd('0')}"
+        }
+
     override fun compareTo(other: Rate): Int = basisPoints.compareTo(other.basisPoints)
 
-    override fun toString(): String = "%${asPercent}"
+    override fun toString(): String = "%$percentLabel"
 
     companion object {
         /** Baz puan ölçeği: %100 = 10.000 bp. */

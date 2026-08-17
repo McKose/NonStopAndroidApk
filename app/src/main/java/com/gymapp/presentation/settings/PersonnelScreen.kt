@@ -205,7 +205,7 @@ private fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit, onDelete: (()
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "Hakediş: %${Rate(staff.commissionBasisPoints).asPercent}",
+                    "Hakediş: %${Rate(staff.commissionBasisPoints).percentLabel}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.secondary
                 )
@@ -234,11 +234,22 @@ private fun StaffDialog(
     var name by remember { mutableStateOf(staff?.fullName ?: "") }
     var title by remember { mutableStateOf(staff?.title ?: "") }
     var branch by remember { mutableStateOf(staff?.branch ?: "") }
+    // Hazır değerler uygulamanın kendi biçimiyle yazılıyor: ayıraç virgül ve
+    // gereksiz ondalık yok.
+    //
+    // Önceden `Double.toString()` kullanılıyordu ve kutuda "40.0" / "2500.0"
+    // görünüyordu — klavyenin ürettiği ayıraç değil, uygulamanın geri kalanının
+    // yazımı da değil. Günlük semptom buydu; ama biçim aynı zamanda **geri
+    // okunamıyordu**: `Double.toString()` 10.000.000'dan itibaren bilimsel
+    // gösterime geçiyor ve "1.0E7" değerini `Decimals` ayrıştırıcısı 1.0E8
+    // olarak okuyor. Yani o büyüklükte bir maaşı olan personel kartı açılıp
+    // maaş alanına hiç dokunulmadan kaydedildiğinde maaş **on katına**
+    // çıkıyordu. Yeni biçim her değerde birebir geri okunuyor.
     var rate by remember {
-        mutableStateOf(staff?.let { Rate(it.commissionBasisPoints).asPercent.toString() } ?: "")
+        mutableStateOf(staff?.let { Rate(it.commissionBasisPoints).percentLabel } ?: "")
     }
     var salary by remember {
-        mutableStateOf(staff?.let { Money(it.monthlySalaryMinor).asDouble.toString() } ?: "")
+        mutableStateOf(staff?.let { Money(it.monthlySalaryMinor).toString() } ?: "")
     }
     var phone by remember { mutableStateOf(staff?.phone ?: "") }
     var nickname by remember { mutableStateOf(staff?.nickname ?: "") }

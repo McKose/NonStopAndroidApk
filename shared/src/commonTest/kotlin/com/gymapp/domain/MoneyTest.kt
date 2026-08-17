@@ -109,12 +109,68 @@ class MoneyTest {
         }
     }
 
+    /**
+     * Ekranda yazan yüzde metni.
+     *
+     * `asPercent` bir `Double` olduğu için doğrudan yazıldığında tam sayı oranlar
+     * "%20.0" çıkıyordu — hem nokta ayıracıyla hem de tabloda olmayan bir
+     * hassasiyet ima ederek.
+     */
+    @Test
+    fun `yuzde metni gereksiz ondalik basmaz`() {
+        assertEquals("20", Rate.ofPercent(20.0).percentLabel)
+        assertEquals("0", Rate.ZERO.percentLabel)
+        assertEquals("100", Rate.ofPercent(100.0).percentLabel)
+        // Ondalıklı oranlarda ayıraç virgül — `Money` ile aynı.
+        assertEquals("12,5", Rate.ofPercent(12.5).percentLabel)
+        assertEquals("3,33", Rate.ofPercent(3.33).percentLabel)
+        assertEquals("%12,5", Rate.ofPercent(12.5).toString())
+    }
+
+    /**
+     * Regresyon: formlara hazır yazılan değer geri okunabilmeli.
+     *
+     * Personel diyaloğu maaş ve hakediş kutularını `Double.toString()` ile
+     * dolduruyordu. Günlük semptom yanlış ayıraçtı ("2500.0"), ama biçim
+     * 10.000.000'dan itibaren bilimsel gösterime geçiyor ve "1.0E7" değerini
+     * [Decimals] 1.0E8 olarak okuyordu: kart açılıp maaşa **hiç dokunulmadan**
+     * kaydedildiğinde maaş on katına çıkıyordu.
+     *
+     * Bu yüzden gidiş-dönüş sınanıyor, yalnızca gösterim değil.
+     */
+    @Test
+    fun `hazir yazilan tutar ve oran birebir geri okunur`() {
+        listOf(0L, 5L, 99L, 250_000L, 1_500_000L, 1_000_000_000L, 5_000_000_000L).forEach { minor ->
+            val hazir = Money(minor).toString()
+            assertEquals(minor, Money.ofMajor(Decimals.parseOrDefault(hazir)).minor, "maaş: '$hazir'")
+        }
+        listOf(0, 300, 333, 1205, 1210, 1250, 4000, 10_000).forEach { bp ->
+            val hazir = Rate(bp).percentLabel
+            assertEquals(bp, Rate.ofPercent(Decimals.parseOrDefault(hazir)).basisPoints, "hakediş: '$hazir'")
+        }
+    }
+
     @Test
     fun `gecersiz oranlar guvenli araliga cekilir`() {
         assertEquals(Rate.ZERO, Rate.ofPercent(-10.0))
         assertEquals(10_000, Rate.ofPercent(500.0).basisPoints)
         assertEquals(Rate.ZERO, Rate.ofPercent(Double.NaN))
         assertEquals(Rate.ZERO, Rate.ofPercentOrZero(null))
+    }
+
+    /**
+     * Sonsuz/NaN girdiler sıfıra çekilir.
+     *
+     * `Pricing.previewPrice` kaldırılırken bu güvence onun testlerinden buraya
+     * taşındı: koruma zaten burada, `Money.ofMajor` içinde duruyor. Sayıya
+     * çevrilemeyecek bir değerden tutar üretmek, sessizce uydurma bir fiyat
+     * yazmak olurdu.
+     */
+    @Test
+    fun `sayi olmayan tutarlar sifira cekilir`() {
+        assertEquals(Money.ZERO, Money.ofMajor(Double.NaN))
+        assertEquals(Money.ZERO, Money.ofMajor(Double.POSITIVE_INFINITY))
+        assertEquals(Money.ZERO, Money.ofMajor(Double.NEGATIVE_INFINITY))
     }
 
     // ─── Kısıtlar ───────────────────────────────────────────────────────────

@@ -14,6 +14,7 @@ import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.PaymentState
 import com.gymapp.domain.PhoneNumber
+import com.gymapp.domain.PriceBreakdown
 import com.gymapp.domain.Pricing
 import com.gymapp.domain.SessionCarryOver
 import com.gymapp.domain.StaffRole
@@ -96,9 +97,32 @@ data class RegisterFormState(
      * sayılabilir bir hak yoksa kullanıcıya sorulacak bir şey de yok.
      */
     val currentRemainingSessions: Int? = null,
-    // Calculated price
-    val previewPrice: Double = 0.0
-)
+) {
+    /**
+     * Ücretin kalemleri — **saklanmıyor, durumdan türetiliyor**.
+     *
+     * Önceden `previewPrice` bir alandı ve fiyatı etkileyen dört ayrı işleyicinin
+     * her biri onu yeniden hesaplamakla yükümlüydü. Beşinci bir işleyici eklemek
+     * (ya da mevcut birinde hesabı unutmak) ekranda eski tutarın kalması demekti;
+     * türetilmiş değerde o hata mümkün değil.
+     */
+    val breakdown: PriceBreakdown
+        get() = Pricing.breakdown(
+            basePrice = Money(selectedPackage?.basePriceMinor ?: 0L),
+            discount = Money.ofMajor(Decimals.parseOrDefault(discount)),
+            paymentType = paymentType,
+            installmentCount = installmentCount,
+        )
+
+    /**
+     * Yazılan iskonto paket fiyatını aşıyor mu?
+     *
+     * Aşınca sessizce kırpmak, kartta "1.000 − 5.000 = 0" gibi kendi içinde
+     * tutarsız bir aritmetik bırakıyordu. Kırpma duruyor ama artık görünür.
+     */
+    val discountCapped: Boolean
+        get() = breakdown.discountWasCapped(Money.ofMajor(Decimals.parseOrDefault(discount)))
+}
 
 class MemberViewModel(
     private val repository: MemberRepository,
@@ -211,18 +235,7 @@ class MemberViewModel(
     }
 
     fun onDiscountChange(value: String) {
-        _formState.update {
-            val disc = Decimals.parseOrDefault(value)
-            it.copy(
-                discount = value,
-                previewPrice = repository.calculateFinalPrice(
-                    it.selectedPackage.basePriceMajor(),
-                    disc,
-                    it.paymentType,
-                    it.installmentCount
-                )
-            )
-        }
+        _formState.update { it.copy(discount = value) }
     }
 
     fun onPaymentStatusChange(status: PaymentState) {
@@ -240,44 +253,30 @@ class MemberViewModel(
     fun onPaymentTypeChange(type: PaymentMethod) {
         _formState.update {
             // Taksit yalnızca kartlı ödemede anlamlı; kural [Pricing] içinde tek noktada.
-            val newInstallment = Pricing.normalizeInstallment(type, it.installmentCount)
             it.copy(
                 paymentType = type,
-                installmentCount = newInstallment,
-                previewPrice = repository.calculateFinalPrice(
-                    it.selectedPackage.basePriceMajor(),
-                    Decimals.parseOrDefault(it.discount),
-                    type,
-                    newInstallment
-                )
+                installmentCount = Pricing.normalizeInstallment(type, it.installmentCount),
             )
         }
     }
 
     fun onInstallmentChange(count: Int) {
-        _formState.update {
-            it.copy(
-                installmentCount = count,
-                previewPrice = repository.calculateFinalPrice(
-                    it.selectedPackage.basePriceMajor(),
-                    Decimals.parseOrDefault(it.discount),
-                    it.paymentType,
-                    count
-                )
-            )
-        }
+        _formState.update { it.copy(installmentCount = count) }
     }
 
+    /**
+     * Paket seçimi hatayı da temizler.
+     *
+     * "Lütfen bir üyelik paketi seçiniz." uyarısı yalnızca gönderimde siliniyordu:
+     * kullanıcı paketi seçtikten sonra bile ekranda duruyor, düzeltilmiş bir
+     * eksiği düzeltilmemiş gibi gösteriyordu. Ad ve telefon alanları bunu zaten
+     * doğru yapıyordu.
+     */
     fun onPackageSelected(pkg: PackageEntity?) {
         _formState.update {
             it.copy(
                 selectedPackage = pkg,
-                previewPrice = repository.calculateFinalPrice(
-                    pkg.basePriceMajor(),
-                    Decimals.parseOrDefault(it.discount),
-                    it.paymentType,
-                    it.installmentCount
-                )
+                submitError = if (pkg != null) null else it.submitError,
             )
         }
     }
@@ -418,6 +417,23 @@ class MemberViewModel(
         }
     }
 
+    /**
+     * Ölçüm kaydını siler (tombstone).
+     *
+     * Depo yolu baştan beri vardı ama hiçbir ekran çağırmıyordu: yanlış girilen
+     * bir kilo ya da çevre ölçüsü kayıtta sonsuza kadar kalıyordu. Ölçüm
+     * geçmişi zamanla karşılaştırmak için tutulduğundan, hatalı bir satır
+     * grafiği kalıcı olarak yanlış gösterirdi.
+     */
+    fun deleteMeasurement(measurementId: String) {
+        viewModelScope.launch {
+            repository.deleteMeasurement(measurementId).fold(
+                onSuccess = { _events.send(MemberEvent.Saved("Ölçüm silindi.")) },
+                onFailure = { _events.send(MemberEvent.Failed(it.message ?: "Ölçüm silinemedi.")) },
+            )
+        }
+    }
+
     fun updateMember(member: MemberEntity) {
         viewModelScope.launch {
             repository.updateMemberInfo(member).fold(
@@ -440,9 +456,9 @@ class MemberViewModel(
         _formState.value = RegisterFormState()
     }
 
-    fun dismissError() {
-        _formState.update { it.copy(submitError = null) }
-    }
+    // KALDIRILDI: `dismissError`. Hiçbir ekran çağırmıyordu; asıl sorun olan
+    // "düzeltilen eksiğin uyarısı ekranda kalıyor" durumu artık kaynağında
+    // çözülüyor (bkz. [onPackageSelected]).
 
     /** Üyenin kalan borcu — tahsilat diyaloğu açılmadan önce okunur. */
     suspend fun outstandingBalance(memberId: String): Money = repository.outstandingBalance(memberId)
@@ -464,10 +480,6 @@ class MemberViewModel(
     }
 }
 
-/**
- * Paket fiyatının TL karşılığı — **yalnızca ekran önizlemesi** için.
- *
- * Kaydedilen tutar kuruş üzerinden [com.gymapp.domain.Pricing.finalPrice] ile hesaplanır;
- * bu dönüşüm hesaba girmez.
- */
-private fun PackageEntity?.basePriceMajor(): Double = Money(this?.basePriceMinor ?: 0L).asDouble
+// KALDIRILDI: `basePriceMajor`. Fiyat önizlemesi TL (`Double`) üzerinden
+// hesaplanmıyor artık; kalemler kuruş cinsinden `RegisterFormState.breakdown`
+// ile geliyor ve ekran onları doğrudan yazıyor.
