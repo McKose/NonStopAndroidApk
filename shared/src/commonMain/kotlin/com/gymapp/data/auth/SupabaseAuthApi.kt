@@ -45,6 +45,15 @@ class SupabaseAuthApi(
     private val now: () -> Long = { Now.epochMillis() },
 ) : AuthApi {
 
+    // Uç noktalar tek yerde: hata mesajı hangi isteğin düştüğünü söyleyebilsin.
+    //
+    // Giriş iki istek ve ikisi de aynı hata biçimini üretiyordu. Gerçek bir
+    // kurulumda "Beklenmeyen yanıt (404): Invalid path specified in request URL"
+    // alındığında hangi çağrının 404 verdiği — jeton mu, salon araması mı —
+    // mesajdan anlaşılamıyordu; ikisi farklı sebeplere işaret ediyor.
+    private val jetonUcu = "${config.url}/auth/v1/token"
+    private val salonUcu = "${config.url}/rest/v1/gym_users"
+
     override suspend fun signIn(email: String, password: String): AuthResult =
         token(
             grantType = "password",
@@ -74,7 +83,7 @@ class SupabaseAuthApi(
         val status = response.status.value
         val text = runCatching { response.bodyAsText() }.getOrDefault("")
 
-        if (status !in 200..299) return failureFor(status, text)
+        if (status !in 200..299) return failureFor(status, text, jetonUcu)
 
         val json = text.asJsonObject()
             ?: return AuthResult.Failed("Sunucu yanıtı okunamadı.", retryable = false)
@@ -134,7 +143,7 @@ class SupabaseAuthApi(
         val status = response.status.value
         val text = runCatching { response.bodyAsText() }.getOrDefault("")
 
-        if (status !in 200..299) return GymLookup.Error(failureFor(status, text))
+        if (status !in 200..299) return GymLookup.Error(failureFor(status, text, salonUcu))
 
         val rows = runCatching {
             Json.parseToJsonElement(text).jsonArray.mapNotNull { element ->
@@ -179,8 +188,18 @@ class SupabaseAuthApi(
      * taşıdığı için mesaj olduğu gibi aktarılıyor — kullanıcı açısından
      * "Invalid login credentials" ile "Email not confirmed" tamamen farklı iki iş:
      * biri şifreyi aratır, diğeri panelden hesap onaylatır.
+     *
+     * ### İstek adresi neden mesaja giriyor
+     * Kimlik hatası dışındaki durumlarda [uc] mesaja ekleniyor. Sebebi somut:
+     * giriş iki ayrı isteğe dayanıyor ve ikisi de aynı biçimde hata üretiyordu,
+     * dolayısıyla bir 404 alındığında hangi çağrının düştüğü bilinemiyordu.
+     * Adres gizli bir şey değil (anahtar ve başlıklar mesaja **girmiyor**), ama
+     * yanlış yapılandırılmış bir sunucu adresini tek bakışta görünür kılıyor.
+     *
+     * Kimlik hatasında (400/401) adres bilinçli olarak eklenmiyor: orada sorun
+     * neredeyse her zaman şifre ve teknik ayrıntı yalnızca gürültü olurdu.
      */
-    private fun failureFor(status: Int, raw: String): AuthResult {
+    private fun failureFor(status: Int, raw: String, uc: String): AuthResult {
         val json = raw.asJsonObject()
         val message = json?.let {
             it.string("error_description")
@@ -189,14 +208,28 @@ class SupabaseAuthApi(
                 ?: it.string("error")
         } ?: raw.take(200).ifBlank { "-" }
 
+        // 404 bu iki uç noktada neredeyse her zaman tek bir şey demek: sunucu
+        // adresi yanlış. Proje adresi yerine panonun (dashboard) adresini ya da
+        // sonuna bir yol eklenmiş bir değeri girmek en sık karşılaşılanı.
+        val ipucu = if (status == 404) {
+            " — sunucu adresi yanlış olabilir: yalnızca `https://<proje>.supabase.co` " +
+                "olmalı, sonunda yol olmadan."
+        } else {
+            ""
+        }
+
         return when {
             status == 400 || status == 401 -> AuthResult.InvalidCredentials(message)
-            status == 403 -> AuthResult.Failed("Erişim reddedildi: $message", retryable = false)
+            status == 403 ->
+                AuthResult.Failed("Erişim reddedildi: $message [$uc]", retryable = false)
             status == 408 || status == 429 ->
-                AuthResult.Failed("Sunucu meşgul ($status): $message", retryable = true)
+                AuthResult.Failed("Sunucu meşgul ($status): $message [$uc]", retryable = true)
             status in 500..599 ->
-                AuthResult.Failed("Sunucu hatası ($status): $message", retryable = true)
-            else -> AuthResult.Failed("Beklenmeyen yanıt ($status): $message", retryable = false)
+                AuthResult.Failed("Sunucu hatası ($status): $message [$uc]", retryable = true)
+            else -> AuthResult.Failed(
+                "Beklenmeyen yanıt ($status): $message [$uc]$ipucu",
+                retryable = false,
+            )
         }
     }
 }
