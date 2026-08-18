@@ -48,8 +48,53 @@
     </form>
 
     <p class="alt" style="max-width:52ch;margin-top:20px">
-      Hesabınız yoksa ya da giriş yapamıyorsanız salonla iletişime geçin —
-      hesaplar salon tarafından oluşturulup üyeliğinize bağlanıyor.
+      Hesabınız yok mu?
+      <a href="#" id="kayda-git">Kayıt olun</a> — hesabınızı açtıktan sonra
+      salon üyeliğinize bağlar.
+    </p>
+  </section>
+
+  <!-- ─── Kayıt ─────────────────────────────────────────────────────────── -->
+  <!--
+    Kayıt YALNIZCA Supabase hesabı açıyor. Üyelik kaydına bağlanma ayrı bir adım
+    ve onu salon yapıyor: kendi kendine bağlanabilseydi, kayıt olan herkes
+    istediği üyenin ölçüm ve sağlık verisini seçip okuyabilirdi.
+  -->
+  <section id="kayit" class="bolum" hidden>
+    <p class="ust-baslik">Üye alanı</p>
+    <h1 class="uye-baslik">Kayıt olun</h1>
+    <p class="alt" style="max-width:56ch">
+      Bilgilerinizi bırakın, salon hesabınızı üyelik kaydınıza bağlasın.
+      Bağlandıktan sonra paket durumunuzu ve ölçümlerinizi buradan
+      takip edebilirsiniz.
+    </p>
+
+    <form id="kayit-formu" class="kart uye-form">
+      <label>Ad Soyad
+        <input type="text" name="ad" autocomplete="name" required>
+      </label>
+      <label>Telefon
+        <input type="tel" name="telefon" autocomplete="tel" required
+               placeholder="05xx xxx xx xx">
+      </label>
+      <label>E-posta
+        <input type="email" name="eposta" autocomplete="email" required>
+      </label>
+      <label>Şifre — en az 6 karakter
+        <input type="password" name="sifre" autocomplete="new-password"
+               minlength="6" required>
+      </label>
+      <label>Eklemek istedikleriniz (isteğe bağlı)
+        <textarea name="not" rows="2"
+                  placeholder="Örn. hangi gün/saat geliyorsunuz"></textarea>
+      </label>
+      <button type="submit" id="kayit-dugmesi" class="dugme dugme-birincil">Kayıt ol</button>
+      <p id="kayit-hata" class="hata" hidden></p>
+      <p id="kayit-bilgi" class="alt" hidden></p>
+    </form>
+
+    <p class="alt" style="max-width:52ch;margin-top:20px">
+      Hesabınız var mı? <a href="#" id="girise-git">Giriş yapın</a>
     </p>
   </section>
 
@@ -62,18 +107,18 @@
   <!-- ─── Bağlanmamış hesap ─────────────────────────────────────────────── -->
   <!--
     Giriş başarılı ama hesap bir üyelik kaydına bağlanmamış. Bu boş bir ekran
-    olarak gösterilemez: kullanıcı verisinin kaybolduğunu sanar. Yapılacak iş
-    salonda ve bunu söylüyoruz.
+    olarak gösterilemez: kullanıcı verisinin kaybolduğunu sanar.
+
+    Bölümün gövdesi `uye.js` tarafından dolduruluyor çünkü üç ayrı hâl var ve
+    kullanıcının yapması gereken şey her birinde farklı: istek hiç
+    gönderilmemiş (form), gönderilmiş ve bekliyor (bilgi), reddedilmiş
+    (iletişim). Üçünü tek metinle anlatmak, ikisinde yanlış yönlendirmek olurdu.
   -->
   <section id="baglanmamis" class="bolum" hidden>
     <h1 class="uye-baslik">Hesabınız henüz bağlanmamış</h1>
-    <p class="alt" style="max-width:56ch">
-      Giriş yaptınız, ancak hesabınız bir üyelik kaydına bağlı değil. Bu işlemi
-      salon yapıyor — bize ulaştığınızda kısa sürede tamamlanıyor. Bağlandıktan
-      sonra paket durumunuz ve ölçümleriniz burada görünecek.
-    </p>
+    <div id="baglanti-durumu"></div>
     <div class="kahraman-dugmeler" style="margin-top:22px">
-      <a class="dugme dugme-birincil" href="https://www.instagram.com/nonstopkartepe"
+      <a class="dugme dugme-ikincil" href="https://www.instagram.com/nonstopkartepe"
          target="_blank" rel="noopener noreferrer">Bize ulaşın</a>
     </div>
   </section>

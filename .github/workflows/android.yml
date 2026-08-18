@@ -290,8 +290,27 @@ jobs:
       # UTC hesap birbirinin aynısı çıkıyor ve aradaki farkı bozan bir hata
       # testlerden geçerdi — ama salonun makinesinde (UTC+3) gece yarısı ile
       # 03:00 arasındaki kayıtlar aralığın dışında kalırdı.
+      # Test dosyaları `find` ile bulunuyor, kabuk deseniyle değil.
+      #
+      # Önceki hâli `web/*.test.js` idi ve bu desen YALNIZCA `web/` kökündeki
+      # tek dosyayı yakalıyordu: panel `web/panel/` altına taşındığında oradaki
+      # sekiz test dosyası CI'da HİÇ koşmamaya başladı — üstelik iş yeşil
+      # kalmaya devam etti, çünkü kalan tek dosya geçiyordu. Aynı sınıf hata
+      # `supabase/tests/run.sh` içinde de yaşandı ve orada da dizinden okumaya
+      # geçilerek kapatıldı.
+      #
+      # Boş liste artık AÇIKÇA düşürüyor: hiç test bulamamak, "bütün testler
+      # geçti" ile aynı şey olmamalı.
       - name: Panel testleri
-        run: node --test web/*.test.js
+        run: |
+          mapfile -t testler < <(find web -name '*.test.js' | sort)
+          if [ ${#testler[@]} -eq 0 ]; then
+            echo "::error::web/ altında hiç test dosyası yok — yol yanlış olabilir."
+            exit 1
+          fi
+          printf 'Koşulacak test dosyaları (%d):\n' "${#testler[@]}"
+          printf '  %s\n' "${testler[@]}"
+          node --test "${testler[@]}"
         env:
           TZ: Europe/Istanbul
 

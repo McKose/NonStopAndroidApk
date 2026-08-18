@@ -100,14 +100,31 @@ a { color: var(--altin); }
 }
 
 /* ─── Düğmeler ──────────────────────────────────────────────────────────── */
+/* `<button>` ile `<a>` aynı görünmeli.
+ *
+ * Sınıf ikisine de veriliyor ama tarayıcının `<button>` varsayılanları farklı:
+ * arka plan `buttonface` (açık gri), yazı tipi de sayfanınki değil. Sıfırlama
+ * burada, `.dugme` içinde yapılıyor — `button.dugme` gibi daha özgül bir
+ * seçicide olsaydı `.dugme-ikincil`in kenarlığını da ezerdi.
+ *
+ * Belirtisi şuydu: üye alanındaki "Çıkış" düğmesi açık gri zemin üzerinde açık
+ * yazıyla, okunamaz hâlde çıkıyordu — yanındaki "Ana sayfa" ise doğru
+ * görünüyordu, çünkü o bir `<a>`. */
 .dugme {
   display: inline-block;
   padding: 9px 16px;
+  background: transparent;
+  /* Saydam kenarlık, `0` değil: ikincil düğmenin 1px kenarlığı var ve `0`
+     olsaydı iki düğme yan yana 2px farklı yükseklikte dururdu. */
+  border: 1px solid transparent;
   border-radius: 8px;
+  font-family: inherit;
   font-size: 14px;
   font-weight: 600;
+  line-height: 1.4;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
   transition: background .18s ease, border-color .18s ease, color .18s ease;
 }
 .dugme-buyuk { padding: 13px 24px; font-size: 15px; }
@@ -115,7 +132,7 @@ a { color: var(--altin); }
 .dugme-birincil { background: var(--altin); color: #17130a; }
 .dugme-birincil:hover { background: var(--altin-parlak); }
 
-.dugme-ikincil { border: 1px solid var(--kenar); color: var(--metin); }
+.dugme-ikincil { background: transparent; border: 1px solid var(--kenar); color: var(--metin); }
 .dugme-ikincil:hover { border-color: var(--altin); color: var(--altin); }
 
 .dugme:focus-visible { outline: 2px solid var(--altin-parlak); outline-offset: 3px; }

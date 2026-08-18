@@ -64,8 +64,32 @@ async function oku(yol) {
   return { tur: "tamam", satirlar: await yanit.json().catch(() => []) };
 }
 
+/** Satır yazar (POST) ya da günceller (PATCH). */
+async function yaz(yol, govde, yontem = "POST") {
+  const o = oturumOku();
+  if (!o) return { tur: "oturumsuz" };
+
+  const yanit = await fetch(`${ayar.url}/rest/v1/${yol}`, {
+    method: yontem,
+    headers: {
+      apikey: ayar.anonKey,
+      Authorization: `Bearer ${o.access_token}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(govde),
+  }).catch(() => null);
+
+  if (!yanit) return { tur: "hata", mesaj: "Sunucuya ulaşılamadı." };
+  if (yanit.status === 401) { oturumSil(); return { tur: "oturumsuz" }; }
+  if (yanit.ok) return { tur: "tamam" };
+
+  const g = await yanit.text().catch(() => "");
+  return { tur: "hata", mesaj: `Kaydedilemedi (${yanit.status}): ${g.slice(0, 160)}` };
+}
+
 function goster(bolum) {
-  for (const id of ["giris", "pano", "ayar-eksik", "baglanmamis"]) {
+  for (const id of ["giris", "kayit", "pano", "ayar-eksik", "baglanmamis"]) {
     $(id).hidden = id !== bolum;
   }
 }
@@ -127,6 +151,161 @@ $("cikis").addEventListener("click", () => {
   goster("giris");
 });
 
+// ─── Kayıt ──────────────────────────────────────────────────────────────────
+
+$("kayda-git").addEventListener("click", (olay) => {
+  olay.preventDefault();
+  goster("kayit");
+});
+$("girise-git").addEventListener("click", (olay) => {
+  olay.preventDefault();
+  goster("giris");
+});
+
+/**
+ * Kayıt: Supabase hesabı açar, sonra bağlanma isteğini yazar.
+ *
+ * ### İki adım neden ayrı
+ * Kayıt hesabı açıyor, istek ise "beni şu salona bağlayın" diyor. Supabase
+ * e-posta doğrulaması AÇIKSA kayıt oturum döndürmüyor — o hâlde istek burada
+ * yazılamaz, çünkü satırı yazacak olan kullanıcının kendisi (`auth.uid()`).
+ * Bu yüzden istek, oturum varsa hemen; yoksa kullanıcı e-postasını doğrulayıp
+ * ilk kez giriş yaptığında `baglanmamis` ekranındaki formdan yazılıyor.
+ *
+ * Girilen ad ve telefon tarayıcıda SAKLANMIYOR: doğrulama başka bir cihazda
+ * (telefonda gelen bağlantı, masaüstünde kayıt) tamamlanabilir ve orada
+ * bulunmayan bir kopyaya güvenmek, bilginin sessizce kaybolması olurdu.
+ * İkinci ekranda tekrar soruluyor.
+ */
+$("kayit-formu").addEventListener("submit", async (olay) => {
+  olay.preventDefault();
+  const dugme = $("kayit-dugmesi");
+  if (dugme.disabled) return;
+
+  const veri = new FormData(olay.target);
+  const ad = String(veri.get("ad")).trim();
+  const telefon = String(veri.get("telefon")).trim();
+  const eposta = String(veri.get("eposta")).trim();
+  const not = String(veri.get("not")).trim();
+
+  hataYaz("kayit-hata", null);
+  hataYaz("kayit-bilgi", null);
+
+  if (!ayar.tenantId) {
+    // Kayıt isteği bir salona ait olmak zorunda (`tenant_id not null`). Ayar
+    // eksikse kaydı sessizce yarım bırakmak yerine hiç başlatmıyoruz:
+    // hesap açılıp istek yazılamasaydı kullanıcı "kayıt oldum" sanırdı ve
+    // salonun listesinde hiç görünmezdi.
+    return hataYaz("kayit-hata",
+      "Kayıt şu anda kapalı (salon ayarı eksik). Lütfen salonla iletişime geçin.");
+  }
+
+  dugme.disabled = true;
+  dugme.textContent = "Kayıt yapılıyor…";
+
+  const yanit = await fetch(`${ayar.url}/auth/v1/signup`, {
+    method: "POST",
+    headers: { apikey: ayar.anonKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: eposta, password: String(veri.get("sifre")) }),
+  }).catch(() => null);
+
+  dugme.disabled = false;
+  dugme.textContent = "Kayıt ol";
+
+  if (!yanit) return hataYaz("kayit-hata", "Sunucuya ulaşılamadı.");
+
+  const govde = await yanit.json().catch(() => ({}));
+  if (!yanit.ok) {
+    // Sunucunun mesajı olduğu gibi aktarılıyor: "User already registered" ile
+    // "Password should be at least 6 characters" kullanıcı açısından tamamen
+    // farklı iki iş.
+    return hataYaz("kayit-hata",
+      govde.error_description || govde.msg || govde.message || "Kayıt yapılamadı.");
+  }
+
+  // Oturum dönmediyse e-posta doğrulaması açık demek.
+  if (!govde.access_token) {
+    olay.target.reset();
+    return hataYaz("kayit-bilgi",
+      `${eposta} adresine bir doğrulama bağlantısı gönderildi. Bağlantıya ` +
+      "tıkladıktan sonra buradan giriş yapın; bilgileriniz orada sorulacak.");
+  }
+
+  oturumYaz({
+    access_token: govde.access_token,
+    expires_at_ms: Date.now() + (Number(govde.expires_in) || 0) * 1000,
+    email: govde.user?.email ?? eposta,
+  });
+
+  const istekSonuc = await istekYaz({ ad, telefon, eposta, not });
+  if (istekSonuc.tur !== "tamam") {
+    // Hesap AÇILDI ama istek yazılamadı. Bunu gizlemek, kullanıcıyı hiç
+    // görünmeyeceği bir bekleyişe göndermek olurdu; `baglanmamis` ekranı formu
+    // tekrar sunuyor ve oradan yeniden denenebiliyor.
+    hataYaz("kayit-hata", istekSonuc.mesaj ?? "Bilgileriniz kaydedilemedi.");
+  }
+
+  panoyuAc();
+});
+
+/** Bağlanma isteğini yazar (yeni satır ya da bekleyen satırın güncellenmesi). */
+async function istekYaz({ ad, telefon, eposta, not }, guncelle = false) {
+  const o = oturumOku();
+  if (!o) return { tur: "oturumsuz" };
+
+  const kimlik = await kullaniciKimligi();
+  if (!kimlik) return { tur: "hata", mesaj: "Oturum bilgisi okunamadı." };
+
+  const simdi = Date.now();
+  const govde = {
+    tenant_id: ayar.tenantId,
+    full_name: ad,
+    phone: telefon,
+    email: eposta || null,
+    note: not || null,
+    updated_at_ms: simdi,
+  };
+
+  if (guncelle) {
+    return yaz(
+      `member_link_requests?auth_user_id=eq.${encodeURIComponent(kimlik)}`,
+      govde,
+      "PATCH",
+    );
+  }
+  return yaz("member_link_requests", {
+    auth_user_id: kimlik,
+    created_at_ms: simdi,
+    ...govde,
+  });
+}
+
+/**
+ * Oturumdaki kullanıcının kimliği.
+ *
+ * Jetonun içinden değil, sunucudan (`/auth/v1/user`) okunuyor. JWT'yi istemcide
+ * çözmek çalışırdı ama kimliği İSTEMCİNİN söylediği bir şey hâline getirirdi;
+ * satırın anahtarı bu değer ve tek doğru kaynağı sunucu. (Yazma kuralı zaten
+ * `auth_user_id = auth.uid()` diyor, yani yanlış bir değer reddedilirdi —
+ * ama o hâlde hata anlaşılmaz olurdu.)
+ */
+async function kullaniciKimligi() {
+  const o = oturumOku();
+  if (!o) return null;
+  if (o.user_id) return o.user_id;
+
+  const yanit = await fetch(`${ayar.url}/auth/v1/user`, {
+    headers: { apikey: ayar.anonKey, Authorization: `Bearer ${o.access_token}` },
+  }).catch(() => null);
+
+  if (!yanit || !yanit.ok) return null;
+  const govde = await yanit.json().catch(() => ({}));
+  if (!govde.id) return null;
+
+  oturumYaz({ ...o, user_id: govde.id });
+  return govde.id;
+}
+
 // ─── Pano ───────────────────────────────────────────────────────────────────
 
 async function panoyuAc() {
@@ -145,7 +324,8 @@ async function panoyuAc() {
   // göstermek kullanıcıya verisinin kaybolduğunu düşündürürdü.
   if (satirlar.length === 0) {
     $("cikis").hidden = false;
-    return goster("baglanmamis");
+    goster("baglanmamis");
+    return baglantiDurumunuCiz();
   }
 
   uye = satirlar[0];
@@ -158,6 +338,138 @@ async function panoyuAc() {
   olcumleriCiz();
   saglikFormunuCiz();
   beyanlariCiz();
+}
+
+// ─── Bağlanma isteği ────────────────────────────────────────────────────────
+
+/**
+ * "Hesabınız bağlanmamış" ekranının gövdesi.
+ *
+ * Üç hâl var ve kullanıcının yapması gereken şey her birinde farklı:
+ *
+ *   - istek yok        → bilgilerini bırakacağı form
+ *   - istek bekliyor   → bilgi + düzeltme imkânı
+ *   - istek reddedildi → salonla iletişim
+ *
+ * Üçünü tek bir metinle anlatmak, en az ikisinde yanlış yönlendirmek olurdu:
+ * "salon sizi bağlayacak" diyen bir ekran, isteğini hiç göndermemiş kişiyi
+ * sonsuza kadar bekletir.
+ */
+async function baglantiDurumunuCiz() {
+  const kap = $("baglanti-durumu");
+  kap.replaceChildren(paragraf("Bilgileriniz kontrol ediliyor…", "alt"));
+
+  // Erişim kuralı yalnızca kendi satırını döndürüyor, o yüzden sorguda süzgeç
+  // yok — yalıtımı sağlayan şey kural, sorgu değil.
+  const sonuc = await oku("member_link_requests?select=*");
+  if (sonuc.tur === "oturumsuz") return goster("giris");
+
+  if (sonuc.tur !== "tamam") {
+    // Okunamadıysa form GÖSTERİLMİYOR: var olan bir isteğin üzerine ikinci
+    // kez yazmayı denemek 409 ile düşerdi ve kullanıcı sebebini anlamazdı.
+    return kap.replaceChildren(paragraf(
+      "Bilgileriniz şu anda okunamadı. Sayfayı yenileyin ya da salonla " +
+      "iletişime geçin.", "hata"));
+  }
+
+  const istek = (sonuc.satirlar ?? [])[0];
+
+  if (!istek) return kap.replaceChildren(istekFormu(null));
+
+  if (istek.state === "REJECTED") {
+    return kap.replaceChildren(paragraf(
+      "Bağlantı isteğiniz onaylanmadı. Bilgilerinizde bir uyuşmazlık olabilir — " +
+      "aşağıdaki bağlantıdan bize ulaşın.", "alt"));
+  }
+
+  if (istek.state === "LINKED") {
+    // Beklenmedik: istek "bağlandı" ama üyelik kaydı görünmüyor. Genelde bağın
+    // başka bir salona kurulmuş olması demek. Sessizce boş ekran göstermek
+    // yerine durumu söylüyoruz.
+    return kap.replaceChildren(paragraf(
+      "Hesabınız bağlı görünüyor ancak üyelik kaydınıza ulaşılamadı. " +
+      "Salonla iletişime geçin.", "hata"));
+  }
+
+  const bilgi = paragraf(
+    `Bilgileriniz salona iletildi (${tarihYaz(istek.created_at_ms)}). ` +
+    "Onaylandığında paket durumunuz ve ölçümleriniz burada görünecek. " +
+    "Yanlış bir bilgi varsa aşağıdan düzeltebilirsiniz.", "alt");
+  kap.replaceChildren(bilgi, istekFormu(istek));
+}
+
+function paragraf(metin, sinif) {
+  const p = document.createElement("p");
+  p.className = sinif;
+  p.style.maxWidth = "56ch";
+  p.textContent = metin;
+  return p;
+}
+
+/** Bilgi bırakma / düzeltme formu. `mevcut` doluysa güncelleme yapıyor. */
+function istekFormu(mevcut) {
+  const form = document.createElement("form");
+  form.className = "kart uye-form";
+
+  const alanlar = {};
+  const ekle = (ad, etiket, deger, tur = "text") => {
+    const l = document.createElement("label");
+    l.textContent = etiket;
+    const i = tur === "textarea" ? document.createElement("textarea") : document.createElement("input");
+    if (tur === "textarea") i.rows = 2;
+    else i.type = tur;
+    i.value = deger ?? "";
+    l.appendChild(i);
+    form.appendChild(l);
+    alanlar[ad] = i;
+  };
+
+  ekle("ad", "Ad Soyad", mevcut?.full_name);
+  ekle("telefon", "Telefon — salondaki kaydınızla aynı olmalı", mevcut?.phone, "tel");
+  ekle("not", "Eklemek istedikleriniz (isteğe bağlı)", mevcut?.note, "textarea");
+
+  const dugme = document.createElement("button");
+  dugme.type = "submit";
+  dugme.className = "dugme dugme-birincil";
+  dugme.textContent = mevcut ? "Bilgilerimi güncelle" : "Bilgilerimi gönder";
+  form.appendChild(dugme);
+
+  const durum = document.createElement("p");
+  durum.className = "alt";
+  form.appendChild(durum);
+
+  form.onsubmit = async (olay) => {
+    olay.preventDefault();
+    if (dugme.disabled) return;
+
+    const ad = alanlar.ad.value.trim();
+    const telefon = alanlar.telefon.value.trim();
+    // İkisi de sunucuda `not null`. Boş gönderim, anlaşılmaz bir 400 olurdu.
+    if (!ad || !telefon) {
+      durum.textContent = "Ad ve telefon gerekli.";
+      return;
+    }
+    if (!ayar.tenantId) {
+      durum.textContent =
+        "Kayıt şu anda kapalı (salon ayarı eksik). Lütfen salonla iletişime geçin.";
+      return;
+    }
+
+    dugme.disabled = true;
+    durum.textContent = "Gönderiliyor…";
+
+    const sonuc = await istekYaz(
+      { ad, telefon, eposta: oturumOku()?.email ?? "", not: alanlar.not.value.trim() },
+      Boolean(mevcut),
+    );
+
+    dugme.disabled = false;
+    if (sonuc.tur === "oturumsuz") return goster("giris");
+    if (sonuc.tur === "tamam") return baglantiDurumunuCiz();
+    durum.textContent = sonuc.mesaj ?? "Gönderilemedi.";
+  };
+
+  return form;
 }
 
 function paketiCiz() {

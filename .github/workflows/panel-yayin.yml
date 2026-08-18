@@ -125,8 +125,17 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # İsteğe bağlı. Yoksa üye KAYDI kapalı kalıyor (ekranda söylüyor);
+          # panel, üye girişi ve açılış sayfası etkilenmiyor. Zorunlu
+          # yapılsaydı, tek bir eksik gizli anahtar yüzünden site hiç
+          # yapılandırılmamış gibi açılırdı.
+          SUPABASE_TENANT_ID: ${{ secrets.SUPABASE_TENANT_ID }}
         run: |
           if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            if [ -z "$SUPABASE_TENANT_ID" ]; then
+              echo "UYARI: SUPABASE_TENANT_ID tanımlı değil — üye kaydı kapalı olacak."
+              echo "Değeri panelde 'Üye Hesapları' sekmesinin altında yazıyor."
+            fi
             # Hedef, `config.js`i ARAYAN dizinlerden türetiliyor; sabit
             # `_site/config.js` değil. Panel `/panel/` altına taşınınca eski
             # sabit yol sessizce yanlış oldu: dosya kökte kalır, panel onu
@@ -143,6 +152,7 @@ jobs:
           window.NONSTOP_CONFIG = {
             url: "$SUPABASE_URL",
             anonKey: "$SUPABASE_ANON_KEY",
+            tenantId: "$SUPABASE_TENANT_ID",
           };
           EOF
               echo "config.js yazıldı: $hedef"
