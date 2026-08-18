@@ -254,6 +254,36 @@ Bunu ben yapamıyorum: DNS Turhost'ta ve oraya erişimim yok.
 
 ---
 
+## "There isn't a GitHub Pages site here" (404)
+
+Alan adına girdiğinde GitHub'ın gri 404 sayfası çıkıyorsa **sitenin dosyalarında
+sorun yok** — o sayfa GitHub'ın kendi hata sayfası ve tek bir şey demek: hiçbir
+depo şu an `nonstopstudio.tr` adresini üstlenmiyor.
+
+En sık sebebi, Pages ayarlarındaki **özel alan adı kaydının düşmesi**. Yayın
+yeşil bitmeye devam ettiği için sessiz bir arıza: Actions sekmesinde her şey
+başarılı görünür.
+
+**Düzeltme (1 dakika):**
+
+1. `https://github.com/McKose/NonStopAndroidApk/settings/pages`
+2. **Custom domain** kutusuna `nonstopstudio.tr` yaz → **Save**.
+3. GitHub bir DNS kontrolü yapar (birkaç dakika). Yeşil tik çıkınca
+   **Enforce HTTPS** kutusunu işaretle.
+
+> **Neden depodaki `CNAME` dosyası bunu tek başına çözmüyor:** site GitHub
+> Actions ile yayınlanıyor ve o yolda alan adının yetkili kaydı **Settings →
+> Pages**. Yapıtın içindeki `CNAME` dosyası ayarı kendi başına kurmuyor. Dosya
+> yine de duruyor ama ona güvenmek yetmiyor — bu yüzden yayın iş akışına, adres
+> beklenenden farklıysa günlüğe uyarı basan bir adım eklendi.
+
+**Bu arada site erişilebilir:** `https://mckose.github.io/NonStopAndroidApk/`
+adresi her zaman çalışır. Panel ve üye alanı da oradan açılır
+(`.../NonStopAndroidApk/panel/` ve `.../NonStopAndroidApk/uye/`). Alan adı
+düzelene kadar denemelerini orada yapabilirsin.
+
+---
+
 ## Bir şey bozulursa
 
 Site açılmıyorsa ya da yanlış görünüyorsa ilk bakılacak yer
