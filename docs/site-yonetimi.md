@@ -210,10 +210,47 @@ Sitenin planlanan işleri bitti. Bundan sonrası isteğe bağlı ekler ve aşağ
 |---|---|
 | **`SUPABASE_TENANT_ID` gizli anahtarı** | Üye kayıt formunun açılması için. Değeri panelde Üye Hesapları sekmesinin altında yazıyor; Settings → Secrets → Actions'a ekle. |
 | **Supabase'de `0006` migrasyonu** | Kayıt isteği tablosu ve görsel kovası bu dosyada. Supabase panelinde SQL Editor'e `supabase/migrations/0006_member_signup_and_storage.sql` içeriğini yapıştırıp çalıştır. Yapılmazsa kayıt ve görsel yükleme çalışmaz (ekran sebebini söyler). |
-| **E-posta riski** | `MX` kaydı hâlâ alan adının kendisini gösteriyor, o da artık GitHub'a bakıyor. Bu alan adıyla e-posta kullanıyorsan mailler geri döner. Turhost'tan gerçek posta sunucusu adresini alıp `MX`'i ona çevirmen gerekiyor. `mail.nonstopstudio.tr` de aynı yere baktığı için onu göstermek çözüm değil. |
+| **E-posta riski** | Aşağıdaki ayrı bölüme bakın — sitede yapılacak bir şey yok, iş Turhost panelinde. |
 | **Yayın anahtarı** | Android uygulamasının mağaza sürümü için. Adımlar `docs/yayin.md` içinde. Anahtarı **yedekle** — kaybı geri dönüşsüz. |
 | **Telefon, çalışma saatleri, açık adres** | Siteye eklenecek. |
 | **Yatay salon fotoğrafı** | Açılış ekranı için (isteğe bağlı). |
+
+---
+
+## E-posta: ne bozuk, ne bozuk değil
+
+**Kod tarafında yapılacak bir şey yok — kontrol edildi.** Site hiçbir yerde
+`@nonstopstudio.tr` adresi yayınlamıyor, `mailto:` bağlantısı yok; iletişim
+Instagram ve harita üzerinden. Üye kaydı da etkilenmiyor: doğrulama e-postasını
+**Supabase kendi sunucusundan** üyenin adresine gönderiyor, senin alan adından
+geçmiyor.
+
+**Bozuk olan tek şey:** `@nonstopstudio.tr` adresine **gelen** postalar.
+
+Bugün ölçülen kayıtlar:
+
+```
+nonstopstudio.tr        MX     0 nonstopstudio.tr
+nonstopstudio.tr        A      185.199.108–111.153   ← GitHub Pages
+mail.nonstopstudio.tr   CNAME  nonstopstudio.tr      ← o da aynı yere gidiyor
+```
+
+`MX`, alan adının kendisini gösteriyor; alan adı da artık GitHub Pages'e
+bakıyor. GitHub Pages **posta sunucusu değil**, yani sana yazan birinin maili
+teslim edilemeyip geri döner. `mail.nonstopstudio.tr` de aynı yere baktığı için
+`MX`'i ona çevirmek **çözüm değil** — sık yapılan hata bu.
+
+### Sende yapılacak (Turhost paneli)
+
+1. Turhost'ta bu alan adı için **e-posta hizmetin var mı** öğren.
+2. **Varsa:** posta sunucusunun gerçek adresini iste (genelde `mail.turhost.com`
+   gibi bir şey) ve DNS'te `MX` kaydını ona çevir. Bir de `TXT` (SPF) kaydı
+   iste — şu an hiç yok, o yüzden gönderdiğin mailler de spam'a düşebilir.
+3. **Yoksa ve bu adresle mail kullanmıyorsan:** `MX` kaydını **sil**. Şu anki
+   hâli, olmayan bir posta sunucusunu işaret ettiği için gönderene yanıltıcı
+   bir hata döndürüyor; kayıt hiç olmazsa hata daha dürüst olur.
+
+Bunu ben yapamıyorum: DNS Turhost'ta ve oraya erişimim yok.
 
 ---
 
