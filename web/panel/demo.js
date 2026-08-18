@@ -10,6 +10,10 @@
 // gerçekte hiç görülmeyecek bir şeyi gösterirdi — ve ekranı ona göre
 // ayarlamak, gerçek veride bozuk görünmesine yol açardı.
 
+// Dosya kontrolü gerçek istemciden alınıyor, kopyalanmıyor: demoda kabul edilip
+// gerçekte reddedilen (ya da tersi) bir dosya, demonun amacını bozardı.
+import { gorselKontrol } from "./supabase.js";
+
 const GUN = 24 * 60 * 60 * 1000;
 const simdi = Date.now();
 
@@ -231,6 +235,33 @@ const UYE_HESAPLARI = [0, 2].map((uyeIndex) => ({
   linked_at_ms: simdi - 20 * GUN,
 }));
 
+// Bekleyen kayıt istekleri. Biri üyelik kaydıyla telefonu TUTUYOR (eşleştirme
+// önerisi görünsün), biri tutmuyor (personelin elle seçtiği hâl de görünsün).
+const KAYIT_ISTEKLERI = [
+  {
+    auth_user_id: "00000000-0000-0000-0000-0000000000f1",
+    tenant_id: "demo",
+    full_name: UYELER[1].full_name,
+    phone: UYELER[1].phone,
+    email: UYELER[1].email,
+    note: "Salı akşam grubundayım.",
+    state: "PENDING",
+    created_at_ms: simdi - 2 * GUN,
+    updated_at_ms: simdi - 2 * GUN,
+  },
+  {
+    auth_user_id: "00000000-0000-0000-0000-0000000000f2",
+    tenant_id: "demo",
+    full_name: "Yeni Başvuran",
+    phone: "+905320000777",
+    email: "yeni@ornek.test",
+    note: null,
+    state: "PENDING",
+    created_at_ms: simdi - 4 * GUN,
+    updated_at_ms: simdi - 4 * GUN,
+  },
+];
+
 const TABLOLAR = {
   gym_members: UYELER,
   gym_packages: PAKETLER,
@@ -242,6 +273,7 @@ const TABLOLAR = {
   staff: PERSONEL,
   announcements: DUYURULAR,
   member_accounts: UYE_HESAPLARI,
+  member_link_requests: KAYIT_ISTEKLERI,
 };
 
 /**
@@ -302,6 +334,22 @@ export function demoIstemcisi() {
     async yaz() {
       if (!oturum) return { tur: "oturumsuz" };
       return { tur: "tamam" };
+    },
+
+    /**
+     * Demo modda yükleme yapılmıyor, sahte bir adres dönüyor.
+     *
+     * Gerçek istemcideki yöntemin karşılığı olması şart — app.js iki istemciyi
+     * ayırt etmiyor ve eksik bir yöntem demoyu çökertirdi. Dönen adres
+     * depodaki bir dosyaya değil, depoda **bulunmayan** bir yola işaret
+     * ediyor: demo ekranını değerlendiren kişi görselin yüklenmediğini görsün,
+     * yüklendiğini sanmasın.
+     */
+    async dosyaYukle(dosya) {
+      if (!oturum) return { tur: "oturumsuz" };
+      const hata = gorselKontrol(dosya);
+      if (hata) return { tur: "hata", mesaj: hata };
+      return { tur: "tamam", adres: `https://ornek.test/demo/${encodeURIComponent(dosya.name)}` };
     },
   };
 }

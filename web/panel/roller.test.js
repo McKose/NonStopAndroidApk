@@ -156,25 +156,32 @@ test("panele özgü bölümler sınırlı ve gerekçeli", () => {
 /**
  * Panele özgü bölümlerin rolleri SUNUCUDAKİ yazma kurallarıyla aynı olmalı.
  *
- * Bu bölümlerin Kotlin karşılığı olmadığı için tek doğru kaynak migrasyon
- * `0005`. Panel sunucudan geniş bir kapı açsaydı kullanıcı formu doldurup
- * "kaydet" der, sunucu sessizce reddederdi — kullanıcının göreceği tek şey
- * hiçbir şeyin olmaması olurdu.
+ * Bu bölümlerin Kotlin karşılığı olmadığı için tek doğru kaynak migrasyonlar.
+ * Panel sunucudan geniş bir kapı açsaydı kullanıcı formu doldurup "kaydet" der,
+ * sunucu sessizce reddederdi — kullanıcının göreceği tek şey hiçbir şeyin
+ * olmaması olurdu.
  */
 test("panele özgü bölümlerin rolleri sunucudaki kuralla aynı", () => {
-  const sql = readFileSync(
-    join(buradan, "..", "..", "supabase", "migrations",
-         "0005_public_site_and_member_access.sql"),
-    "utf8",
-  );
+  const migrasyon = (ad) =>
+    readFileSync(join(buradan, "..", "..", "supabase", "migrations", ad), "utf8");
 
-  // `announcements_insert` ve `member_accounts_insert` kurallarının rolleri.
-  for (const [sekme, kuralAdi] of [
-    ["duyurular", "announcements_insert"],
-    ["uye-hesaplari", "member_accounts_insert"],
+  const kaynak = {
+    "0005": migrasyon("0005_public_site_and_member_access.sql"),
+    "0006": migrasyon("0006_member_signup_and_storage.sql"),
+  };
+
+  // `uye-hesaplari` sekmesi İKİ kurala birden bağlı: hesabı bağlamak
+  // (`member_accounts_insert`) ve isteği işaretlemek
+  // (`link_requests_staff_update`). İkisi de aynı düğmenin arkasında, yani
+  // ikisi de aynı rol kümesini istemeli — biri gevşerse düğme yarım çalışırdı.
+  for (const [sekme, kuralAdi, dosya] of [
+    ["duyurular", "announcements_insert", "0005"],
+    ["uye-hesaplari", "member_accounts_insert", "0005"],
+    ["uye-hesaplari", "link_requests_staff_update", "0006"],
   ]) {
+    const sql = kaynak[dosya];
     const bas = sql.indexOf(`create policy ${kuralAdi}`);
-    assert.ok(bas > 0, `${kuralAdi} kuralı migrasyonda bulunamadı`);
+    assert.ok(bas > 0, `${kuralAdi} kuralı ${dosya} migrasyonunda bulunamadı`);
 
     const govde = sql.slice(bas, sql.indexOf(";", bas));
     const roller = [...govde.matchAll(/'(ADMIN|MANAGER|TRAINER)'/g)].map((m) => m[1]);

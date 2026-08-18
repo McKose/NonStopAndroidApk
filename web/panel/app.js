@@ -670,10 +670,16 @@ function duyuruFormu() {
   ekle("starts", "Başlangıç tarihi (boş bırakılabilir)", "date");
   ekle("ends", "Bitiş tarihi — bu tarihte siteden kendiliğinden kalkar", "date");
   ekle("image_url", "Görsel adresi (isteğe bağlı)");
+  form.appendChild(gorselYukleyici(alanlar.image_url));
 
+  // `styles.css` etiketleri IZGARA yapıyor (`label { display: grid }`), yani
+  // `flex-direction` hiçbir işe yaramıyordu: onay kutusu metnin ÜSTÜNDE, ortada
+  // duruyordu ve hangi metne ait olduğu belli değildi. `display` burada açıkça
+  // `flex`e çevriliyor.
   const yayinL = document.createElement("label");
-  yayinL.style.flexDirection = "row";
+  yayinL.style.display = "flex";
   yayinL.style.alignItems = "center";
+  yayinL.style.gap = "8px";
   const yayin = document.createElement("input");
   yayin.type = "checkbox";
   yayinL.append(yayin, document.createTextNode(" Hemen yayınla"));
@@ -732,6 +738,91 @@ function duyuruFormu() {
   return form;
 }
 
+/**
+ * Görsel yükleme kutusu: dosya seç → Supabase Storage'a yükle → adresi
+ * yukarıdaki "Görsel adresi" alanına yaz.
+ *
+ * ### Adres alanı neden duruyor
+ * Yükleme onun yerini almıyor, onu DOLDURUYOR. Görsel başka bir yerde
+ * barındırılıyorsa (Instagram gönderisi, tasarımcının verdiği bağlantı)
+ * adresi elle yapıştırmak hâlâ mümkün olmalı. Alanı gizleyip yalnızca yükleme
+ * bırakmak, var olan bir görseli kullanmayı imkânsız kılardı.
+ *
+ * ### Yüklenen görsel neden herkese açık
+ * Duyuru kartı açılış sayfasında, giriş yapılmadan gösteriliyor. Süreli imzalı
+ * adres üretmek sunucu tarafında bir bileşen gerektirirdi ve burada öyle bir şey
+ * yok. Bunun bedeli açık: bu kovaya **yalnızca** duyuru görseli konmalı — üye
+ * fotoğrafı, sağlık belgesi gibi şeyler değil.
+ */
+function gorselYukleyici(adresAlani) {
+  const kap = document.createElement("div");
+  kap.style.marginBottom = "12px";
+
+  const etiket = document.createElement("label");
+  etiket.textContent = "…ya da bilgisayarınızdan yükleyin";
+  const dosya = document.createElement("input");
+  dosya.type = "file";
+  dosya.accept = "image/*";
+  etiket.appendChild(dosya);
+  kap.appendChild(etiket);
+
+  const dugme = document.createElement("button");
+  // `type=button`: varsayılan `submit` olurdu ve düğme, duyuruyu yükleme
+  // bitmeden kaydederdi.
+  dugme.type = "button";
+  dugme.className = "ikincil";
+  dugme.textContent = "Görseli yükle";
+  dugme.disabled = true;
+  kap.appendChild(dugme);
+
+  const durum = document.createElement("p");
+  durum.className = "alt";
+  kap.appendChild(durum);
+
+  const onizleme = document.createElement("img");
+  onizleme.hidden = true;
+  onizleme.alt = "Yüklenen görsel";
+  onizleme.style.maxHeight = "150px";
+  onizleme.style.marginTop = "10px";
+  onizleme.style.borderRadius = "8px";
+  kap.appendChild(onizleme);
+
+  dosya.addEventListener("change", () => {
+    dugme.disabled = !dosya.files?.length;
+    durum.textContent = "";
+  });
+
+  dugme.addEventListener("click", async () => {
+    const secilen = dosya.files?.[0];
+    if (!secilen) return;
+
+    dugme.disabled = true;
+    durum.textContent = "Yükleniyor…";
+
+    const sonuc = await istemci.dosyaYukle(secilen, aktifTenant);
+
+    if (sonuc.tur === "tamam") {
+      adresAlani.value = sonuc.adres;
+      onizleme.src = sonuc.adres;
+      onizleme.hidden = false;
+      durum.textContent = "Yüklendi. Adres yukarıdaki alana yazıldı.";
+      // Aynı dosyanın ikinci kez yüklenmesini engellemek için seçim
+      // temizleniyor; düğme yeni bir dosya seçilene kadar kapalı kalıyor.
+      dosya.value = "";
+      return;
+    }
+
+    dugme.disabled = false;
+    if (sonuc.tur === "oturumsuz") {
+      hataYaz("giris-hata", "Oturumunuzun süresi doldu, tekrar giriş yapın.");
+      return goster("giris");
+    }
+    durum.textContent = sonuc.mesaj ?? "Yüklenemedi.";
+  });
+
+  return kap;
+}
+
 /** Yayına alma / yayından kaldırma düğmesi. */
 function yayinDugmesi(duyuru) {
   const dugme = document.createElement("button");
@@ -784,18 +875,24 @@ function turEtiketi(tur) {
  * `member_accounts` üzerinden çalışıyor (migrasyon 0005). Bu bilinçli: bağı
  * kurmak bir erişim kararı ve salon veriyor.
  *
- * Hesap kimliğini elle girmek zorunda olmak kaba ama güvenli: e-posta
- * eşleşmesiyle otomatik bağlamak reddedildi çünkü `gym_members.email` hem boş
- * olabiliyor hem de tekil değil — bir yazım hatası başka birinin sağlık
- * verisini açardı.
+ * ### Hesap kimliği artık elle girilmiyor
+ * Üye `/uye/` üzerinden kayıt olurken KENDİSİ bir istek satırı yazıyor
+ * (`member_link_requests`, migrasyon 0006) ve o satır hesap kimliğini taşıyor.
+ * Personel yalnızca "bu istek şu üyelik kaydına ait" diyor.
+ *
+ * Eşleştirme yine de OTOMATİK DEĞİL ve olmayacak: e-postayla otomatik bağlamak
+ * reddedildi çünkü `gym_members.email` hem boş olabiliyor hem de tekil değil —
+ * bir yazım hatası başka birinin sağlık verisini açardı. Telefon eşleşmesi
+ * yalnızca bir ÖNERİ olarak sunuluyor, kararı insan veriyor.
  */
 async function uyeHesaplariYukle(ad) {
-  const [bagSonuc, uyeSonuc] = await Promise.all([
+  const [bagSonuc, uyeSonuc, istekSonuc] = await Promise.all([
     istemci.oku("member_accounts", { order: "linked_at_ms.desc" }),
     istemci.oku("gym_members", { order: "full_name.asc" }),
+    istemci.oku("member_link_requests", { order: "created_at_ms.asc" }),
   ]);
 
-  for (const sonuc of [bagSonuc, uyeSonuc]) {
+  for (const sonuc of [bagSonuc, uyeSonuc, istekSonuc]) {
     if (sonuc.tur === "oturumsuz") {
       hataYaz("giris-hata", "Oturumunuzun süresi doldu, tekrar giriş yapın.");
       return goster("giris");
@@ -807,20 +904,24 @@ async function uyeHesaplariYukle(ad) {
   const baglar = bagSonuc.satirlar;
   const uyeler = silinmemisler(uyeSonuc.satirlar);
   const bagliIdler = new Set(baglar.map((b) => b.member_id));
+  const bekleyenler = istekSonuc.satirlar.filter((i) => i.state === "PENDING");
 
   const kap = document.createElement("div");
   kap.appendChild(kutular([
     ["Üye", String(uyeler.length)],
     ["Hesabı bağlı", String(bagliIdler.size)],
     ["Bağlı değil", String(uyeler.filter((u) => !bagliIdler.has(u.id)).length)],
+    ["Bekleyen istek", String(bekleyenler.length)],
   ]));
 
   const aciklama = document.createElement("p");
   aciklama.className = "alt";
   aciklama.textContent =
-    "Üye önce nonstopstudio.tr/uye/ adresinden hesap açar; ardından buradan " +
-    "üyelik kaydına bağlanır. Bağlanmadan hiçbir veri göremez.";
+    "Üye önce nonstopstudio.tr/uye/ adresinden hesap açıp bilgilerini bildirir; " +
+    "istek aşağıda görünür. Siz bağlayana kadar hiçbir veri göremez.";
   kap.appendChild(aciklama);
+
+  kap.appendChild(bekleyenIstekler(bekleyenler, uyeler, bagliIdler));
 
   const baslik = document.createElement("h2");
   baslik.textContent = "Üyeler";
@@ -838,7 +939,214 @@ async function uyeHesaplariYukle(ad) {
     ]),
   ));
 
+  kap.appendChild(salonKimligi());
+
   $("icerik").appendChild(kap);
+}
+
+/**
+ * Salon kimliğini gösterir.
+ *
+ * Sitedeki kayıt formunun ayarı (`tenantId`) bu değer ve başka bir yerden
+ * kolay bulunamıyor: giriş yapmamış ziyaretçi salon listesini OKUYAMIYOR
+ * (okuyabilseydi bütün salonlar herkese açık olurdu), yani site kendi salonunu
+ * çalışma zamanında çözemez. Değeri Supabase panelinden SQL yazarak bulmak
+ * mümkün ama gereksiz — burada zaten oturumda duruyor.
+ */
+function salonKimligi() {
+  const kap = document.createElement("details");
+  kap.style.marginTop = "24px";
+
+  const baslik = document.createElement("summary");
+  baslik.textContent = "Site kayıt ayarı (salon kimliği)";
+  baslik.className = "alt";
+  kap.appendChild(baslik);
+
+  const aciklama = document.createElement("p");
+  aciklama.className = "alt";
+  aciklama.textContent =
+    "Sitedeki üye kaydının çalışması için bu değer depo gizli anahtarlarına " +
+    "SUPABASE_TENANT_ID adıyla eklenmeli (Settings → Secrets → Actions):";
+  kap.appendChild(aciklama);
+
+  const deger = document.createElement("code");
+  deger.textContent = aktifTenant ?? "—";
+  deger.style.userSelect = "all";
+  kap.appendChild(deger);
+
+  return kap;
+}
+
+/**
+ * Bekleyen kayıt istekleri listesi.
+ *
+ * Her satırda üye seçici + "Bağla" + "Reddet". Seçicide **yalnızca hesabı
+ * bağlanmamış** üyeler var: bağlı bir üyeyi seçmek zaten sunucuda tekillik
+ * kısıtına takılırdı, listede durması boşuna bir denemeye davet olurdu.
+ */
+function bekleyenIstekler(istekler, uyeler, bagliIdler) {
+  const kap = document.createElement("div");
+
+  const baslik = document.createElement("h2");
+  baslik.textContent = "Bekleyen kayıt istekleri";
+  baslik.style.marginTop = "28px";
+  kap.appendChild(baslik);
+
+  if (istekler.length === 0) {
+    const bos = document.createElement("p");
+    bos.className = "alt";
+    bos.textContent = "Bekleyen istek yok.";
+    kap.appendChild(bos);
+    return kap;
+  }
+
+  const bagsizlar = uyeler.filter((u) => !bagliIdler.has(u.id));
+
+  // Seçici ve düğmeler AYNI hücrede. Ayrı sütunlar olsaydı tablo yedi sütuna
+  // çıkar ve "Bağla" düğmesi dizüstü genişliğinde yatay kaydırmanın ardında
+  // kalırdı — ekranın tek eylemi görünmez olurdu.
+  kap.appendChild(tabloYap(
+    ["Ad Soyad", "Telefon", "E-posta", "Not", "İstek tarihi", "Üyelik kaydı ve işlem"],
+    istekler.map((istek) => {
+      const secici = uyeSecici(bagsizlar, istek);
+      return [
+        istek.full_name,
+        istek.phone,
+        istek.email,
+        istek.note,
+        tarihYaz(istek.created_at_ms),
+        istekEylemleri(istek, secici),
+      ];
+    }),
+  ));
+
+  return kap;
+}
+
+/**
+ * İsteği bir üyelik kaydıyla eşleştiren açılır liste.
+ *
+ * Telefon eşleşmesi önceden seçiliyor. `gym_members.phone` kiracı bazında tekil
+ * olduğu için bu en güvenilir ipucu — ama yalnızca ipucu: personel değiştirebilir
+ * ve eşleşme yoksa seçim boş kalıyor, kendiliğinden bir tahmin yapılmıyor.
+ */
+function uyeSecici(uyeler, istek) {
+  const secici = document.createElement("select");
+
+  const bos = document.createElement("option");
+  bos.value = "";
+  bos.textContent = "— üye seçin —";
+  secici.appendChild(bos);
+
+  const normal = (t) => String(t ?? "").replace(/\D/g, "");
+  const istekTel = normal(istek.phone);
+
+  for (const u of uyeler) {
+    const o = document.createElement("option");
+    o.value = u.id;
+    o.textContent = `${u.full_name} — ${u.phone ?? "telefonsuz"}`;
+    // Eşleşme boş telefonlar üzerinden kurulamaz: `normal("")` iki tarafta da
+    // `""` döner ve telefonu olmayan her üye "eşleşmiş" görünürdü.
+    if (istekTel && normal(u.phone) === istekTel) o.selected = true;
+    secici.appendChild(o);
+  }
+
+  return secici;
+}
+
+/** Bir isteğin üye seçicisi ve "Bağla" / "Reddet" düğmeleri. */
+function istekEylemleri(istek, secici) {
+  const kap = document.createElement("div");
+  kap.style.display = "flex";
+  kap.style.flexWrap = "wrap";
+  kap.style.alignItems = "center";
+  kap.style.gap = "8px";
+  kap.appendChild(secici);
+
+  const durum = document.createElement("span");
+  durum.className = "alt";
+
+  const bagla = document.createElement("button");
+  bagla.textContent = "Bağla";
+  bagla.addEventListener("click", async () => {
+    const uyeId = secici.value;
+    if (!uyeId) {
+      durum.textContent = "Önce üye seçin.";
+      return;
+    }
+
+    bagla.disabled = true;
+    durum.textContent = "Bağlanıyor…";
+
+    const simdi = Date.now();
+
+    // Sıra önemli: önce BAĞ kuruluyor, sonra istek işaretleniyor.
+    //
+    // Tersi yapılsaydı ve ikinci adım düşseydi, istek "bağlandı" görünüp
+    // listeden kaybolur, üye ise hiçbir şey göremezdi — kimsenin fark
+    // etmeyeceği bir kayıp. Bu sırayla yarım kalırsa istek listede DURUYOR,
+    // yani hata görünür kalıyor.
+    const bagSonuc = await istemci.yaz("member_accounts", {
+      member_id: uyeId,
+      tenant_id: aktifTenant,
+      auth_user_id: istek.auth_user_id,
+      linked_at_ms: simdi,
+    });
+
+    if (bagSonuc.tur !== "tamam" && bagSonuc.tur !== "cakisma") {
+      bagla.disabled = false;
+      durum.textContent = bagSonuc.mesaj ?? "Bağlanamadı.";
+      return;
+    }
+    // `cakisma`: bağ zaten var — önceki yarım kalmış bir denemeden. İşaretleme
+    // adımına devam etmek doğru olan, çünkü eksik olan tam da o.
+    if (bagSonuc.tur === "cakisma") {
+      durum.textContent = "Bağ zaten vardı; istek işaretleniyor…";
+    }
+
+    const isaretSonuc = await istemci.yaz(
+      "member_link_requests",
+      { state: "LINKED", updated_at_ms: simdi },
+      `auth_user_id=eq.${encodeURIComponent(istek.auth_user_id)}`,
+    );
+
+    if (isaretSonuc.tur !== "tamam") {
+      bagla.disabled = false;
+      // Kullanıcının bilmesi gereken şey burada bağın KURULDUĞU: tekrar
+      // denerse "zaten var" görecek ve neden olduğunu bilmezse paniğe kapılır.
+      durum.textContent =
+        `Bağ kuruldu ama istek işaretlenemedi: ${isaretSonuc.mesaj ?? "bilinmeyen hata"}`;
+      return;
+    }
+
+    sekmeYukle(aktifSekme);
+  });
+
+  const reddet = document.createElement("button");
+  reddet.className = "ikincil";
+  reddet.textContent = "Reddet";
+  reddet.addEventListener("click", async () => {
+    // Reddetmek isteği listeden düşürüyor ama hesabı silmiyor — hesabı silmek
+    // `service_role` gerektirir ve o anahtar buraya asla gelmiyor. Kişi tekrar
+    // başvurmak isterse bilgilerini güncelleyebilir.
+    if (!confirm(`"${istek.full_name}" isteği reddedilsin mi?`)) return;
+
+    reddet.disabled = true;
+    durum.textContent = "Reddediliyor…";
+
+    const sonuc = await istemci.yaz(
+      "member_link_requests",
+      { state: "REJECTED", updated_at_ms: Date.now() },
+      `auth_user_id=eq.${encodeURIComponent(istek.auth_user_id)}`,
+    );
+
+    if (sonuc.tur === "tamam") return sekmeYukle(aktifSekme);
+    reddet.disabled = false;
+    durum.textContent = sonuc.mesaj ?? "Reddedilemedi.";
+  });
+
+  kap.append(bagla, reddet, durum);
+  return kap;
 }
 
 function kutular(ciftler) {

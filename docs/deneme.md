@@ -77,9 +77,19 @@ Diğer ikisi gerçek sunucuya bağlanıyor.
    Hepsi tekrar çalıştırılabilir — emin değilseniz yeniden koşturun, zarar
    vermez.
 
-En son eklenen: **`0004_role_based_access.sql`** — kim neyi yazabilir kuralı.
-Çalıştırılmazsa uygulama ve panel çalışmaya devam eder; yalnızca yetki ayrımı
-olmaz, yani salona bağlı herkes her şeyi yazabilir.
+Son üç dosya ve çalıştırılmazlarsa ne olduğu:
+
+| Dosya | Ne getiriyor | Çalıştırılmazsa |
+|---|---|---|
+| `0004_role_based_access.sql` | Kim neyi yazabilir | Uygulama ve panel çalışır, ama yetki ayrımı olmaz: salona bağlı herkes her şeyi yazabilir |
+| `0005_public_site_and_member_access.sql` | Duyurular, üye hesabı bağı, sağlık beyanı | Sitedeki etkinlik vitrini boş kalır, üye alanı ve panelin iki yeni sekmesi çalışmaz |
+| `0006_member_signup_and_storage.sql` | Üye kayıt isteği tablosu, duyuru görseli kovası | Üye kayıt olamaz, panele görsel yüklenemez (ekran sebebini söyler) |
+
+> `0006`'nın depolama (Storage) bölümü **yalnızca Supabase'de** çalışıyor;
+> yerel testlerde `storage` şeması olmadığı için atlanıyor ve bunu günlüğe
+> yazıyor. Yani o kurallar ancak burada, gerçek projede doğrulanabiliyor:
+> çalıştırdıktan sonra Storage → Buckets altında **`duyuru-gorselleri`**
+> kovasının göründüğünü kontrol edin.
 
 ### b) Kendi rolünüzü kontrol edin
 

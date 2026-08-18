@@ -19,10 +19,14 @@ henüz hazır olmadığı ve hangi sırayla geleceği var.
 |---|---|---|---|
 | Açılış fotoğrafı, reformer fotoğrafı, logo | **Sen** | GitHub'dan dosya yükle | ✅ hazır |
 | Sayfadaki metinler, başlıklar, iletişim | Claude | Söylemen yeterli | ✅ hazır |
-| Etkinlik / duyuru ekleme, kaldırma | **Sen** | Panelden | ⏳ Faz 5 |
-| Etkinlik görseli | **Sen** | Faz 5'teki karara bağlı | ⏳ Faz 5 |
-| Üye hesabı açma, üyeye bağlama | **Sen** | Panelden | ⏳ Faz 5 |
-| Üyenin kendi paket/ölçüm görmesi | Üye | `/uye/` | ⏳ Faz 4 |
+| Etkinlik / duyuru ekleme, kaldırma | **Sen** | Panel → Duyurular | ✅ hazır |
+| Etkinlik görseli | **Sen** | Panelden yükle (5 MB'a kadar) | ✅ hazır |
+| Üye kaydını onaylama, hesaba bağlama | **Sen** | Panel → Üye Hesapları | ✅ hazır |
+| Üyenin kendi paket/ölçüm görmesi | Üye | `/uye/` | ✅ hazır |
+| Üyenin hesap açması | Üye | `/uye/` → Kayıt olun | ✅ hazır\* |
+
+\* Sunucuda `0006` migrasyonu ve `SUPABASE_TENANT_ID` gizli anahtarı gerekiyor —
+"Sende bekleyenler" bölümüne bakın.
 
 ---
 
@@ -86,49 +90,75 @@ Eksik olan ve eklenebilecekler: telefon numarası, çalışma saatleri, açık a
 
 ---
 
-## 3. Etkinlik ve duyurular (Faz 5'te açılacak)
+## 3. Etkinlik ve duyurular — **panelden, koda dokunmadan**
 
-Etkinlikler sabit dosya **değil** — veritabanından geliyor. Sayfa öyle kuruldu ki
-her etkinlik için yazılımcıya ihtiyacın olmasın.
-
-**Sunucu tarafı hazır** (migrasyon `0005`): `announcements` tablosu, yayın
-penceresi ve erişim kuralları kuruldu ve sınandı. Yalnızca **yayınlanmış** ve
-tarihi geçmemiş duyurular siteye çıkıyor; taslak olanlar giriş yapmadan
-okunamıyor bile.
-
-**Eksik olan:** panelde etkinlik girdiğin ekran. Faz 5'te gelecek. O ekran
-açıldığında şunları gireceksin:
+Etkinlikler sabit dosya **değil** — veritabanından geliyor. Yazılımcıya ihtiyacın
+yok: panelde **Duyurular** sekmesine gir, formu doldur, kaydet.
 
 | Alan | Ne işe yarıyor |
 |---|---|
-| Başlık | Kartın başlığı |
+| Başlık | Kartın başlığı — boş bırakılamıyor |
 | Metin | Açıklama |
 | Tür | Etkinlik / Kampanya / Duyuru |
 | Başlangıç–bitiş tarihi | Bitince siteden **kendiliğinden** kalkıyor |
-| Yayınla | İşaretlemeden site göstermiyor |
-| Görsel adresi | Aşağıya bakın |
+| Görsel | Ya adres yapıştır ya da dosya seçip **"Görseli yükle"** |
+| Hemen yayınla | İşaretlemeden site göstermiyor |
+
+Kaydettikten sonra listede görünüyor; oradaki **Yayınla / Yayından kaldır**
+düğmesiyle istediğin an açıp kapatabiliyorsun.
 
 > **Otomatik kalkma neden önemli:** bitmiş bir etkinliğin sitede durması, siteye
 > bakılmadığı izlenimi veriyor. Bitiş tarihi girersen o tarihte kendiliğinden
 > kayboluyor; kaldırmayı hatırlaman gerekmiyor.
 
-### Etkinlik görseli — karar verilmesi gereken konu
+### Görsel yükleme
 
-Tabloda görsel bir **adres** olarak tutuluyor, yani görselin internette bir
-yerde durması gerekiyor. Üç yol var:
+Karar verildi: **Supabase Storage**. Panelde "Görseli yükle" düğmesi var;
+bilgisayardan ya da telefondan dosya seçiyorsun, yüklendikten sonra adres
+"Görsel adresi" alanına kendiliğinden yazılıyor ve küçük bir önizleme çıkıyor.
 
-1. **Supabase Storage (önerilen).** Panele "Görsel yükle" düğmesi konur;
-   telefondan ya da bilgisayardan seçersin, gerisi otomatik. Gerçek çözüm bu
-   ve seni tamamen bağımsız yapıyor. Faz 5'e ek iş getiriyor.
-2. **Dış bağlantı yapıştırma.** Görseli başka bir yere yükleyip adresini
-   yapıştırırsın. Hızlı ama kırılgan: o site görseli silerse ya da dışarıdan
-   bağlanmayı engellerse etkinlik görselsiz kalır.
-3. **Görselsiz etkinlikler.** Başlık, metin ve tarih yeter. **Bu bugün zaten
-   çalışıyor** — görsel yoksa kart düzgün görünüyor, kırık resim simgesi
-   çıkmıyor.
+Sınırlar:
 
-Karar verilmezse 3 geçerli olur ve 2 de kendiliğinden çalışır; 1 ayrıca
-yapılması gereken bir iş.
+- **En fazla 5 MB.** Büyüğünü seçersen yüklemeden önce söylüyor.
+- **Yalnızca görsel** (jpg, jpeg, png, webp, avif, gif).
+- Yükleme **yönetici ve müdür** rollerinde; eğitmen yükleyemiyor.
+
+Adres alanı hâlâ duruyor ve elle de yapıştırabilirsin — görsel başka bir yerde
+duruyorsa (tasarımcının verdiği bağlantı gibi) o yol da açık. Görselsiz de
+olur: kart görselsiz düzgün görünüyor, kırık resim simgesi çıkmıyor.
+
+> ⚠️ Yüklediğin görseller **herkese açık** bir alanda duruyor — açılış sayfası
+> onları giriş yapılmadan gösterdiği için başka türlüsü mümkün değil. Oraya
+> yalnızca duyuru görseli koy; üye fotoğrafı, sağlık belgesi gibi şeyleri asla.
+
+---
+
+## 3b. Üye kayıtları — bekleyen istekleri onaylamak
+
+Üye `nonstopstudio.tr/uye/` adresinden **kendisi kayıt oluyor**: e-posta, şifre,
+ad ve telefon bırakıyor. Kayıt olması tek başına ona **hiçbir şey açmıyor** —
+hesabını üyelik kaydına bağlayana kadar kendi verisi dahil hiçbir şey göremiyor.
+
+Panelde **Üye Hesapları** sekmesinde "Bekleyen kayıt istekleri" listesi var:
+
+1. Kişinin adı, telefonu, e-postası ve notu görünüyor.
+2. Yanındaki listede **telefonu tutan üye önceden seçili** geliyor — telefon
+   salonda tekil olduğu için en güvenilir ipucu bu. Doğruluğunu sen onaylıyorsun.
+3. **Bağla** dersen hesap o üyeliğe bağlanıyor ve kişi anında kendi paketini,
+   ölçümlerini görmeye başlıyor.
+4. **Reddet** dersen istek listeden düşüyor.
+
+> **Neden otomatik değil:** e-postaya bakıp otomatik bağlamak denendi ve
+> reddedildi. Üye kaydındaki e-posta hem boş olabiliyor hem de tekil değil — tek
+> bir yazım hatası, birinin sağlık verisini başka birine açardı. Bu bir erişim
+> kararı ve kararı insan veriyor.
+
+**Bunun çalışması için bir ayar gerekiyor** (bir kerelik): deponun
+Settings → Secrets and variables → Actions bölümüne `SUPABASE_TENANT_ID`
+adıyla salon kimliğini eklemen lazım. Değeri panelde **Üye Hesapları →
+"Site kayıt ayarı (salon kimliği)"** başlığının altında yazıyor; oradan
+kopyalayabilirsin. Eklemezsen site açılır, giriş çalışır, yalnızca **kayıt
+formu** kapalı kalır ve ekranda bunu söyler.
 
 ---
 
@@ -158,24 +188,30 @@ kuruldu, `nonstopstudio.tr` bağlandı.
 **Faz 3 — açılış sayfası.** Marka, branşlar, iletişim, etkinlik vitrini.
 Fotoğraflar ve logo yerleşti.
 
+**Faz 4 — üye alanı** (`/uye/`). Üye giriş yapıp kendi paket durumunu (kalan
+seans, üyelik bitişi, ödenen tutar), eğitmeninin kaydettiği ölçümleri görüyor ve
+sağlık durumundaki değişiklikleri bildiriyor. Sağlık beyanı **üzerine
+yazmıyor**: her bildirim ayrı bir kayıt ve geçmiş duruyor.
+
+**Faz 5 — panelde iki yeni bölüm.** *Duyurular* ve *Üye hesapları*.
+
+**Faz 6 — üye kayıt akışı ve görsel yükleme.** Üye kendisi kayıt oluyor, sen
+panelden onaylıyorsun; duyuru görselleri panelden yükleniyor. (Yukarıdaki
+3. ve 3b. bölümler.)
+
 ### ⏳ Sırada
 
-**Faz 4 — üye alanı** (`/uye/`). Üye giriş yapıp kendi paket durumunu (kalan
-seans, üyelik bitişi, ödeme durumu), eğitmeninin kaydettiği ölçümleri görüyor ve
-sağlık durumundaki değişiklikleri bildiriyor. Şu an yer tutucu sayfa var.
-
-**Faz 5 — panelde iki yeni bölüm.**
-- *Duyurular*: etkinlik girip yayınlama (yukarıdaki bölüm).
-- *Üye hesapları*: bir üyeyi bir hesaba bağlama. Üye alanının çalışması buna
-  bağlı — bağ kurulmadan üye hiçbir veri göremiyor, ve bu bilinçli.
+Sitenin planlanan işleri bitti. Bundan sonrası isteğe bağlı ekler ve aşağıdaki
+"sende bekleyenler" listesi.
 
 ### 📌 Sende bekleyenler
 
 | Konu | Ne gerekiyor |
 |---|---|
-| **E-posta riski** | `MX` kaydı hâlâ alan adının kendisini gösteriyor, o da artık GitHub'a bakıyor. Bu alan adıyla e-posta kullanıyorsan mailler geri döner. Turhost'tan gerçek posta sunucusu adresini alıp `MX`'i ona çevirmen gerekiyor. |
+| **`SUPABASE_TENANT_ID` gizli anahtarı** | Üye kayıt formunun açılması için. Değeri panelde Üye Hesapları sekmesinin altında yazıyor; Settings → Secrets → Actions'a ekle. |
+| **Supabase'de `0006` migrasyonu** | Kayıt isteği tablosu ve görsel kovası bu dosyada. Supabase panelinde SQL Editor'e `supabase/migrations/0006_member_signup_and_storage.sql` içeriğini yapıştırıp çalıştır. Yapılmazsa kayıt ve görsel yükleme çalışmaz (ekran sebebini söyler). |
+| **E-posta riski** | `MX` kaydı hâlâ alan adının kendisini gösteriyor, o da artık GitHub'a bakıyor. Bu alan adıyla e-posta kullanıyorsan mailler geri döner. Turhost'tan gerçek posta sunucusu adresini alıp `MX`'i ona çevirmen gerekiyor. `mail.nonstopstudio.tr` de aynı yere baktığı için onu göstermek çözüm değil. |
 | **Yayın anahtarı** | Android uygulamasının mağaza sürümü için. Adımlar `docs/yayin.md` içinde. Anahtarı **yedekle** — kaybı geri dönüşsüz. |
-| **Görsel yükleme kararı** | Yukarıdaki üç seçenekten biri. |
 | **Telefon, çalışma saatleri, açık adres** | Siteye eklenecek. |
 | **Yatay salon fotoğrafı** | Açılış ekranı için (isteğe bağlı). |
 

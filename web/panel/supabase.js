@@ -209,6 +209,10 @@ export class SupabaseClient {
    * Üye, paket, randevu, defter gibi tablolara buradan yazılmıyor ve
    * yazılmamalı.
    *
+   * (`member_link_requests` de bu listeye katıldı: üyenin kendi yazdığı kayıt
+   * isteğini personel yalnızca "bağlandı/reddedildi" olarak işaretliyor. İş
+   * kuralı yok, erişim kararı var.)
+   *
    * @param {string} tablo hedef tablo
    * @param {object} govde yazılacak alanlar
    * @param {?string} eslesme `id=eq.xxx` gibi bir süzgeç; verilirse GÜNCELLEME
@@ -251,6 +255,15 @@ export class SupabaseClient {
       return { tur: "yetkisiz", mesaj: "Bu işlem için yetkiniz yok." };
     }
 
+    // 409: tekillik kısıtı. Ayrı ele alınıyor çünkü tek başına bir HATA
+    // olmayabilir — hesap bağlama akışında bunun anlamı "bu bağ zaten var",
+    // yani işlem yarım kalmış bir denemeden sonra tekrarlanıyor. Ham PostgREST
+    // metni ("duplicate key value violates unique constraint …") kullanıcıya
+    // gösterilecek bir şey değil.
+    if (yanit.status === 409) {
+      return { tur: "cakisma", mesaj: "Bu kayıt zaten var." };
+    }
+
     if (!yanit.ok) {
       const metin = await yanit.text().catch(() => "");
       return { tur: "hata", mesaj: `Kaydedilemedi (${yanit.status}): ${metin.slice(0, 200)}` };
@@ -258,4 +271,110 @@ export class SupabaseClient {
 
     return { tur: "tamam" };
   }
+
+  /**
+   * Duyuru görselini Supabase Storage'a yükler ve herkese açık adresini döndürür.
+   *
+   * ### Neden dosya adı korunmuyor
+   * Yüklenen ad tamamen atılıyor, yalnızca uzantısı alınıyor. Sebep dosya
+   * adlarının nesne yolunun parçası olması: Türkçe harf, boşluk ve `..` gibi
+   * şeyler ya adresi bozar ya da yolu oynatır. Üstelik iki kişi aynı gün
+   * "etkinlik.jpg" yüklerse ikincisi birincisinin görselini ezerdi — sitedeki
+   * duyuru sessizce başka bir resme dönerdi.
+   *
+   * ### Neden kova salon klasörüne ayrılıyor
+   * Yol `<salon>/<zaman>-<rastgele>.<uzantı>`. Bu bir GÜVENLİK sınırı değil —
+   * kova herkese açık ve kuralları yola bakmıyor (bkz. migrasyon 0006) — sadece
+   * düzen: hangi görselin hangi salona ait olduğu dosya listesinden görünüyor.
+   *
+   * @param {File} dosya `<input type=file>` üzerinden seçilen dosya
+   * @param {string} salonId nesne yolunun ilk parçası
+   */
+  async dosyaYukle(dosya, salonId) {
+    const oturum = this.oturumOku();
+    if (!oturum) return { tur: "oturumsuz" };
+    if (Date.now() >= oturum.expires_at_ms) {
+      this.oturumSil();
+      return { tur: "oturumsuz" };
+    }
+
+    const kontrol = gorselKontrol(dosya);
+    if (kontrol) return { tur: "hata", mesaj: kontrol };
+
+    const yol =
+      `${temizParca(salonId)}/${Date.now()}-` +
+      `${Math.random().toString(36).slice(2, 8)}.${uzanti(dosya.name)}`;
+
+    const yanit = await fetch(`${this.url}/storage/v1/object/${KOVA}/${yol}`, {
+      method: "POST",
+      headers: {
+        apikey: this.anonKey,
+        Authorization: `Bearer ${oturum.access_token}`,
+        // Tarayıcının seçtiği tür olduğu gibi gönderiliyor; Storage bunu
+        // saklıyor ve görsel indirilirken aynı başlıkla dönüyor.
+        "Content-Type": dosya.type || "application/octet-stream",
+      },
+      body: dosya,
+    }).catch(() => null);
+
+    if (!yanit) return { tur: "hata", mesaj: "Sunucuya ulaşılamadı." };
+    if (yanit.status === 401) {
+      this.oturumSil();
+      return { tur: "oturumsuz" };
+    }
+    if (yanit.status === 403) {
+      return {
+        tur: "yetkisiz",
+        mesaj: "Görsel yükleme yetkiniz yok (yönetici veya müdür gerekiyor).",
+      };
+    }
+    if (yanit.status === 404) {
+      // Kova yoksa 404 dönüyor ve bu, kullanıcının düzeltebileceği bir şey
+      // değil: migrasyon 0006 Supabase'e uygulanmamış demek.
+      return {
+        tur: "hata",
+        mesaj: `"${KOVA}" kovası bulunamadı — sunucuda 0006 migrasyonu uygulanmamış olabilir.`,
+      };
+    }
+    if (!yanit.ok) {
+      const metin = await yanit.text().catch(() => "");
+      return { tur: "hata", mesaj: `Yüklenemedi (${yanit.status}): ${metin.slice(0, 200)}` };
+    }
+
+    return { tur: "tamam", adres: `${this.url}/storage/v1/object/public/${KOVA}/${yol}` };
+  }
 }
+
+/** Duyuru görsellerinin kovası (migrasyon 0006). */
+const KOVA = "duyuru-gorselleri";
+
+/** Kabul edilen uzantılar. Liste dar tutuluyor: kova herkese açık. */
+const GORSEL_UZANTILARI = new Set(["jpg", "jpeg", "png", "webp", "avif", "gif"]);
+
+/** 5 MB. Sitede kart görseli olarak kullanılıyor; daha büyüğü sayfayı yavaşlatır. */
+const EN_BUYUK_BAYT = 5 * 1024 * 1024;
+
+const uzanti = (ad) => String(ad || "").split(".").pop().toLowerCase();
+
+/** Yol parçasındaki tehlikeli karakterleri eler (`/`, `..`, boşluk …). */
+const temizParca = (s) => String(s || "salon").replace(/[^a-zA-Z0-9_-]/g, "") || "salon";
+
+/**
+ * Dosya kabul edilebilir mi; değilse **sebebi** döner.
+ *
+ * Sunucuya gitmeden bakılıyor: 20 MB'lık bir dosyayı yükleyip reddedilmesini
+ * beklemek, hatayı öğrenmenin en yavaş yolu olurdu.
+ */
+function gorselKontrol(dosya) {
+  if (!dosya) return "Dosya seçilmedi.";
+  if (!GORSEL_UZANTILARI.has(uzanti(dosya.name))) {
+    return `Yalnızca görsel yüklenebilir (${[...GORSEL_UZANTILARI].join(", ")}).`;
+  }
+  if (dosya.size > EN_BUYUK_BAYT) {
+    const mb = (dosya.size / 1024 / 1024).toFixed(1);
+    return `Dosya çok büyük (${mb} MB). En fazla 5 MB olmalı.`;
+  }
+  return null;
+}
+
+export { gorselKontrol, KOVA };
