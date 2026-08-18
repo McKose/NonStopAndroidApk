@@ -1,0 +1,89 @@
+/* Üye alanına özgü eklemeler.
+ *
+ * Temel palet ve bileşenler `site.css`ten geliyor — üye alanı sitenin parçası,
+ * ayrı bir ürün değil. Burada yalnızca panelde olmayan birkaç şey var. */
+
+.uye-baslik {
+  margin: 0 0 14px;
+  font-size: clamp(26px, 4vw, 38px);
+  letter-spacing: -.01em;
+}
+
+/* Form kartı: giriş ve sağlık beyanı aynı düzeni paylaşıyor. */
+.uye-form {
+  display: grid;
+  gap: 14px;
+  max-width: 560px;
+  margin-top: 22px;
+}
+.uye-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--soluk);
+}
+.uye-form input,
+.uye-form textarea {
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--metin);
+  background: var(--zemin);
+  border: 1px solid var(--kenar);
+  border-radius: 8px;
+}
+.uye-form textarea { resize: vertical; }
+.uye-form input:focus-visible,
+.uye-form textarea:focus-visible {
+  outline: 2px solid var(--altin);
+  outline-offset: 2px;
+}
+.uye-form button { justify-self: start; }
+
+/* Açık rıza onayı: yatay ve okunur. Diğer etiketler ızgara olduğu için
+   varsayılan düzen onay kutusunu metnin üstüne atardı. */
+.riza {
+  display: flex !important;
+  gap: 10px;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+.riza input { margin-top: 3px; }
+
+/* Ölçüm tablosu telefonda taşmasın: sayfa değil tablo kaysın. */
+.tablo-sar { overflow-x: auto; }
+.tablo-sar table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.tablo-sar th,
+.tablo-sar td {
+  padding: 10px 12px;
+  text-align: start;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--kenar);
+}
+.tablo-sar th { color: var(--soluk); font-weight: 500; }
+
+.kutular {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+.kutu {
+  padding: 16px 18px;
+  background: var(--yuzey);
+  border: 1px solid var(--kenar);
+  border-top: 2px solid var(--altin-koyu);
+  border-radius: var(--yuvarlak);
+}
+.kutu strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 21px;
+  font-variant-numeric: tabular-nums;
+}
+
+#uye-adi { align-self: center; }

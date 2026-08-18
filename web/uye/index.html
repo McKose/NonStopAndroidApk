@@ -7,20 +7,12 @@
   <meta name="robots" content="noindex">
   <link rel="icon" href="../varliklar/nonstop-gym.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../site.css">
+  <link rel="stylesheet" href="uye.css">
+
+  <script>window.NONSTOP_CONFIG = null;</script>
+  <script src="config.js" onerror="window.__configYok = true"></script>
 </head>
 <body>
-
-<!--
-  Üye alanının yer tutucusu.
-
-  Açılış sayfasındaki "Üye Girişi" düğmesinin 404 vermemesi için var. Boş bir
-  sayfa ya da kırık bir bağlantı, siteyi yarım bırakılmış gösterirdi; burada ne
-  olduğunu ve ne zaman açılacağını söylüyor.
-
-  Sunucu tarafı HAZIR (migrasyon 0005): üye hesabı bağı, kendi paket ve ölçüm
-  kayıtlarına erişim kuralları ve sağlık beyanı tablosu kuruldu ve sınandı.
-  Eksik olan yalnızca bu ekran — Faz 4.
--->
 
 <header class="ust">
   <a class="marka" href="../" aria-label="Non Stop GYM ana sayfa">
@@ -28,33 +20,86 @@
     <span class="marka-ad">Non Stop <strong>GYM</strong></span>
   </a>
   <div class="ust-girisler" style="margin-inline-start:auto">
+    <span id="uye-adi" class="alt" hidden></span>
+    <button id="cikis" class="dugme dugme-ikincil" hidden>Çıkış</button>
     <a class="dugme dugme-ikincil" href="../">Ana sayfa</a>
   </div>
 </header>
 
 <main>
-  <section class="bolum">
+  <!-- ─── Giriş ─────────────────────────────────────────────────────────── -->
+  <section id="giris" class="bolum" hidden>
     <p class="ust-baslik">Üye alanı</p>
-    <h1 style="margin:0 0 16px;font-size:clamp(28px,4vw,40px)">Çok yakında</h1>
-
-    <p style="max-width:56ch;color:var(--soluk)">
-      Üye girişi hazırlanıyor. Açıldığında buradan paket durumunuzu (kalan
-      seans, üyelik bitişi), eğitmeninizin kaydettiği ölçümlerinizi
-      görebilecek ve sağlık durumunuzdaki değişiklikleri bize
-      iletebileceksiniz.
+    <h1 class="uye-baslik">Giriş yapın</h1>
+    <p class="alt" style="max-width:52ch">
+      Paket durumunuzu, ölçümlerinizi görebilir ve sağlık bilgilerinizdeki
+      değişiklikleri bildirebilirsiniz.
     </p>
 
-    <p style="max-width:56ch;color:var(--soluk)">
-      Hesabınız salon tarafından oluşturulup üyeliğinize bağlanacak; ayrıca
-      bir kayıt işlemi yapmanıza gerek yok.
-    </p>
+    <form id="giris-formu" class="kart uye-form">
+      <label>E-posta
+        <input type="email" name="eposta" autocomplete="username" required>
+      </label>
+      <label>Şifre
+        <input type="password" name="sifre" autocomplete="current-password" required>
+      </label>
+      <button type="submit" id="giris-dugmesi" class="dugme dugme-birincil">Giriş yap</button>
+      <p id="giris-hata" class="hata" hidden></p>
+    </form>
 
-    <div class="kahraman-dugmeler" style="margin-top:26px">
-      <a class="dugme dugme-birincil dugme-buyuk"
-         href="https://www.instagram.com/nonstopkartepe"
-         target="_blank" rel="noopener noreferrer">Instagram'dan haberdar olun</a>
-      <a class="dugme dugme-ikincil dugme-buyuk" href="../">Ana sayfaya dön</a>
+    <p class="alt" style="max-width:52ch;margin-top:20px">
+      Hesabınız yoksa ya da giriş yapamıyorsanız salonla iletişime geçin —
+      hesaplar salon tarafından oluşturulup üyeliğinize bağlanıyor.
+    </p>
+  </section>
+
+  <!-- ─── Ayar eksik ────────────────────────────────────────────────────── -->
+  <section id="ayar-eksik" class="bolum" hidden>
+    <h1 class="uye-baslik">Kurulum tamamlanmamış</h1>
+    <p class="alt">Sunucu bağlantı bilgisi eksik. Salonla iletişime geçin.</p>
+  </section>
+
+  <!-- ─── Bağlanmamış hesap ─────────────────────────────────────────────── -->
+  <!--
+    Giriş başarılı ama hesap bir üyelik kaydına bağlanmamış. Bu boş bir ekran
+    olarak gösterilemez: kullanıcı verisinin kaybolduğunu sanar. Yapılacak iş
+    salonda ve bunu söylüyoruz.
+  -->
+  <section id="baglanmamis" class="bolum" hidden>
+    <h1 class="uye-baslik">Hesabınız henüz bağlanmamış</h1>
+    <p class="alt" style="max-width:56ch">
+      Giriş yaptınız, ancak hesabınız bir üyelik kaydına bağlı değil. Bu işlemi
+      salon yapıyor — bize ulaştığınızda kısa sürede tamamlanıyor. Bağlandıktan
+      sonra paket durumunuz ve ölçümleriniz burada görünecek.
+    </p>
+    <div class="kahraman-dugmeler" style="margin-top:22px">
+      <a class="dugme dugme-birincil" href="https://www.instagram.com/nonstopkartepe"
+         target="_blank" rel="noopener noreferrer">Bize ulaşın</a>
     </div>
+  </section>
+
+  <!-- ─── Üye panosu ────────────────────────────────────────────────────── -->
+  <section id="pano" class="bolum" hidden>
+    <p id="pano-hata" class="hata" hidden></p>
+
+    <h2 class="bolum-baslik">Üyeliğim</h2>
+    <div id="paket-kutulari" class="kutular"></div>
+
+    <h2 class="bolum-baslik" style="margin-top:36px">Ölçümlerim</h2>
+    <p class="alt" style="margin-top:-22px;margin-bottom:22px">
+      Eğitmeninizin kaydettiği ölçümler. Değiştirilemez.
+    </p>
+    <div id="olcumler"></div>
+
+    <h2 class="bolum-baslik" style="margin-top:36px">Sağlık bilgilerim</h2>
+    <p class="alt" style="margin-top:-22px;margin-bottom:22px">
+      Sağlık durumunuzda bir değişiklik olduysa buradan bildirin. Bildirdikleriniz
+      eğitmeninize iletilir ve geçmişe dönük olarak saklanır — önceki
+      bildirimlerinizin üzerine yazılmaz.
+    </p>
+    <form id="saglik-formu" class="kart uye-form"></form>
+
+    <div id="beyan-gecmisi" style="margin-top:28px"></div>
   </section>
 </main>
 
@@ -62,5 +107,6 @@
   <p>© Non Stop Studio — Kartepe</p>
 </footer>
 
+<script type="module" src="uye.js"></script>
 </body>
 </html>
