@@ -102,13 +102,17 @@ jobs:
             mkdir -p "_site/$(dirname "$dosya")"
             cp "web/$dosya" "_site/$dosya"
           done < /tmp/yayin-listesi.txt
-          # `CNAME` özel alan adını GitHub Pages'e söyleyen dosya. Türetmeye
-          # girmiyor çünkü hiçbir sayfa ona referans vermiyor — bir yayın
-          # yapılandırması, sayfa varlığı değil. Bu yüzden açıkça kopyalanıyor.
+          # `CNAME` özel alan adını taşıyan dosya. Türetmeye girmiyor çünkü
+          # hiçbir sayfa ona referans vermiyor — bir yayın yapılandırması,
+          # sayfa varlığı değil. Bu yüzden açıkça kopyalanıyor.
           #
-          # Eksik kalırsa Pages her yayında özel alan adı ayarını SIFIRLIYOR ve
-          # site github.io adresine döner; belirtisi de "alan adı bir gün
-          # çalışıp ertesi gün çalışmaması" oluyor.
+          # DİKKAT: bu dosya tek başına YETMİYOR. Actions ile yayınlanan bir
+          # sitede alan adının yetkili kaynağı Settings → Pages; yapıtın
+          # içindeki CNAME onu kaydetmiyor. 18.08.2026'da bu yüzden yayın yeşil
+          # bitti ama site alan adında 404 verdi. Dosya yine de kopyalanıyor
+          # (dal tabanlı yayına düşülürse gerekiyor) ve aşağıdaki son adım,
+          # ayarın gerçekten etkin olup olmadığını yayın adresinden kontrol
+          # ediyor.
           if [ -f web/CNAME ]; then
             cp web/CNAME _site/CNAME
             echo "Özel alan adı: $(cat _site/CNAME)"
@@ -171,3 +175,42 @@ jobs:
       - name: Yayınla
         id: dagitim
         uses: actions/deploy-pages@v4
+
+      # Yayınlanan adres beklenen alan adı mı?
+      #
+      # 18.08.2026'da tam olarak şu yaşandı: yayın YEŞİL bitti, bütün dosyalar
+      # (CNAME dâhil) doğru gönderildi, ama site `nonstopstudio.tr` adresinde
+      # "There isn't a GitHub Pages site here" verdi. Sebep, Pages ayarlarındaki
+      # **özel alan adı** kaydının düşmüş olmasıydı; günlükteki tek belirti
+      # `Evaluated environment url: https://mckose.github.io/...` satırıydı ve
+      # onu kimse okumuyordu.
+      #
+      # Buradaki ders şu: yapıtın içindeki `CNAME` dosyası, Actions ile
+      # yayınlanan bir sitede alan adını KENDİ BAŞINA kaydetmiyor — yetkili
+      # kaynak Settings → Pages. Dosya yine de duruyor (dal tabanlı yayına
+      # düşülürse gerekiyor), ama ona güvenmek yetmiyor.
+      #
+      # Bu adım işi DÜŞÜRMÜYOR: site github.io adresinde gerçekten yayında ve
+      # yayını kırmızıya boyamak, çalışan bir dağıtımı başarısız göstermek
+      # olurdu. Yaptığı şey, sessiz olanı görünür kılmak.
+      - name: Özel alan adı gerçekten etkin mi
+        if: always() && steps.dagitim.outcome == 'success'
+        env:
+          YAYIN_ADRESI: ${{ steps.dagitim.outputs.page_url }}
+        run: |
+          if [ ! -f web/CNAME ]; then
+            echo "web/CNAME yok — özel alan adı beklenmiyor, kontrol atlandı."
+            exit 0
+          fi
+          beklenen=$(tr -d '[:space:]' < web/CNAME)
+          echo "Beklenen alan adı : $beklenen"
+          echo "Yayınlanan adres  : $YAYIN_ADRESI"
+
+          case "$YAYIN_ADRESI" in
+            *"$beklenen"*)
+              echo "Özel alan adı etkin."
+              ;;
+            *)
+              echo "::warning title=Özel alan adı etkin değil::Site \"$beklenen\" yerine $YAYIN_ADRESI adresinde yayınlandı. Settings → Pages → Custom domain alanına \"$beklenen\" yazıp kaydedin; DNS kontrolü geçtikten sonra Enforce HTTPS'i işaretleyin. Alan adına giren ziyaretçiler o ana kadar GitHub'ın 404 sayfasını görür."
+              ;;
+          esac
