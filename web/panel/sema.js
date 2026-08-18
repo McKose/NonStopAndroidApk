@@ -65,6 +65,21 @@ export function sunucuSemasi() {
  * sayardı.
  */
 function kolonlariAyikla(govde) {
+  // Yorumlar virgülle bölmeden ÖNCE atılıyor.
+  //
+  // Sonra atılırsa yorumun içindeki bir virgül kolonu ikiye böler ve ikinci
+  // parçanın ilk kelimesi kolon adı sanılır. Gerçekte olan buydu:
+  //
+  //     -- `on delete set null` değil, kasıtlı olarak kısıt yok.
+  //     linked_by    uuid,
+  //
+  // Yorumdaki virgül parçayı bölüyor, ikinci parça "kasıtlı olarak kısıt
+  // yok. linked_by uuid" oluyor, ilk kelime "kasıtlı" olarak okunuyor ve
+  // `\w` sınamasından geçemediği için ELENİYOR. Sonuç: `linked_by` şemada
+  // görünmez oluyordu — sessizce. Bunu yakalayan şey demo verisi kontrolü
+  // oldu; kolonun kendisi hiçbir yerde hata vermiyordu.
+  govde = govde.replace(/--[^\n]*/g, "");
+
   const kolonlar = [];
   let derinlik = 0;
   let parca = "";

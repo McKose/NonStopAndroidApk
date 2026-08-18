@@ -37,6 +37,15 @@
 
 * { box-sizing: border-box; }
 
+/* `hidden` özniteliği her zaman kazanmalı.
+ *
+ * Tarayıcının varsayılanı `[hidden] { display: none }` ama bu, yazarın
+ * belirlediği bir `display`e YENİLİYOR — `.dugme { display: inline-block }`
+ * gibi. Sonuç: `hidden` yazılmış bir düğme ekranda durmaya devam ediyor.
+ * Üye alanındaki "Çıkış" düğmesi tam olarak böyle görünüyordu: giriş
+ * yapılmamışken bile ortadaydı. */
+[hidden] { display: none !important; }
+
 html { scroll-behavior: smooth; }
 
 body {

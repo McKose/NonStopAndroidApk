@@ -28,6 +28,9 @@ let aktifSekme = "ozet";
 /** Giriş yapan kişinin rolü; sekme görünürlüğü buna bağlı. */
 let aktifRol = null;
 
+/** Giriş yapan kişinin salonu; yeni satır yazarken `tenant_id` buradan. */
+let aktifTenant = null;
+
 /**
  * Sunucudan gelen ham satırlar, açık olan sekme için.
  *
@@ -90,6 +93,7 @@ function paneliAc(oturum) {
   $("kullanici").textContent = oturum.email || "";
   $("rol").textContent = rolEtiketi(oturum.role);
   aktifRol = oturum.role;
+  aktifTenant = oturum.gym_id;
   sekmeleriRoleGoreAyarla();
   goster("panel");
   sekmeYukle(aktifSekme);
@@ -172,6 +176,8 @@ const CIZIMLER = {
   satislar: { ciz: satislariCiz },
   personel: { ciz: personeliCiz },
   finans: { ciz: finansiCiz },
+  duyurular: { ozel: duyurulariYukle },
+  "uye-hesaplari": { ozel: uyeHesaplariYukle },
 };
 
 const SEKMELER = Object.fromEntries(
@@ -571,6 +577,270 @@ function hakedisYaz(basisPoints) {
   return `%${(sayi / 100).toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
 }
 
+// ─── Duyurular ──────────────────────────────────────────────────────────────
+
+/**
+ * Duyurular: herkese açık sitenin etkinlik vitrinini besleyen bölüm.
+ *
+ * Panelin **yazan** ilk bölümü. Panel bilinçli olarak salt okunurdu ve gerekçe
+ * hâlâ geçerli: uygulamadaki yazma yolları iş kuralları taşıyor ve o kurallar
+ * ortak Kotlin modülünde. Burada kopyalanan bir kural YOK — `announcements`
+ * tablosunu uygulama hiç bilmiyor, okumuyor, yazmıyor. Ayrım `supabase.js`
+ * içindeki `yaz` yönteminde de yazılı.
+ */
+async function duyurulariYukle(ad) {
+  const sonuc = await istemci.oku("announcements", { order: "sort_order.asc" });
+  if (sonuc.tur === "oturumsuz") {
+    hataYaz("giris-hata", "Oturumunuzun süresi doldu, tekrar giriş yapın.");
+    return goster("giris");
+  }
+  if (sonuc.tur !== "tamam") return hataYaz("panel-hata", sonuc.mesaj);
+  if (ad !== aktifSekme) return;
+
+  const kap = document.createElement("div");
+  kap.appendChild(duyuruFormu());
+
+  const satirlar = silinmemisler(sonuc.satirlar);
+  const baslik = document.createElement("h2");
+  baslik.textContent = "Mevcut duyurular";
+  kap.appendChild(baslik);
+
+  if (satirlar.length === 0) {
+    const bos = document.createElement("p");
+    bos.className = "alt";
+    bos.textContent = "Henüz duyuru yok. Yukarıdaki formla ekleyebilirsiniz.";
+    kap.appendChild(bos);
+  } else {
+    kap.appendChild(tabloYap(
+      ["Başlık", "Tür", "Yayın", "Başlangıç", "Bitiş", ""],
+      satirlar.map((d) => [
+        d.title,
+        turEtiketi(d.kind),
+        d.is_published
+          ? { rozet: "aktif", metin: "Yayında" }
+          : { rozet: "donduruldu", metin: "Taslak" },
+        tarihYaz(d.starts_at_ms),
+        tarihYaz(d.ends_at_ms),
+        yayinDugmesi(d),
+      ]),
+    ));
+  }
+
+  $("icerik").appendChild(kap);
+}
+
+/** Yeni duyuru formu. */
+function duyuruFormu() {
+  const form = document.createElement("form");
+  form.className = "kart";
+  form.style.marginBottom = "24px";
+
+  const baslik = document.createElement("h2");
+  baslik.textContent = "Yeni duyuru";
+  form.appendChild(baslik);
+
+  const alanlar = {};
+  const ekle = (ad, etiket, tur = "text") => {
+    const l = document.createElement("label");
+    l.textContent = etiket;
+    const i = tur === "textarea" ? document.createElement("textarea") : document.createElement("input");
+    if (tur !== "textarea") i.type = tur;
+    if (tur === "textarea") i.rows = 3;
+    l.appendChild(i);
+    form.appendChild(l);
+    alanlar[ad] = i;
+  };
+
+  ekle("title", "Başlık");
+  ekle("body", "Metin", "textarea");
+
+  const turL = document.createElement("label");
+  turL.textContent = "Tür";
+  const tur = document.createElement("select");
+  for (const [deger, metin] of [["EVENT", "Etkinlik"], ["AD", "Kampanya"], ["NOTICE", "Duyuru"]]) {
+    const o = document.createElement("option");
+    o.value = deger;
+    o.textContent = metin;
+    tur.appendChild(o);
+  }
+  turL.appendChild(tur);
+  form.appendChild(turL);
+  alanlar.kind = tur;
+
+  ekle("starts", "Başlangıç tarihi (boş bırakılabilir)", "date");
+  ekle("ends", "Bitiş tarihi — bu tarihte siteden kendiliğinden kalkar", "date");
+  ekle("image_url", "Görsel adresi (isteğe bağlı)");
+
+  const yayinL = document.createElement("label");
+  yayinL.style.flexDirection = "row";
+  yayinL.style.alignItems = "center";
+  const yayin = document.createElement("input");
+  yayin.type = "checkbox";
+  yayinL.append(yayin, document.createTextNode(" Hemen yayınla"));
+  form.appendChild(yayinL);
+  alanlar.is_published = yayin;
+
+  const dugme = document.createElement("button");
+  dugme.type = "submit";
+  dugme.textContent = "Kaydet";
+  form.appendChild(dugme);
+
+  const durum = document.createElement("p");
+  durum.className = "alt";
+  form.appendChild(durum);
+
+  form.addEventListener("submit", async (olay) => {
+    olay.preventDefault();
+    if (dugme.disabled) return;
+
+    // Başlıksız duyuru sitede boş bir kart olurdu.
+    if (!alanlar.title.value.trim()) {
+      durum.textContent = "Başlık gerekli.";
+      return;
+    }
+
+    dugme.disabled = true;
+    durum.textContent = "Kaydediliyor…";
+
+    const simdi = Date.now();
+    const sonuc = await istemci.yaz("announcements", {
+      // Kimlik istemcide üretiliyor; tablo `text primary key` ve uygulamanın
+      // geri kalanında da desen bu.
+      id: `duyuru-${simdi}-${Math.random().toString(36).slice(2, 8)}`,
+      tenant_id: aktifTenant,
+      title: alanlar.title.value.trim(),
+      body: alanlar.body.value.trim(),
+      kind: alanlar.kind.value,
+      image_url: alanlar.image_url.value.trim() || null,
+      starts_at_ms: tariheCevir(alanlar.starts.value),
+      ends_at_ms: tariheCevir(alanlar.ends.value, true),
+      is_published: alanlar.is_published.checked,
+      sort_order: 0,
+      created_at_ms: simdi,
+      updated_at_ms: simdi,
+    });
+
+    dugme.disabled = false;
+
+    if (sonuc.tur === "tamam") {
+      durum.textContent = "Kaydedildi.";
+      return sekmeYukle(aktifSekme);
+    }
+    durum.textContent = sonuc.mesaj ?? "Kaydedilemedi.";
+  });
+
+  return form;
+}
+
+/** Yayına alma / yayından kaldırma düğmesi. */
+function yayinDugmesi(duyuru) {
+  const dugme = document.createElement("button");
+  dugme.className = "ikincil";
+  dugme.textContent = duyuru.is_published ? "Yayından kaldır" : "Yayınla";
+  dugme.addEventListener("click", async () => {
+    dugme.disabled = true;
+    const sonuc = await istemci.yaz(
+      "announcements",
+      { is_published: !duyuru.is_published, updated_at_ms: Date.now() },
+      `id=eq.${encodeURIComponent(duyuru.id)}`,
+    );
+    if (sonuc.tur === "tamam") return sekmeYukle(aktifSekme);
+    dugme.disabled = false;
+    hataYaz("panel-hata", sonuc.mesaj ?? "Değiştirilemedi.");
+  });
+  return dugme;
+}
+
+/**
+ * `<input type=date>` değerini epoch ms'ye çevirir.
+ *
+ * Bitiş tarihinde günün SONU alınıyor: kullanıcı "31 Aralık" yazdığında
+ * etkinliğin 31 Aralık günü boyunca görünmesini bekliyor, o günün 00:00'ında
+ * kaybolmasını değil.
+ */
+function tariheCevir(deger, gunSonu = false) {
+  if (!deger) return null;
+  const d = new Date(deger);
+  if (Number.isNaN(d.getTime())) return null;
+  if (gunSonu) d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+
+function turEtiketi(tur) {
+  switch (tur) {
+    case "EVENT": return "Etkinlik";
+    case "AD": return "Kampanya";
+    case "NOTICE": return "Duyuru";
+    default: return tur ?? "—";
+  }
+}
+
+// ─── Üye hesapları ──────────────────────────────────────────────────────────
+
+/**
+ * Üye kaydını bir Supabase hesabına bağlar.
+ *
+ * Bağ olmadan üye giriş yapsa bile HİÇBİR veri göremiyor — erişim kuralları
+ * `member_accounts` üzerinden çalışıyor (migrasyon 0005). Bu bilinçli: bağı
+ * kurmak bir erişim kararı ve salon veriyor.
+ *
+ * Hesap kimliğini elle girmek zorunda olmak kaba ama güvenli: e-posta
+ * eşleşmesiyle otomatik bağlamak reddedildi çünkü `gym_members.email` hem boş
+ * olabiliyor hem de tekil değil — bir yazım hatası başka birinin sağlık
+ * verisini açardı.
+ */
+async function uyeHesaplariYukle(ad) {
+  const [bagSonuc, uyeSonuc] = await Promise.all([
+    istemci.oku("member_accounts", { order: "linked_at_ms.desc" }),
+    istemci.oku("gym_members", { order: "full_name.asc" }),
+  ]);
+
+  for (const sonuc of [bagSonuc, uyeSonuc]) {
+    if (sonuc.tur === "oturumsuz") {
+      hataYaz("giris-hata", "Oturumunuzun süresi doldu, tekrar giriş yapın.");
+      return goster("giris");
+    }
+    if (sonuc.tur !== "tamam") return hataYaz("panel-hata", sonuc.mesaj);
+  }
+  if (ad !== aktifSekme) return;
+
+  const baglar = bagSonuc.satirlar;
+  const uyeler = silinmemisler(uyeSonuc.satirlar);
+  const bagliIdler = new Set(baglar.map((b) => b.member_id));
+
+  const kap = document.createElement("div");
+  kap.appendChild(kutular([
+    ["Üye", String(uyeler.length)],
+    ["Hesabı bağlı", String(bagliIdler.size)],
+    ["Bağlı değil", String(uyeler.filter((u) => !bagliIdler.has(u.id)).length)],
+  ]));
+
+  const aciklama = document.createElement("p");
+  aciklama.className = "alt";
+  aciklama.textContent =
+    "Üye önce nonstopstudio.tr/uye/ adresinden hesap açar; ardından buradan " +
+    "üyelik kaydına bağlanır. Bağlanmadan hiçbir veri göremez.";
+  kap.appendChild(aciklama);
+
+  const baslik = document.createElement("h2");
+  baslik.textContent = "Üyeler";
+  kap.appendChild(baslik);
+
+  kap.appendChild(tabloYap(
+    ["Ad Soyad", "Telefon", "E-posta", "Hesap durumu"],
+    uyeler.map((u) => [
+      u.full_name,
+      u.phone,
+      u.email,
+      bagliIdler.has(u.id)
+        ? { rozet: "aktif", metin: "Bağlı" }
+        : { rozet: "donduruldu", metin: "Bağlı değil" },
+    ]),
+  ));
+
+  $("icerik").appendChild(kap);
+}
+
 function kutular(ciftler) {
   const kap = document.createElement("div");
   kap.className = "kutular";
@@ -609,7 +879,10 @@ function tabloYap(basliklar, satirlar) {
       const td = document.createElement("td");
       // `textContent`, `innerHTML` değil: sunucudan gelen isimler ve notlar
       // kullanıcı girdisi ve HTML olarak yorumlanmamalı.
-      if (hucre && typeof hucre === "object" && hucre.rozet) {
+      // Hazır bir DOM düğümü (ör. satır içi düğme) doğrudan yerleştiriliyor.
+      if (hucre instanceof Node) {
+        td.appendChild(hucre);
+      } else if (hucre && typeof hucre === "object" && hucre.rozet) {
         const span = document.createElement("span");
         span.className = `rozet rozet-${hucre.rozet}`;
         span.textContent = hucre.metin;

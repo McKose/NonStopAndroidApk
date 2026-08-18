@@ -201,6 +201,36 @@ const PERSONEL = [
   deleted_at_ms: null,
 }));
 
+const DUYURULAR = [
+  ["Açık Ders: Reformer Tanışma", "Reformer pilatesi hiç denemediyseniz bu seans sizin için. Kontenjan sınırlı.", "EVENT", 3, 10, true],
+  ["Yeni Üyelere %20", "Ağustos ayı boyunca ilk üyeliğinizde geçerli.", "AD", 0, 25, true],
+  ["Salon Bakımı", "Cumartesi 09:00-12:00 arası fitness alanı kapalı olacak.", "NOTICE", 5, 6, false],
+].map(([baslik, metin, tur, baslarGun, biterGun, yayinda], i) => ({
+  id: kimlik("duyuru", i),
+  tenant_id: "demo",
+  title: baslik,
+  body: metin,
+  kind: tur,
+  image_url: null,
+  starts_at_ms: simdi + baslarGun * GUN,
+  ends_at_ms: simdi + biterGun * GUN,
+  is_published: yayinda,
+  sort_order: i,
+  created_at_ms: simdi - 5 * GUN,
+  updated_at_ms: simdi - GUN,
+  deleted_at_ms: null,
+}));
+
+// İki üyenin hesabı bağlı, kalanların değil: "Bağlı / Bağlı değil" ayrımı
+// demoda da görünsün.
+const UYE_HESAPLARI = [0, 2].map((uyeIndex) => ({
+  member_id: kimlik("uye", uyeIndex),
+  tenant_id: "demo",
+  auth_user_id: `00000000-0000-0000-0000-00000000000${uyeIndex}`,
+  linked_by: null,
+  linked_at_ms: simdi - 20 * GUN,
+}));
+
 const TABLOLAR = {
   gym_members: UYELER,
   gym_packages: PAKETLER,
@@ -210,6 +240,8 @@ const TABLOLAR = {
   stock_movements: STOK_HAREKETLERI,
   orders: SIPARISLER,
   staff: PERSONEL,
+  announcements: DUYURULAR,
+  member_accounts: UYE_HESAPLARI,
 };
 
 /**
@@ -255,6 +287,21 @@ export function demoIstemcisi() {
       // `undefined` gelir ve stok sekmesi demoda gerçekte olmayan bir yoldan
       // geçerdi.
       return { tur: "tamam", satirlar: TABLOLAR[tablo] ?? [], kesildi: false };
+    },
+
+    /**
+     * Demo modda yazma **kabul ediliyor ama kalıcı değil**.
+     *
+     * Gerçek istemciyle aynı yüzeyi taşıması şart: app.js hangisiyle
+     * çalıştığını bilmiyor ve eksik bir yöntem demoda çökmeye yol açardı.
+     *
+     * Satır listeye eklenmiyor: demo verisi sabit kalmalı ki ekranı
+     * değerlendiren kişi her açtığında aynı şeyi görsün. Formun çalıştığı,
+     * "kaydedildi" mesajının görünmesinden anlaşılıyor.
+     */
+    async yaz() {
+      if (!oturum) return { tur: "oturumsuz" };
+      return { tur: "tamam" };
     },
   };
 }

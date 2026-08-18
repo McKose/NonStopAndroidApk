@@ -191,4 +191,71 @@ export class SupabaseClient {
     // gösteriyor.
     return { tur: "tamam", satirlar, kesildi: satirlar.length >= limit };
   }
+
+  /**
+   * Satır ekler ya da günceller.
+   *
+   * ### Panel neden artık yazıyor
+   * Panel bilinçli olarak salt okunurdu ve gerekçesi geçerliliğini koruyor:
+   * uygulamadaki yazma yolları iş kuralları taşıyor (hakediş, seans düşme,
+   * defter kaydı) ve o kurallar ortak Kotlin modülünde. Panelden yazmak
+   * onların ikinci bir kopyasını burada tutmak olurdu.
+   *
+   * Bu yöntem **yalnızca** o kuralların hiç bulunmadığı iki tabloda
+   * kullanılıyor: `announcements` (herkese açık sitenin içeriği) ve
+   * `member_accounts` (üye ↔ hesap bağı). İkisi de web'e ait; uygulama
+   * ikisini de bilmiyor, okumuyor, yazmıyor. Yani kopyalanan bir kural yok.
+   *
+   * Üye, paket, randevu, defter gibi tablolara buradan yazılmıyor ve
+   * yazılmamalı.
+   *
+   * @param {string} tablo hedef tablo
+   * @param {object} govde yazılacak alanlar
+   * @param {?string} eslesme `id=eq.xxx` gibi bir süzgeç; verilirse GÜNCELLEME
+   */
+  async yaz(tablo, govde, eslesme = null) {
+    const oturum = this.oturumOku();
+    if (!oturum) return { tur: "oturumsuz" };
+    if (Date.now() >= oturum.expires_at_ms) {
+      this.oturumSil();
+      return { tur: "oturumsuz" };
+    }
+
+    const adres = eslesme
+      ? `${this.url}/rest/v1/${tablo}?${eslesme}`
+      : `${this.url}/rest/v1/${tablo}`;
+
+    const yanit = await fetch(adres, {
+      method: eslesme ? "PATCH" : "POST",
+      headers: {
+        apikey: this.anonKey,
+        Authorization: `Bearer ${oturum.access_token}`,
+        "Content-Type": "application/json",
+        // `return=minimal`: yanıt gövdesi gerekmiyor, yazma başarısı durum
+        // kodundan anlaşılıyor.
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(govde),
+    }).catch(() => null);
+
+    if (!yanit) return { tur: "hata", mesaj: "Sunucuya ulaşılamadı." };
+    if (yanit.status === 401) {
+      this.oturumSil();
+      return { tur: "oturumsuz" };
+    }
+
+    // 403: sunucudaki erişim kuralı reddetti. Ayrı ele alınıyor çünkü
+    // kullanıcının yapabileceği şey farklı — "tekrar dene" değil, "bu işlem
+    // senin rolünde yok".
+    if (yanit.status === 403) {
+      return { tur: "yetkisiz", mesaj: "Bu işlem için yetkiniz yok." };
+    }
+
+    if (!yanit.ok) {
+      const metin = await yanit.text().catch(() => "");
+      return { tur: "hata", mesaj: `Kaydedilemedi (${yanit.status}): ${metin.slice(0, 200)}` };
+    }
+
+    return { tur: "tamam" };
+  }
 }

@@ -74,6 +74,14 @@ export const SEKME_VERISI = {
     tarihAlani: "occurred_at_ms",
     tarihEtiketi: "İşlem tarihi",
   },
+
+  // ─── Panele özgü bölümler ───────────────────────────────────────────────
+  // Bu ikisi uygulamada karşılığı olmayan, web'e ait işler (bkz. roller.js).
+  // İkisi de YAZMA yapıyor — panelin geri kalanı salt okunur, ve bu ayrımın
+  // gerekçesi `supabase.js` içindeki `yaz` yönteminde yazılı: bu iki tabloda
+  // ortak Kotlin modülünde tanımlı hiçbir iş kuralı yok.
+  duyurular: { ozel: true, okunanTablolar: ["announcements"] },
+  "uye-hesaplari": { ozel: true, okunanTablolar: ["member_accounts", "gym_members"] },
 };
 
 /** `order` değerinin kolon kısmı: `"full_name.asc"` → `"full_name"`. */

@@ -35,6 +35,34 @@ export const SEKME_ROLLERI = {
   // Salonun tüm parası. Eğitmenin günlük işinde karşılığı yok ve tek ekranda
   // salonun tamamının cirosunu göstermek, göstermemekten çok soru doğuruyor.
   finans: ["ADMIN", "MANAGER"],
+
+  // ─── Panele özgü bölümler ───────────────────────────────────────────────
+  // Bu ikisinin uygulamada karşılığı YOK ve olması da gerekmiyor; ikisi de
+  // web tarafına ait işler. Roller sunucudaki yazma kurallarıyla aynı seviyede
+  // tutuluyor (migrasyon 0005: ADMIN + MANAGER) — panel sunucudan daha geniş
+  // bir kapı açsaydı kullanıcı "kaydet" deyip sessizce reddedilirdi.
+  duyurular: ["ADMIN", "MANAGER"],
+  "uye-hesaplari": ["ADMIN", "MANAGER"],
+};
+
+/**
+ * Uygulamada karşılığı olmayan bölümleri işaretler.
+ *
+ * [SEKME_HEDEFI] normalde her sekmeyi Kotlin'deki bir `AppDestination`a
+ * bağlıyor ve test bu eşleşmeyi zorunlu tutuyor. Panele özgü bir bölüm o
+ * kontrolden **gerekçesiyle** muaf tutuluyor: sessizce muaf tutmak, yarın
+ * gerçekten unutulmuş bir eşleşmeyi de görünmez yapardı.
+ */
+export const PANEL_OZEL = "PANEL_OZEL";
+
+/** Panele özgü her bölümün neden uygulamada karşılığı olmadığı. */
+export const PANEL_OZEL_GEREKCE = {
+  duyurular:
+    "Herkese açık sitenin içeriği. Uygulama duyuru göstermiyor ve göstermesi " +
+    "için sebep yok — bu bölüm siteyi besliyor.",
+  "uye-hesaplari":
+    "Üye kaydını bir Supabase hesabına bağlama. Uygulamada üye girişi diye bir " +
+    "şey yok; bağ yalnızca web'deki üye alanı için anlamlı.",
 };
 
 /**
@@ -59,6 +87,10 @@ export const SEKME_HEDEFI = {
   satislar: "MARKET",
   personel: "PERSONNEL",
   finans: "FINANCE",
+
+  // Uygulamada karşılığı yok; gerekçeleri PANEL_OZEL_GEREKCE içinde.
+  duyurular: PANEL_OZEL,
+  "uye-hesaplari": PANEL_OZEL,
 };
 
 /** Bu rol bu sekmeyi görebilir mi? */
