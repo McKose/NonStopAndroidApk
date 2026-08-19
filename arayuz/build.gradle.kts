@@ -1,0 +1,78 @@
+plugins {
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.compose.multiplatform)
+}
+
+/**
+ * Ortak arayüz: ekranlar, tema ve (i3'ten itibaren) gezinme.
+ *
+ * Ekranlar Android'de Jetpack Compose ile yazılmıştı; Compose Multiplatform
+ * aynı paket adlarını kullandığı için buraya taşınırken import'lar değişmiyor.
+ * Modül üç yerde çalışıyor:
+ *
+ *   - Android: `app` bu modüle bağlanacak (i3)
+ *   - iOS:     `iosApp` kabuğu framework üzerinden açacak (i4)
+ *   - JVM:     `masaustu` kabuğu pencere olarak açıyor — iOS simülatörü
+ *              olmayan makinelerde ekranları görmenin yolu bu
+ *
+ * ### Bu modülde ne YOK
+ * Veri erişimi ve iş kuralı yok — onlar `shared`'da ve orada kalıyor. Buradaki
+ * kod yalnızca çiziyor; durum dışarıdan geliyor (state hoisting). Bu ayrım
+ * bilinçli: arayüzü üç platformda sınamak ucuz, iş kuralını üç platformda
+ * sınamak pahalı.
+ */
+kotlin {
+    androidTarget {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+        }
+    }
+
+    jvm()
+
+    // iOS hedefleri i1'de yalnızca DERLENİYOR (klib) — framework'e i4'te,
+    // iOS kabuğu gelince bağlanacak. Derlemeyi şimdiden kurmanın sebebi,
+    // Compose Multiplatform'un Kotlin/Native tarafındaki bir uyumsuzluğu
+    // 13 ekran taşındıktan sonra değil, ilk PR'da görmek.
+    iosArm64()
+    iosSimulatorArm64()
+    iosX64()
+
+    sourceSets {
+        commonMain.dependencies {
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.ui)
+            // Ekranlar 52 yerde Material ikonu kullanıyor ve bu artefaktın
+            // multiplatform'da yaşayıp yaşamadığı bilinen bir risk
+            // (bkz. docs/ios-plani.md, madde 2). Giriş ekranındaki tek ikon
+            // o riskin turnusolü: tutmuyorsa ilk PR'da, tek dosyada görülür.
+            implementation(compose.materialIconsExtended)
+        }
+
+        // Görüntü testi: ekran gerçek Skia ile ekransız (headless) çiziliyor
+        // ve PNG olarak kaydediliyor. Pencere ya da X sunucusu GEREKMİYOR —
+        // CI'ın Linux koşucusunda da, bu geliştirme ortamında da koşuyor.
+        jvmTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(compose.desktop.currentOs)
+        }
+    }
+}
+
+android {
+    namespace = "com.gymapp.arayuz"
+    compileSdk = 36
+
+    defaultConfig {
+        minSdk = 26
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+}

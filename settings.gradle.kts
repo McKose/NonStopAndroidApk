@@ -25,3 +25,8 @@ dependencyResolutionManagement {
 rootProject.name = "GymApp"
 include(":app")
 include(":shared")
+// Ortak arayüz (Compose Multiplatform) ve onu pencere olarak açan masaüstü
+// kabuğu. Masaüstü, iOS simülatörünün yokluğunda ekranları GÖRMENİN yolu:
+// geliştirme Linux'ta, kullanıcı Windows'ta ve ikisinde de simülatör yok.
+include(":arayuz")
+include(":masaustu")

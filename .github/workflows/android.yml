@@ -56,6 +56,27 @@ jobs:
       - name: Veritabanı testleri (JVM)
         run: ./gradlew --no-daemon :shared:jvmTest
 
+      # Ortak arayüz (Compose Multiplatform) ve masaüstü kabuğu. Görüntü
+      # testleri ekranı GERÇEKTEN çiziyor — Skia ile, ekransız; pencere ya da
+      # xvfb gerekmiyor. Derlenen ama çizilmeyen ekran mümkün olduğu için
+      # derleme tek başına kanıt sayılmıyor.
+      - name: Ortak arayüz derle (Android + masaüstü)
+        run: ./gradlew --no-daemon :arayuz:compileDebugKotlinAndroid :masaustu:compileKotlinJvm
+
+      - name: Ortak arayüz görüntü testleri (ekransız çizim)
+        run: ./gradlew --no-daemon :arayuz:jvmTest
+
+      # PNG'ler yapıt olarak: ekranların nasıl göründüğü, kod çalıştırmadan
+      # buradan indirilip bakılabiliyor. `if: always()` — testler düştüğünde
+      # görüntü daha da değerli, çünkü NEDEN düştüğünü gösteriyor.
+      - name: Ekran görüntülerini yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arayuz-goruntuleri
+          path: arayuz/build/goruntuler/
+          if-no-files-found: ignore
+
       # "Yeşil" ile "koştu" aynı şey değil: kaynak dizini yanlış olsaydı görev
       # hiç test bulamaz ve yine de başarılı sayılırdı. Bu adım sonuç dosyalarını
       # sayıp sıfırsa işi düşürüyor — test altyapısının kendisi de doğrulanmalı.
@@ -462,3 +483,10 @@ jobs:
       # patlayan bir davranış farkı (yuvarlama, tarih, metin) burada yakalanır.
       - name: Ortak modül testleri (Kotlin/Native)
         run: ./gradlew --no-daemon :shared:iosSimulatorArm64Test
+
+      # Ortak ARAYÜZ de Apple hedefine derleniyor. i1'de yalnızca derleme
+      # (klib) — framework'e i4'te, iOS kabuğu gelince bağlanacak. Şimdiden
+      # buradaki sebebi: Compose Multiplatform'un Kotlin/Native tarafında bir
+      # uyumsuzluk varsa 13 ekran taşındıktan sonra değil, ilk PR'da görülsün.
+      - name: Ortak arayüz (Kotlin/Native derlemesi)
+        run: ./gradlew --no-daemon :arayuz:compileKotlinIosSimulatorArm64 :arayuz:compileKotlinIosArm64

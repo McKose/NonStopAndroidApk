@@ -28,6 +28,9 @@ room            = "2.7.1"
 # Kotlin 2.3'e çıkıldığında (artık KSP'nin de 2.3.x sürümleri var) 4.2.x'e
 # dönülebilir; o yükseltme Room/AGP/Compose'u da kapsadığı için ayrı bir dilim.
 koin            = "4.1.1"
+# Compose Multiplatform. Kotlin sürümüne (2.2.21) uyumlu olması gerekiyor;
+# uyumsuzluk yerelde görülemez (Gradle yerelde koşamıyor), CI söyler.
+composeMultiplatform = "1.9.3"
 
 # Ktor — HTTP istemcisi (Supabase'in veri API'si PostgREST üzerinden).
 #
@@ -107,3 +110,4 @@ kotlin-compose      = { id = "org.jetbrains.kotlin.plugin.compose", version.ref 
 ksp                 = { id = "com.google.devtools.ksp",            version.ref = "ksp" }
 room                = { id = "androidx.room",                      version.ref = "room" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose",                    version.ref = "composeMultiplatform" }
