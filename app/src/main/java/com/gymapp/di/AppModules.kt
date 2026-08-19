@@ -4,8 +4,10 @@ import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.db.createGymDatabase
 import com.gymapp.data.auth.CurrentUser
 import com.gymapp.data.auth.SessionManager
+import com.gymapp.data.local.preferences.AndroidTercihler
 import com.gymapp.data.local.preferences.AppPreferences
 import com.gymapp.data.sync.ArkaPlanSenkronizasyonu
+import com.gymapp.data.sync.WorkManagerSenkronizasyonu
 import com.gymapp.data.repository.AppointmentRepository
 import com.gymapp.data.repository.FinanceRepository
 import com.gymapp.data.repository.LedgerRepository
@@ -63,7 +65,9 @@ val databaseModule = module {
  * kurucular birbirinden sapamıyor.
  */
 val appModule = module {
-    single { AppPreferences(androidContext()) }
+    // Arayüze bağlanıyor: Ayarlar ekranı i3'te ortak modüle taşınacak ve orada
+    // yalnızca `AppPreferences` arayüzünü görecek. Gerçekleme platformun işi.
+    single<AppPreferences> { AndroidTercihler(androidContext()) }
 
     /**
      * Oturumdaki rolün ve personel bağlantısının tek kaynağı.
@@ -73,7 +77,7 @@ val appModule = module {
      * bkz. `CurrentUser`.
      */
     single { CurrentUser(session = get<SessionManager>().session, staffDao = get()) }
-    single { ArkaPlanSenkronizasyonu(androidContext()) }
+    single<ArkaPlanSenkronizasyonu> { WorkManagerSenkronizasyonu(androidContext()) }
 
     singleOf(::LedgerRepository)
     singleOf(::MemberRepository)

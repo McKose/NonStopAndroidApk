@@ -48,13 +48,18 @@ class SenkronizasyonIsi(
 }
 
 /**
- * Arka plan işinin kurulması ve durdurulması.
+ * [ArkaPlanSenkronizasyonu]'nun Android gerçeklemesi — WorkManager üzerinde.
+ *
+ * (i2'de yeniden adlandırıldı: `ArkaPlanSenkronizasyonu` artık `shared`'daki
+ * ortak ARAYÜZÜN adı; çağıranlar yalnızca onu görüyor. iOS ve masaüstü
+ * karşılığı `ArkaPlanYok` — orada neden hiçbir şey planlanmadığının gerekçesi
+ * arayüzün dosyasında.)
  *
  * WorkManager ayrıntılarını tek noktada tutuyor: iş adı, aralık ve kısıtlar
  * çağıran ekranlara sızmıyor. Sızsaydı iki farklı yerden farklı kısıtlarla
  * planlanabilir ve hangisinin geçerli olduğu duruma göre değişirdi.
  */
-class ArkaPlanSenkronizasyonu(private val context: Context) {
+class WorkManagerSenkronizasyonu(private val context: Context) : ArkaPlanSenkronizasyonu {
 
     /**
      * İşi planlar. Aynı iş zaten planlıysa tanımı güncellenir, zamanı sıfırlanmaz.
@@ -68,7 +73,7 @@ class ArkaPlanSenkronizasyonu(private val context: Context) {
      * Çağrılması güvenli ve tekrarlanabilir: girişte ve oturum geri
      * yüklendiğinde çağrılıyor.
      */
-    fun baslat() {
+    override fun baslat() {
         val istek = PeriodicWorkRequestBuilder<SenkronizasyonIsi>(
             ARALIK_DAKIKA, TimeUnit.MINUTES,
         )
@@ -98,7 +103,7 @@ class ArkaPlanSenkronizasyonu(private val context: Context) {
      * pil harcayan bir döngü. İşin kendisi oturumsuz durumu zaten sorunsuz
      * karşılıyor, ama en ucuz iş hiç koşmayan iştir.
      */
-    fun durdur() {
+    override fun durdur() {
         WorkManager.getInstance(context).cancelUniqueWork(IS_ADI)
     }
 
