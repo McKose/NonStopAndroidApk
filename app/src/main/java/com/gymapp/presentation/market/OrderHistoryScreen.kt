@@ -1,5 +1,7 @@
 package com.gymapp.presentation.market
 
+import com.gymapp.domain.ParaBicimi
+import com.gymapp.domain.TarihBicimi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,8 +22,6 @@ import com.gymapp.data.local.entity.OrderEntity
 import com.gymapp.domain.PaymentState
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
-import java.text.SimpleDateFormat
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,7 +71,6 @@ fun OrderHistoryScreen(
 
 @Composable
 fun OrderItem(order: OrderEntity, memberNames: Map<String, String> = emptyMap()) {
-    val sdf = remember { SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("tr")) }
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -89,7 +88,7 @@ fun OrderItem(order: OrderEntity, memberNames: Map<String, String> = emptyMap())
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "₺${String.format(Locale.getDefault(), "%,.2f", Money(order.finalPriceMinor).asDouble)}",
+                    text = ParaBicimi.tl(Money(order.finalPriceMinor)),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.ExtraBold
@@ -115,7 +114,7 @@ fun OrderItem(order: OrderEntity, memberNames: Map<String, String> = emptyMap())
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        text = sdf.format(Date(order.dateMs)),
+                        text = TarihBicimi.gunKisaAyYilSaat(order.dateMs),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray
                     )

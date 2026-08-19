@@ -1,5 +1,7 @@
 package com.gymapp.presentation.finance
 
+import com.gymapp.domain.ParaBicimi
+import com.gymapp.domain.TarihBicimi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -28,8 +30,6 @@ import org.koin.androidx.compose.koinViewModel
 import com.gymapp.presentation.common.ReadOnlyNotice
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
-import java.text.SimpleDateFormat
-import java.util.*
 
 /**
  * Finans ekranına yetkisiz gelindiğinde gösterilen ekran.
@@ -294,7 +294,7 @@ fun FinanceSummaryCard(label: String, amount: Money, icon: androidx.compose.ui.g
             Spacer(Modifier.height(8.dp))
             Text(label, style = MaterialTheme.typography.labelMedium, color = color)
             Text(
-                "₺${String.format(Locale.getDefault(), "%,.2f", amount.asDouble)}",
+                ParaBicimi.tl(amount),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = color
@@ -312,7 +312,7 @@ fun RevenueCard(label: String, amount: Money) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(label, style = MaterialTheme.typography.labelSmall)
             Text(
-                "₺${String.format(Locale.getDefault(), "%,.0f", amount.asDouble)}",
+                ParaBicimi.tlYuvarlak(amount),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -322,7 +322,6 @@ fun RevenueCard(label: String, amount: Money) {
 
 @Composable
 fun TransactionListItem(transaction: FinanceEntry) {
-    val sdf = remember { SimpleDateFormat("dd MMM, HH:mm", Locale("tr")) }
     val isIncome = transaction.isIncome
     
     val containerColor = if (transaction.isPending) {
@@ -392,7 +391,7 @@ fun TransactionListItem(transaction: FinanceEntry) {
                         color = Color.Gray,
                         modifier = Modifier.padding(end = 8.dp)
                     )
-                    Text(sdf.format(Date(transaction.occurredAtMs)), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Text(TarihBicimi.gunKisaAySaat(transaction.occurredAtMs), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 }
                 transaction.note?.let {
                     if (it.isNotBlank()) {
@@ -407,7 +406,7 @@ fun TransactionListItem(transaction: FinanceEntry) {
             }
             
             Text(
-                "${if (isIncome) "+" else "-"}₺${String.format(Locale.getDefault(), "%,.2f", transaction.amount.asDouble)}",
+                "${if (isIncome) "+" else "-"}${ParaBicimi.tl(transaction.amount)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = if (isIncome) Color(0xFF4CAF50) else Color(0xFFF44336)

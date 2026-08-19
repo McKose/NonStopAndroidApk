@@ -69,7 +69,12 @@ yaşam döngüsü farklı. Ama "ekran çiziliyor mu, akış çalışıyor mu" so
 |---|---|---|
 | i1 | `arayuz` + `masaustu` iskeleti: tema, Koin, giriş ekranının taşınmış hâli. `app/` HENÜZ dokunulmuyor. | CI: üç hedef derleniyor; masaüstü xvfb ekran görüntüsü |
 | i2 | Platform dikişleri: `AppPreferences` → `expect/actual`, `ArkaPlanSenkronizasyonu` arayüzü, `Theme.kt` ayrımı | JVM testleri |
-| i3 | 13 ekran + ViewModel'ler + gezinme `arayuz`'a; `app/` ince kabuğa iniyor | CI + masaüstü görüntüleri + Android APK'nın davranış eşitliği |
+| i3a | `app` ortak giriş ekranına bağlanıyor; i1'deki kopya siliniyor | Android derlemesi — zincirin gerçekten çalıştığının kanıtı |
+| i3-tarih | Ortak tarih biçimlendirme (`TarihBicimi`) + ekranlardaki `SimpleDateFormat`/`java.time` çağrılarının değiştirilmesi | `commonTest` — JVM **ve** Kotlin/Native'de aynı çıktı |
+| i3b | Küçük ekranlar (paketler, sipariş geçmişi, ayarlar) ~700 satır | Çizim testleri |
+| i3c | Orta ekranlar (pano, üye listesi, takvim, kayıt) ~1400 satır | Çizim testleri |
+| i3d | Büyük ekranlar (personel, finans, market, üye detayı) ~2150 satır | Çizim testleri |
+| i3e | ViewModel'ler + gezinme ortak modüle | CI |
 | i4 | `iosApp` Xcode projesi; CI'da simülatör derlemesi | macOS CI işi |
 | i5 | İmzasız `.ipa` + TestFlight yükleme iş akışı | Elle tetiklenen CI işi |
 | — | **KULLANICI:** Apple Developer üyeliği (99 $/yıl), imza sertifikaları, TestFlight | Telefonda uygulama |
@@ -107,6 +112,35 @@ sorun varsa ilk gün görünsün.
 **6. İmza olmadan telefona kurulamaz.** CI imzasız `.ipa` üretebilir ama
 iPhone 14 Pro'ya kurmak için Apple Developer hesabı + TestFlight şart. Bu
 kullanıcı adımı en geç i3 biterken başlamalı, yoksa i5 bitince beklemeye düşer.
+
+**7. i3 tek parça olamaz — bölündü (i2 sonrası eklendi).** İlk planda 13 ekran
+tek dilimdi. Yerel Gradle koşmadığı için her hata ancak CI'da görülüyor ve
+4 327 satırlık bir dilimde hatalar birikip birbirini gizler; ayrıca düşen bir
+derleme, hangi ekranın soruna yol açtığını söylemez. Dilimler ekran boyutuna
+göre büyüyen sırada (i3a → i3e): en riskli dördü (personel, finans, market,
+üye detayı) en sona bırakıldı, çünkü o noktada desen dört dilim boyunca
+sınanmış olacak.
+
+Bölmeyi mümkün kılan şey i1'deki **durum dışarıdan** (state hoisting) kararı:
+ekranlar ViewModel tanımadığı için ViewModel'lerin taşınmasını (i3e)
+beklemeden tek tek taşınabiliyorlar.
+
+**8. Tarih biçimlendirme planda hiç yoktu (i3a sonrası bulundu).** Ekranlar
+tarandığında **yedi ekran ve üç ViewModel'in** `SimpleDateFormat` ya da
+`java.time` kullandığı görüldü; ikisi de JVM'e özgü, Kotlin/Native'de yok.
+Plan bunu hesaba katmamıştı — ekranlar olduğu gibi taşınsaydı her biri iOS
+derlemesinde ayrı ayrı patlardı.
+
+Karar: biçimlendirme ekranlardan ÖNCE ortaklaştırılıyor (`TarihBicimi`,
+`shared/commonMain`) ve önce **yerinde** uygulanıyor — ekranlar `app`'te
+kalırken. Böylece değişiklik mevcut Android derlemesiyle doğrulanabiliyor ve
+taşıma işi saf bir dosya taşımasına indirgeniyor. Beş dilime dağıtılsaydı aynı
+iş beş kez yapılır ve beş kez sapma şansı doğardı.
+
+Yan kazanç: eski kodun iki yerinde `Locale.getDefault()` vardı, yani telefonu
+İngilizce olan personel "19 August 2026", Türkçe olan "19 Ağustos 2026"
+görüyordu. Ortak biçimlendirici ay adlarını açıkça taşıdığı için bu tutarsızlık
+da kapandı.
 
 ## Süre
 
