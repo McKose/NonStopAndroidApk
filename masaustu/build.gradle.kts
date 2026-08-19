@@ -24,6 +24,12 @@ kotlin {
         jvmMain.dependencies {
             implementation(project(":arayuz"))
             implementation(compose.desktop.currentOs)
+            // `desktop.currentOs` material3'ü GETİRMİYOR (eski Material'i
+            // getiriyor) ve `arayuz`'un material3'ü `implementation` olduğu
+            // için buraya sızmıyor — sızmaması da doğru: kabuk kendi
+            // kullandığı bağımlılığı kendisi bildirmeli. Main.kt tema ve
+            // Surface için material3 kullanıyor.
+            implementation(compose.material3)
         }
     }
 }
