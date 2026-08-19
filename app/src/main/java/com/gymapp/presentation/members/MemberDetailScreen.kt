@@ -1,5 +1,6 @@
 package com.gymapp.presentation.members
 
+import com.gymapp.domain.TarihBicimi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,8 +28,6 @@ import com.gymapp.domain.Money
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.SessionQuota
 import com.gymapp.domain.labelTr
-import java.text.SimpleDateFormat
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -134,7 +133,6 @@ fun MemberDetailScreen(
 
 @Composable
 fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = koinViewModel()) {
-    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
     Column(
         modifier = Modifier.padding(16.dp).fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -200,8 +198,8 @@ fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = koinViewMo
         Text("Üyelik Bilgileri", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                DetailRow(label = "Başlangıç", value = member.startDateMs?.let { dateFormat.format(Date(it)) } ?: "-")
-                DetailRow(label = "Bitiş", value = member.endDateMs?.let { dateFormat.format(Date(it)) } ?: "-")
+                DetailRow(label = "Başlangıç", value = member.startDateMs?.let { TarihBicimi.gunAyYil(it) } ?: "-")
+                DetailRow(label = "Bitiş", value = member.endDateMs?.let { TarihBicimi.gunAyYil(it) } ?: "-")
                 DetailRow(label = "Kalan Seans", value = member.remainingSessions?.toString() ?: "Sınırsız")
             }
         }
@@ -312,7 +310,6 @@ fun MeasurementsTab(member: MemberEntity, viewModel: MemberViewModel = koinViewM
     var showAddDialog by remember { mutableStateOf(false) }
     // Silinecek ölçüm; onay istemeden silmiyoruz çünkü geri alma yolu yok.
     var silinecek by remember { mutableStateOf<com.gymapp.data.local.entity.MeasurementEntity?>(null) }
-    val tarihBicimi = remember { SimpleDateFormat("dd MMMM yyyy", Locale("tr")) }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
@@ -370,7 +367,7 @@ fun MeasurementsTab(member: MemberEntity, viewModel: MemberViewModel = koinViewM
             onDismissRequest = { silinecek = null },
             title = { Text("Ölçümü sil") },
             text = {
-                Text("${tarihBicimi.format(Date(olcum.dateMs))} tarihli ölçüm silinecek. Bu işlem geri alınamaz.")
+                Text("${TarihBicimi.gunAyAdiYil(olcum.dateMs)} tarihli ölçüm silinecek. Bu işlem geri alınamaz.")
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -392,7 +389,6 @@ fun MeasurementHistoryItem(
     measurement: com.gymapp.data.local.entity.MeasurementEntity,
     onDelete: () -> Unit,
 ) {
-    val sdf = remember { SimpleDateFormat("dd MMMM yyyy", Locale("tr")) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
@@ -403,7 +399,7 @@ fun MeasurementHistoryItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(sdf.format(Date(measurement.dateMs)), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(TarihBicimi.gunAyAdiYil(measurement.dateMs), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("${measurement.weight} kg / ${measurement.height} cm", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                     IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
@@ -514,7 +510,6 @@ fun AddMeasurementDialog(
 fun PackagesTab(member: MemberEntity, viewModel: MemberViewModel = koinViewModel()) {
     val packages by viewModel.packages.collectAsState()
     val activePackage = packages.find { it.id == member.activePackageId }
-    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (activePackage != null) {
@@ -534,7 +529,7 @@ fun PackagesTab(member: MemberEntity, viewModel: MemberViewModel = koinViewModel
                     // `-1` sentinel'i ekranda "-1 Seans" olarak sızabiliyordu.
                     val unlimited = SessionQuota.isUnlimited(activePackage.sessionCount)
                     DetailRow(label = "Paket Türü", value = if (unlimited) "Abonman" else "Ders Paketi")
-                    DetailRow(label = "Bitiş Tarihi", value = member.endDateMs?.let { dateFormat.format(Date(it)) } ?: "-")
+                    DetailRow(label = "Bitiş Tarihi", value = member.endDateMs?.let { TarihBicimi.gunAyYil(it) } ?: "-")
                     DetailRow(
                         label = "Kalan Hak",
                         value = member.remainingSessions?.let { "$it Seans" } ?: "Sınırsız"
@@ -570,7 +565,7 @@ fun PackagesTab(member: MemberEntity, viewModel: MemberViewModel = koinViewModel
             )
         } else {
             hareketler.forEach { hareket ->
-                LedgerRow(entry = hareket, dateFormat = dateFormat)
+                LedgerRow(entry = hareket)
             }
         }
     }
@@ -585,7 +580,6 @@ fun PackagesTab(member: MemberEntity, viewModel: MemberViewModel = koinViewModel
 @Composable
 private fun LedgerRow(
     entry: com.gymapp.data.local.entity.LedgerEntryEntity,
-    dateFormat: SimpleDateFormat,
 ) {
     val tahsilat = entry.type == LedgerType.PAYMENT
     Row(
@@ -595,7 +589,7 @@ private fun LedgerRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(entry.description, style = MaterialTheme.typography.bodyMedium)
             Text(
-                dateFormat.format(Date(entry.occurredAtMs)),
+                TarihBicimi.gunAyYil(entry.occurredAtMs),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.Gray,
             )
