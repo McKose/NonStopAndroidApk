@@ -56,7 +56,7 @@ import com.gymapp.arayuz.paketler.PaketFormuEkrani
 import com.gymapp.arayuz.paketler.PaketListesiEkrani
 import com.gymapp.presentation.packages.PackageEvent
 import com.gymapp.presentation.packages.PackageViewModel
-import com.gymapp.presentation.members.MemberDetailScreen
+import com.gymapp.arayuz.uyeler.UyeDetayEkrani
 import com.gymapp.arayuz.uyeler.UyeListesiEkrani
 import com.gymapp.presentation.members.MemberEvent
 import com.gymapp.presentation.members.MemberViewModel
@@ -230,10 +230,7 @@ class MainActivity : ComponentActivity() {
                                 arguments = listOf(navArgument("memberId") { type = NavType.StringType })
                             ) { backStackEntry ->
                                 val memberId = backStackEntry.arguments?.getString("memberId").orEmpty()
-                                MemberDetailScreen(
-                                    memberId = memberId,
-                                    onNavigateBack = { navController.popBackStack() }
-                                )
+                                UyeDetayBagla(navController, memberId)
                             }
                             composable("package_list") {
                                 // Ekran ORTAK modülde; ViewModel bağlaması ve
@@ -838,6 +835,91 @@ private fun MarketBagla(navController: androidx.navigation.NavHostController) {
         onIskonto = { model.setDiscount(Decimals.parseOrDefault(it)) },
         onNotlar = { model.setNotes(it) },
         onOdemeOnayla = { model.checkout() },
+        snackbarDurumu = snackbarDurumu,
+    )
+}
+
+/**
+ * Üye detayının Android bağlaması.
+ *
+ * Ekranın dört sekmesi eskiden her biri kendi `koinViewModel()`ini
+ * çekiyordu; artık verilerin hepsi burada toplanıp parametre olarak
+ * geçiyor.
+ *
+ * Silme SONUCA bağlı: geri gezinme yalnızca `Deleted` olayı gelince
+ * yapılıyor. Önceden sonuç beklenmeden yapılıyordu ve silme başarısız
+ * olduğunda kullanıcı listeye dönüp üyeyi orada görüyordu.
+ */
+@Composable
+private fun UyeDetayBagla(
+    navController: androidx.navigation.NavHostController,
+    uyeId: String,
+) {
+    val model: MemberViewModel = koinViewModel()
+    val uye by model.getMemberById(uyeId).collectAsState(initial = null)
+    val olcumler by model.getMeasurements(uyeId).collectAsState(initial = emptyList())
+    val hareketler by model.getLedgerForMember(uyeId).collectAsState(initial = emptyList())
+    val paketler by model.packages.collectAsState()
+    val snackbarDurumu = remember { SnackbarHostState() }
+
+    var secilenSekme by remember { mutableStateOf(0) }
+    var silmeOnayiAcik by remember { mutableStateOf(false) }
+    var siliniyor by remember { mutableStateOf(false) }
+    var kalanBorc by remember { mutableStateOf<Money?>(null) }
+
+    LaunchedEffect(uyeId, uye?.paymentStatus) {
+        kalanBorc = model.outstandingBalance(uyeId)
+    }
+
+    LaunchedEffect(Unit) {
+        model.events.collect { olay ->
+            when (olay) {
+                is MemberEvent.Deleted -> navController.popBackStack()
+                is MemberEvent.Saved -> snackbarDurumu.showSnackbar(olay.message)
+                is MemberEvent.Failed -> {
+                    siliniyor = false
+                    snackbarDurumu.showSnackbar(olay.message)
+                }
+            }
+        }
+    }
+
+    UyeDetayEkrani(
+        uye = uye,
+        secilenSekme = secilenSekme,
+        silmeOnayiAcik = silmeOnayiAcik,
+        siliniyor = siliniyor,
+        simdiMs = Now.epochMillis(),
+        kalanBorc = kalanBorc,
+        olcumler = olcumler,
+        aktifPaket = paketler.find { it.id == uye?.activePackageId },
+        hareketler = hareketler,
+        onGeri = { navController.popBackStack() },
+        onSekmeSec = { secilenSekme = it },
+        onSilIste = { silmeOnayiAcik = true },
+        onSilOnayla = {
+            siliniyor = true
+            silmeOnayiAcik = false
+            model.deleteMember(uyeId)
+        },
+        onSilVazgec = { silmeOnayiAcik = false },
+        onTahsilat = { tutar -> model.markAsPaid(uyeId, tutar) },
+        onSaglikKaydet = { model.updateMember(it) },
+        onOlcumEkle = { boy, kilo, omuz, gogus, karin, kalca, bacak, kol, not ->
+            model.addMeasurement(
+                memberId = uyeId,
+                height = boy,
+                weight = kilo,
+                shoulder = omuz,
+                chest = gogus,
+                waist = karin,
+                hips = kalca,
+                leg = bacak,
+                arm = kol,
+                notes = not,
+            )
+        },
+        onOlcumSil = { model.deleteMeasurement(it) },
         snackbarDurumu = snackbarDurumu,
     )
 }
