@@ -1,5 +1,6 @@
 package com.gymapp.presentation.calendar
 
+import com.gymapp.domain.ParaBicimi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -178,7 +179,7 @@ fun TimeSlotRow(
         verticalAlignment = Alignment.Top
     ) {
         Text(
-            text = String.format(Locale.getDefault(), "%02d:00", hour),
+            text = "${if (hour < 10) "0$hour" else "$hour"}:00",
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.width(60.dp).padding(top = 12.dp),
             color = Color.Gray
@@ -375,7 +376,7 @@ fun AddAppointmentSheet(
                     FilterChip(
                         selected = selectedHour == h,
                         onClick = { selectedHour = h },
-                        label = { Text(String.format(Locale.getDefault(), "%02d:00", h)) }
+                        label = { Text("${if (h < 10) "0$h" else "$h"}:00") }
                     )
                 }
             }

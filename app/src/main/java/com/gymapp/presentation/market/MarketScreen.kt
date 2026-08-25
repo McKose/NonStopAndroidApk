@@ -1,5 +1,6 @@
 package com.gymapp.presentation.market
 
+import com.gymapp.domain.ParaBicimi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -28,7 +29,6 @@ import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentState
 import com.gymapp.domain.labelTr
-import java.util.Locale
 
 private const val LOW_STOCK_THRESHOLD = 5
 
@@ -123,7 +123,6 @@ fun MarketScreen(
                     // Ara toplam (iskonto ödeme sayfasında giriliyor). Tutar
                     // artık burada hesaplanmıyor: ekran kuruş yerine `Double`
                     // ile topluyordu ve gerçek tutardan sapabiliyordu.
-                    val totalPrice = uiState.cartTotal.asDouble
 
                     Row(
                         modifier = Modifier.padding(24.dp).fillMaxWidth(),
@@ -132,7 +131,7 @@ fun MarketScreen(
                     ) {
                         Column {
                             Text("$totalItems Ürün", style = MaterialTheme.typography.labelMedium)
-                            Text("₺${String.format(Locale.getDefault(), "%.2f", totalPrice)}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text(ParaBicimi.tl(uiState.cartTotal), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         }
                         Button(
                             onClick = { showCheckoutSheet = true },
@@ -320,25 +319,21 @@ fun CheckoutContent(
 
         Spacer(Modifier.height(16.dp))
 
-        val totalPrice = uiState.cartTotal.asDouble
-        val appliedDiscount = uiState.cartDiscount.asDouble
-        val finalPrice = uiState.cartFinal.asDouble
-
         Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
-            Text("Ara Toplam: ₺${String.format(Locale.getDefault(), "%.2f", totalPrice)}", style = MaterialTheme.typography.bodyMedium)
-            if (appliedDiscount > 0) {
-                Text("İndirim: -₺${String.format(Locale.getDefault(), "%.2f", appliedDiscount)}", style = MaterialTheme.typography.bodyMedium, color = Color.Red)
+            Text("Ara Toplam: ${ParaBicimi.tl(uiState.cartTotal)}", style = MaterialTheme.typography.bodyMedium)
+            if (uiState.cartDiscount.isPositive) {
+                Text("İndirim: -${ParaBicimi.tl(uiState.cartDiscount)}", style = MaterialTheme.typography.bodyMedium, color = Color.Red)
             }
             // Girilen iskonto sepeti aşıyorsa sessizce kırpmak yerine söyleniyor:
             // kasiyer 80 yazıp 50 uygulandığını görmeliyse, görmeli.
-            if (uiState.discount > appliedDiscount) {
+            if (Money.ofMajor(uiState.discount) > uiState.cartDiscount) {
                 Text(
-                    "Girilen indirim sepeti aşıyor; ₺${String.format(Locale.getDefault(), "%.2f", appliedDiscount)} uygulandı.",
+                    "Girilen indirim sepeti aşıyor; ${ParaBicimi.tl(uiState.cartDiscount)} uygulandı.",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Red,
                 )
             }
-            Text("Genel Toplam: ₺${String.format(Locale.getDefault(), "%.2f", finalPrice)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text("Genel Toplam: ${ParaBicimi.tl(uiState.cartFinal)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         }
 
         Button(

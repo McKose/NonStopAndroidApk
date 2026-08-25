@@ -36,9 +36,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
+import com.gymapp.arayuz.giris.GirisEkrani
 import com.gymapp.presentation.calendar.CalendarScreen
 import com.gymapp.presentation.dashboard.DashboardScreen
-import com.gymapp.presentation.login.LoginScreen
+import com.gymapp.presentation.login.LoginViewModel
 import com.gymapp.presentation.packages.AddPackageScreen
 import com.gymapp.presentation.packages.PackageListScreen
 import com.gymapp.presentation.members.MemberDetailScreen
@@ -135,12 +136,26 @@ class MainActivity : ComponentActivity() {
                             startDestination = baslangicHedefi,
                         ) {
                             composable("login") {
-                                LoginScreen(
-                                    onLoginSuccess = {
-                                        navController.navigate("dashboard") {
-                                            popUpTo("login") { inclusive = true }
+                                // Ekranın kendisi ORTAK modülde (`:arayuz`) ve
+                                // ViewModel'i tanımıyor: durumu parametre
+                                // olarak alıyor, tıklamayı geri çağrıyla
+                                // bildiriyor. Bağlama işi burada, Android
+                                // kabuğunda yapılıyor — iOS kabuğu aynı ekranı
+                                // kendi tarafında aynı şekilde bağlayacak.
+                                val girisModeli: LoginViewModel = koinViewModel()
+                                val hata by girisModeli.error.collectAsState()
+                                val gonderiliyor by girisModeli.isSubmitting.collectAsState()
+
+                                GirisEkrani(
+                                    gonderiliyor = gonderiliyor,
+                                    hata = hata,
+                                    onGiris = { eposta, sifre ->
+                                        girisModeli.login(eposta, sifre) {
+                                            navController.navigate("dashboard") {
+                                                popUpTo("login") { inclusive = true }
+                                            }
                                         }
-                                    }
+                                    },
                                 )
                             }
                             composable("dashboard") {

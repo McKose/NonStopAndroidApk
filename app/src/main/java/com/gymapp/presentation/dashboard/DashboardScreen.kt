@@ -1,5 +1,6 @@
 package com.gymapp.presentation.dashboard
 
+import com.gymapp.domain.TarihBicimi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -235,7 +236,7 @@ fun AppointmentDashboardItem(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val hour = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(appt.startTimeMs))
+            val hour = TarihBicimi.saat(appt.startTimeMs)
             Text(
                 text = hour,
                 style = MaterialTheme.typography.titleMedium,

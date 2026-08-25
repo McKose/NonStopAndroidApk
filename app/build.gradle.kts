@@ -255,6 +255,11 @@ dependencies {
     // Platformdan bağımsız iş kuralları — iOS uygulaması da aynı modülü kullanacak.
     implementation(project(":shared"))
 
+    // Ortak arayüz (Compose Multiplatform). Ekranlar buraya taşındıkça `app`
+    // inceliyor; sonunda geriye yalnızca Android kabuğu kalacak (MainActivity,
+    // GymApplication, WorkManager dikişi).
+    implementation(project(":arayuz"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
