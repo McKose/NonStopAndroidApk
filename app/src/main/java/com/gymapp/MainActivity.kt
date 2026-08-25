@@ -28,6 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.gymapp.domain.Decimals
+import com.gymapp.domain.Money
+import com.gymapp.domain.labelTr
 import com.gymapp.data.auth.SessionManager
 import com.gymapp.data.sync.ArkaPlanSenkronizasyonu
 import com.gymapp.data.sync.SyncCoordinator
@@ -40,7 +43,8 @@ import com.gymapp.arayuz.giris.GirisEkrani
 import com.gymapp.presentation.calendar.CalendarScreen
 import com.gymapp.presentation.dashboard.DashboardScreen
 import com.gymapp.presentation.login.LoginViewModel
-import com.gymapp.presentation.packages.AddPackageScreen
+import com.gymapp.arayuz.paketler.PaketFormu
+import com.gymapp.arayuz.paketler.PaketFormuEkrani
 import com.gymapp.arayuz.paketler.PaketListesiEkrani
 import com.gymapp.presentation.packages.PackageEvent
 import com.gymapp.presentation.packages.PackageViewModel
@@ -49,7 +53,8 @@ import com.gymapp.presentation.members.MemberListScreen
 import com.gymapp.presentation.members.RegisterMemberScreen
 import com.gymapp.presentation.finance.FinanceScreen
 import com.gymapp.presentation.market.MarketScreen
-import com.gymapp.presentation.market.OrderHistoryScreen
+import com.gymapp.arayuz.market.SiparisGecmisiEkrani
+import com.gymapp.presentation.market.OrderHistoryViewModel
 import com.gymapp.presentation.settings.SettingsScreen
 import com.gymapp.presentation.settings.PersonnelScreen
 
@@ -208,7 +213,15 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             composable("order_history") {
-                                OrderHistoryScreen(onNavigateBack = { navController.popBackStack() })
+                                val siparisModeli: OrderHistoryViewModel = koinViewModel()
+                                val siparisler by siparisModeli.orders.collectAsState()
+                                val uyeAdlari by siparisModeli.memberNames.collectAsState()
+
+                                SiparisGecmisiEkrani(
+                                    siparisler = siparisler,
+                                    uyeAdlari = uyeAdlari,
+                                    onGeri = { navController.popBackStack() },
+                                )
                             }
                             composable("settings") {
                                 SettingsScreen(
@@ -286,15 +299,18 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             composable("add_package") {
-                                AddPackageScreen(onNavigateBack = { navController.popBackStack() })
+                                PaketFormuBagla(
+                                    paketId = null,
+                                    navController = navController,
+                                )
                             }
                             composable(
                                 route = "edit_package/{packageId}",
                                 arguments = listOf(navArgument("packageId") { type = NavType.StringType })
                             ) { backStackEntry ->
-                                AddPackageScreen(
-                                    packageId = backStackEntry.arguments?.getString("packageId"),
-                                    onNavigateBack = { navController.popBackStack() }
+                                PaketFormuBagla(
+                                    paketId = backStackEntry.arguments?.getString("packageId"),
+                                    navController = navController,
                                 )
                             }
                         }
@@ -338,4 +354,76 @@ class MainActivity : ComponentActivity() {
          */
         const val SENKRONIZASYON_ARALIGI_MS = 60_000L
     }
+}
+
+/**
+ * Paket formunu ViewModel'e bağlar.
+ *
+ * Ayrı bir işlev çünkü iki gezinme yolu (yeni paket / düzenleme) aynı bağlamayı
+ * kullanıyor; `NavHost` içine iki kez yazılsaydı biri düzeltilip diğeri
+ * unutulabilirdi.
+ *
+ * Ekranın kendisi ORTAK modülde ve ViewModel tanımıyor: düzenlenecek paketi
+ * okumak, kaydetmek ve olayları bildirime çevirmek burada — Android kabuğunda.
+ */
+@Composable
+private fun PaketFormuBagla(
+    paketId: String?,
+    navController: androidx.navigation.NavHostController,
+) {
+    val model: PackageViewModel = koinViewModel()
+    val snackbarDurumu = remember { SnackbarHostState() }
+
+    // Düzenlemede paket okunana kadar form boş kalmamalı; `null` başlangıç
+    // "henüz yüklenmedi" demek, `PaketFormu()` ise "yeni paket".
+    var baslangic by remember(paketId) { mutableStateOf(if (paketId == null) PaketFormu() else null) }
+    var yukleniyor by remember(paketId) { mutableStateOf(paketId != null) }
+
+    LaunchedEffect(paketId) {
+        if (paketId != null) {
+            model.getPackageById(paketId)?.let { paket ->
+                baslangic = PaketFormu(
+                    sinirsiz = paket.sessionCount == null,
+                    seansSayisi = paket.sessionCount?.toString() ?: "10",
+                    tur = paket.type,
+                    kategori = paket.category,
+                    fiyat = Money(paket.basePriceMinor).asDouble.toString(),
+                    gun = paket.validityDays.toString(),
+                )
+            }
+            yukleniyor = false
+        }
+    }
+
+    // Kaydetme sonucu **her zaman** bildirilir; önceden hata sessizce yutuluyor
+    // ve ekran başarılıymış gibi kapanıyordu.
+    LaunchedEffect(Unit) {
+        model.events.collect { olay ->
+            when (olay) {
+                is PackageEvent.Saved -> navController.popBackStack()
+                // Silme bu ekrandan yapılamıyor; liste ekranı bildiriyor.
+                is PackageEvent.Deleted -> Unit
+                is PackageEvent.Failed -> snackbarDurumu.showSnackbar(olay.message)
+            }
+        }
+    }
+
+    PaketFormuEkrani(
+        baslangic = baslangic,
+        yukleniyor = yukleniyor,
+        onKaydet = { form ->
+            model.savePackage(
+                packageId = paketId,
+                name = "${if (form.sinirsiz) "Sınırsız" else form.seansSayisi.ifBlank { "0" }} - " +
+                    "${form.tur.labelTr()} - ${form.kategori.labelTr()}",
+                type = form.tur,
+                category = form.kategori,
+                basePrice = Decimals.parseOrDefault(form.fiyat),
+                validityDays = form.gun.toIntOrNull() ?: 30,
+                sessionCount = if (form.sinirsiz) null else form.seansSayisi.toIntOrNull(),
+            )
+        },
+        onGeri = { navController.popBackStack() },
+        snackbarDurumu = snackbarDurumu,
+    )
 }
