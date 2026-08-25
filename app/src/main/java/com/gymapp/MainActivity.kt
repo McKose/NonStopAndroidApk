@@ -41,7 +41,8 @@ import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.arayuz.giris.GirisEkrani
 import com.gymapp.presentation.calendar.CalendarScreen
-import com.gymapp.presentation.dashboard.DashboardScreen
+import com.gymapp.arayuz.pano.PanoEkrani
+import com.gymapp.presentation.dashboard.DashboardViewModel
 import com.gymapp.presentation.login.LoginViewModel
 import com.gymapp.arayuz.paketler.PaketFormu
 import com.gymapp.arayuz.paketler.PaketFormuEkrani
@@ -167,14 +168,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             composable("dashboard") {
-                                DashboardScreen(
-                                    onNavigateToMembers = { navController.navigate("member_list") },
-                                    onNavigateToFinance = { navController.navigate("finance") },
-                                    onNavigateToMarket = { navController.navigate("market") },
-                                    onNavigateToCalendar = { navController.navigate("calendar") },
-                                    onNavigateToPackages = { navController.navigate("package_list") },
-                                    onNavigateToSettings = { navController.navigate("settings") }
-                                )
+                                PanoBagla(navController)
                             }
                             composable("calendar") {
                                 CalendarScreen(onNavigateBack = { navController.popBackStack() })
@@ -456,5 +450,33 @@ private fun AyarlarBagla(navController: androidx.navigation.NavHostController) {
         onCikisiOnayla = { model.confirmLogout(cikisaGit) },
         onCikistanVazgec = { model.cancelLogout() },
         onSalonAdiKaydet = { model.updateSalonName(it) },
+    )
+}
+
+/**
+ * Panonun Android bağlaması.
+ *
+ * Ekran `arayuz` modülünde ve ViewModel tanımıyor; durum sınıfının alanları
+ * burada tek tek parametrelere açılıyor.
+ */
+@Composable
+private fun PanoBagla(navController: androidx.navigation.NavHostController) {
+    val model: DashboardViewModel = koinViewModel()
+    val durum by model.uiState.collectAsState()
+
+    PanoEkrani(
+        rol = durum.userRole,
+        aktifUye = durum.activeMembers,
+        gunlukRandevular = durum.dailyAppointments,
+        uyeler = durum.members,
+        personeller = durum.staffList,
+        kritikUyarilar = durum.criticalAlerts,
+        personelBaglantisiYok = durum.personelBaglantisiYok,
+        onUyeler = { navController.navigate("member_list") },
+        onFinans = { navController.navigate("finance") },
+        onMarket = { navController.navigate("market") },
+        onTakvim = { navController.navigate("calendar") },
+        onPaketler = { navController.navigate("package_list") },
+        onAyarlar = { navController.navigate("settings") },
     )
 }
