@@ -88,6 +88,18 @@ object TarihBicimi {
         return "${iki(t.hour)}:${iki(t.minute)}"
     }
 
+    /**
+     * Yerel saatin **sayı** olarak kendisi (0–23).
+     *
+     * Biçimlendirme değil, gruplama için: takvim ekranı randevuları saat
+     * satırlarına dağıtıyor ve bunun için metne değil sayıya ihtiyacı var.
+     * Önceden `Instant.ofEpochMilli(...).atZone(ZoneId.systemDefault()).hour`
+     * ile hesaplanıyordu; o çağrı JVM'e özgü ve ekranın taşınmasını
+     * engelliyordu.
+     */
+    fun saatSayisi(epochMs: Long, zaman: TimeZone = TimeZone.currentSystemDefault()): Int =
+        yerel(epochMs, zaman).hour
+
     private fun yerel(epochMs: Long, zaman: TimeZone) =
         Instant.fromEpochMilliseconds(epochMs).toLocalDateTime(zaman)
 

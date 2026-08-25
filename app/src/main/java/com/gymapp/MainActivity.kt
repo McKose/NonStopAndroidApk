@@ -29,6 +29,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.gymapp.domain.Decimals
+import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Money
 import com.gymapp.domain.Now
@@ -42,7 +43,9 @@ import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.arayuz.giris.GirisEkrani
-import com.gymapp.presentation.calendar.CalendarScreen
+import com.gymapp.arayuz.takvim.TakvimEkrani
+import com.gymapp.presentation.calendar.CalendarEvent
+import com.gymapp.presentation.calendar.CalendarViewModel
 import com.gymapp.arayuz.pano.PanoEkrani
 import com.gymapp.presentation.dashboard.DashboardViewModel
 import com.gymapp.presentation.login.LoginViewModel
@@ -175,7 +178,7 @@ class MainActivity : ComponentActivity() {
                                 PanoBagla(navController)
                             }
                             composable("calendar") {
-                                CalendarScreen(onNavigateBack = { navController.popBackStack() })
+                                TakvimBagla(navController)
                             }
                             composable("member_list") {
                                 UyeListesiBagla(navController)
@@ -535,6 +538,71 @@ private fun UyeListesiBagla(navController: androidx.navigation.NavHostController
         onFinans = { navController.navigate("finance") },
         onMarket = { navController.navigate("market") },
         onAyarlar = { navController.navigate("settings") },
+        snackbarDurumu = snackbarDurumu,
+    )
+}
+
+/**
+ * Takvimin Android bağlaması.
+ *
+ * Ekran artık gün aritmetiği yapmıyor; ileri/geri/bugün burada
+ * `java.time.LocalDate` ile hesaplanıyor (ViewModel de o tiple konuşuyor) ve
+ * ekrana yalnızca seçili günün epoch milisaniyesi geçiyor.
+ *
+ * Sheet ve diyaloğun açık/kapalı hâli de burada: kayıt reddedildiğinde
+ * (çakışma, seans hakkı yok) sheet açık kalmalı ve bunu yalnızca olayları
+ * dinleyen taraf bilebilir.
+ */
+@Composable
+private fun TakvimBagla(navController: androidx.navigation.NavHostController) {
+    val model: CalendarViewModel = koinViewModel()
+    val durum by model.uiState.collectAsState()
+    val secilenGun by model.selectedDate.collectAsState()
+    val snackbarDurumu = remember { SnackbarHostState() }
+
+    var eklemeAcik by remember { mutableStateOf(false) }
+    var secilenRandevu by remember { mutableStateOf<AppointmentEntity?>(null) }
+
+    // Çakışma / seans hakkı gibi reddedilme sebepleri kullanıcıya gösteriliyor.
+    LaunchedEffect(Unit) {
+        model.events.collect { olay ->
+            when (olay) {
+                is CalendarEvent.AppointmentSaved -> {
+                    eklemeAcik = false
+                    snackbarDurumu.showSnackbar("Randevu oluşturuldu.")
+                }
+                is CalendarEvent.StatusUpdated -> {
+                    secilenRandevu = null
+                    snackbarDurumu.showSnackbar("Randevu güncellendi.")
+                }
+                is CalendarEvent.Failed -> snackbarDurumu.showSnackbar(olay.message)
+            }
+        }
+    }
+
+    val gunMs = secilenGun.atStartOfDay(java.time.ZoneId.systemDefault())
+        .toInstant().toEpochMilli()
+
+    TakvimEkrani(
+        secilenGunMs = gunMs,
+        randevular = durum.appointments,
+        uyeler = durum.members,
+        personeller = durum.staffList,
+        randevuEklemeAcik = eklemeAcik,
+        secilenRandevu = secilenRandevu,
+        onGeri = { navController.popBackStack() },
+        onOncekiGun = { model.setDate(secilenGun.minusDays(1)) },
+        onSonrakiGun = { model.setDate(secilenGun.plusDays(1)) },
+        onBugun = { model.setDate(java.time.LocalDate.now()) },
+        onRandevuEklemeAc = { eklemeAcik = true },
+        onRandevuEklemeKapat = { eklemeAcik = false },
+        onRandevuSec = { secilenRandevu = it },
+        onRandevuEkle = { uyeId, personelId, saat, tur ->
+            model.addAppointment(uyeId, personelId, saat, tur)
+        },
+        onDurumGuncelle = { randevuId, yeniDurum, not ->
+            model.updateAppointmentStatus(randevuId, yeniDurum, not)
+        },
         snackbarDurumu = snackbarDurumu,
     )
 }
