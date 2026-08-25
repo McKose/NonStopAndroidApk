@@ -41,7 +41,9 @@ import com.gymapp.presentation.calendar.CalendarScreen
 import com.gymapp.presentation.dashboard.DashboardScreen
 import com.gymapp.presentation.login.LoginViewModel
 import com.gymapp.presentation.packages.AddPackageScreen
-import com.gymapp.presentation.packages.PackageListScreen
+import com.gymapp.arayuz.paketler.PaketListesiEkrani
+import com.gymapp.presentation.packages.PackageEvent
+import com.gymapp.presentation.packages.PackageViewModel
 import com.gymapp.presentation.members.MemberDetailScreen
 import com.gymapp.presentation.members.MemberListScreen
 import com.gymapp.presentation.members.RegisterMemberScreen
@@ -249,15 +251,38 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             composable("package_list") {
-                                PackageListScreen(
-                                    onNavigateToAdd = { packageId ->
-                                        if (packageId == null) {
-                                            navController.navigate("add_package")
-                                        } else {
-                                            navController.navigate("edit_package/$packageId")
+                                // Ekran ORTAK modülde; ViewModel bağlaması ve
+                                // olay akışının bildirime çevrilmesi burada,
+                                // Android kabuğunda.
+                                val paketModeli: PackageViewModel = koinViewModel()
+                                val paketler by paketModeli.packages.collectAsState()
+                                val yazabilir by paketModeli.canWrite.collectAsState()
+                                val snackbarDurumu = remember { SnackbarHostState() }
+
+                                // Silme sonucu her durumda bildiriliyor. Önceden
+                                // `deletePackage` fırlatıyor ve sonuç hiçbir yerde
+                                // okunmuyordu: başarısız silme başarılıdan ayırt
+                                // edilemiyor, üstelik uygulama kapanıyordu.
+                                LaunchedEffect(Unit) {
+                                    paketModeli.events.collect { olay ->
+                                        when (olay) {
+                                            is PackageEvent.Saved -> Unit // kaydetme başka ekranda
+                                            is PackageEvent.Deleted ->
+                                                snackbarDurumu.showSnackbar("Paket silindi.")
+                                            is PackageEvent.Failed ->
+                                                snackbarDurumu.showSnackbar(olay.message)
                                         }
-                                    },
-                                    onNavigateBack = { navController.popBackStack() }
+                                    }
+                                }
+
+                                PaketListesiEkrani(
+                                    paketler = paketler,
+                                    yazabilir = yazabilir,
+                                    onEkle = { navController.navigate("add_package") },
+                                    onDuzenle = { id -> navController.navigate("edit_package/$id") },
+                                    onSil = { id -> paketModeli.deletePackage(id) },
+                                    onGeri = { navController.popBackStack() },
+                                    snackbarDurumu = snackbarDurumu,
                                 )
                             }
                             composable("add_package") {

@@ -29,7 +29,7 @@ import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Rate
 import com.gymapp.domain.StaffRole
 import com.gymapp.data.access.yetkiOzetiTr
-import com.gymapp.presentation.common.ReadOnlyNotice
+import com.gymapp.arayuz.ortak.SaltOkunurSerit
 import com.gymapp.domain.labelTr
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -84,7 +84,7 @@ fun PersonnelScreen(
         ) {
             if (!canWrite) {
                 item {
-                    ReadOnlyNotice(
+                    SaltOkunurSerit(
                         "Personel listesini görüntüleyebilirsiniz. Değiştirmek " +
                             "salon sahibi yetkisi gerektiriyor."
                     )

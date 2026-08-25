@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.domain.labelTr
 import com.gymapp.data.access.AppDestination
-import com.gymapp.presentation.common.ReadOnlyNotice
+import com.gymapp.arayuz.ortak.SaltOkunurSerit
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.StaffEntity
@@ -73,7 +73,7 @@ fun DashboardScreen(
             if (uiState.personelBaglantisiYok) {
                 item {
                     Spacer(modifier = Modifier.height(8.dp))
-                    ReadOnlyNotice(
+                    SaltOkunurSerit(
                         "Hesabınız bir personel kaydına bağlı olmadığı için kendi " +
                             "dersleriniz ve üyeleriniz listelenemiyor. Salon sahibinin " +
                             "Ayarlar → Personel Yönetimi'nden kartınıza Supabase " +

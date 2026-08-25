@@ -42,6 +42,13 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            // Ekranlar varlıkları (`PackageEntity`), para/tarih biçimlendirmesini
+            // ve etiketleri (`labelTr`) buradan alıyor. `api` DEĞİL
+            // `implementation`: kabuklar (app, masaustu, iosApp) `shared`'a
+            // zaten kendileri bağlanıyor — ikinci bir yol açmak, bağımlılığın
+            // nereden geldiğini belirsizleştirirdi.
+            implementation(project(":shared"))
+
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
