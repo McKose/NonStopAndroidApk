@@ -248,10 +248,19 @@ class MemberViewModel(
         viewModelScope.launch {
             _formState.update { it.copy(isSubmitting = true, submitError = null) }
             
-            val result = if (state.isRenewal && state.memberId != null && state.selectedPackage != null) {
+            // Yerel değişkenler ŞART, akıllı dönüşüm burada çalışmıyor:
+            // `UyeKayitFormu` artık başka bir modülde (`:arayuz`) ve Kotlin
+            // farklı modüldeki bir `val`in iki okuma arasında değişmeyeceğini
+            // garanti edemiyor. Aynı kod sınıf `app` içindeyken derleniyordu;
+            // tipi modül sınırının ötesine taşımak derleyicinin kanıtlayabildiği
+            // şeyi daralttı.
+            val yenilenecekUye = state.memberId
+            val secilenPaket = state.selectedPackage
+
+            val result = if (state.isRenewal && yenilenecekUye != null && secilenPaket != null) {
                 repository.renewPackage(
-                    memberId = state.memberId,
-                    selectedPackage = state.selectedPackage,
+                    memberId = yenilenecekUye,
+                    selectedPackage = secilenPaket,
                     paymentType = state.paymentType,
                     installmentCount = state.installmentCount,
                     discount = Decimals.parseOrDefault(state.discount),
