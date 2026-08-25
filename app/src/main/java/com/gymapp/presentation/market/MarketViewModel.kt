@@ -11,61 +11,11 @@ import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.DeliveryStatus
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.arayuz.market.MarketDurumu
 import com.gymapp.domain.PaymentState
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-
-data class MarketUiState(
-    val products: List<ProductEntity> = emptyList(),
-    val members: List<MemberEntity> = emptyList(),
-    val cart: Map<String, Int> = emptyMap(), // ProductId -> Quantity
-    val selectedMemberId: String? = null,
-    val paymentType: String = "CASH",
-    val paymentStatus: PaymentState = PaymentState.PAID,
-    val deliveryStatus: String = "POST_DELIVERY",
-    val discount: Double = 0.0,
-    val notes: String = "",
-    /** Ürün kimliği → eldeki stok (hareketlerin toplamı). */
-    val stockByProduct: Map<String, Int> = emptyMap(),
-    val isLoading: Boolean = false,
-    val isCheckingOut: Boolean = false,
-) {
-    fun stockOf(productId: String): Int = stockByProduct[productId] ?: 0
-
-    // ─── Sepet tutarları ────────────────────────────────────────────────────
-    //
-    // Burada, ekranda değil. Ekran bu hesabı İKİ ayrı yerde `Double` ile
-    // tekrarlıyordu; gerçek tutar ise kuruş tam sayısıyla hesaplanıyor
-    // (`ProductRepository.processOrder`). İki ayrı aritmetik, gösterilen ile
-    // çekilen tutarın sapması demekti.
-    //
-    // İfadeler deponunkiyle birebir aynı — sapmanın kaynağı buydu.
-
-    /** Sepetin iskonto öncesi tutarı. */
-    val cartTotal: Money
-        get() = Money(
-            cart.entries.sumOf { (id, adet) ->
-                (products.find { it.id == id }?.priceMinor ?: 0L) * adet
-            }
-        )
-
-    /**
-     * Uygulanan iskonto — sepeti **aşamaz**.
-     *
-     * Ekran kırpmıyordu, depo kırpıyordu. 50 TL'lik sepete 80 TL iskonto
-     * girildiğinde ekran "₺-30,00" gösteriyor, kaydedilen siparişin nihai tutarı
-     * ise 0 oluyordu. Üstelik `processOrder` tahsilatı yalnızca tutar pozitifken
-     * yazdığı için, "ÖDENDİ" işaretli o sipariş **hiç tahsilat yazmıyordu**:
-     * ürünler stoktan çıkıyor, gelir sıfır kalıyordu.
-     */
-    val cartDiscount: Money
-        get() = Money.ofMajor(discount).coerceNonNegative().coerceAtMost(cartTotal)
-
-    /** Tahsil edilecek tutar. */
-    val cartFinal: Money
-        get() = cartTotal - cartDiscount
-}
 
 /** Bir kez tüketilen kullanıcı bildirimleri (Snackbar). */
 sealed interface MarketEvent {
@@ -115,13 +65,13 @@ class MarketViewModel(
      * cast'leniyordu; dizideki sıra değişince çalışma anında `ClassCastException` riski vardı.
      * Form alanları tek bir veri sınıfında toplandığı için artık tip güvenli.
      */
-    val uiState: StateFlow<MarketUiState> = combine(
+    val uiState: StateFlow<MarketDurumu> = combine(
         repository.getAllProducts(),
         repository.observeStockByProduct(),
         memberRepository.getAllMembers(),
         _form,
     ) { products, stock, members, form ->
-        MarketUiState(
+        MarketDurumu(
             products = products,
             stockByProduct = stock,
             members = members,
@@ -138,7 +88,7 @@ class MarketViewModel(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = MarketUiState(isLoading = true)
+        initialValue = MarketDurumu(isLoading = true)
     )
 
     private val _events = Channel<MarketEvent>(Channel.BUFFERED)

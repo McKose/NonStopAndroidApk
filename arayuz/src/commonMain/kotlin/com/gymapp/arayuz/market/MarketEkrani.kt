@@ -1,9 +1,19 @@
-package com.gymapp.presentation.market
+package com.gymapp.arayuz.market
 
-import com.gymapp.domain.ParaBicimi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -13,130 +23,176 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddBusiness
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import org.koin.androidx.compose.koinViewModel
-import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.ProductEntity
-import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
+import com.gymapp.domain.ParaBicimi
 import com.gymapp.domain.PaymentState
 import com.gymapp.domain.labelTr
 
+/** Bu adedin altındaki stok kartta uyarı rengiyle çiziliyor. */
 private const val LOW_STOCK_THRESHOLD = 5
 
+/**
+ * Market / POS — `app`'teki `MarketScreen`'in ortak modüle taşınmış hâli.
+ *
+ * ### Yetki ürün tanımıyla sınırlı
+ * [urunYonetebilir] yalnızca ürün ekleme/düzenleme/silme girişlerini
+ * etkiliyor; satış (sepet, ödeme) herkese açık. Eğitmen satış yapabilmeli
+ * ama ürünün fiyatını değiştirememeli — ayrım bilinçli.
+ *
+ * ### Sepet tutarı ekranda hesaplanmıyor
+ * `MarketDurumu.cartTotal` / `cartDiscount` / `cartFinal` durumdan
+ * türetiliyor. Ekran bu hesabı iki ayrı yerde `Double` ile tekrarlıyordu;
+ * gerçek tutar ise kuruş tam sayısıyla hesaplanıyor. İki ayrı aritmetik,
+ * gösterilen ile çekilen tutarın sapması demekti.
+ *
+ * ### Ödeme sayfası dışarıdan kapanıyor
+ * Sipariş BAŞARILI olduğunda kapanıyor, reddedildiğinde açık kalıyor —
+ * başarısız sipariş sessizce "başarılı" gibi görünmesin diye. Bu kararı
+ * ekran veremez.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MarketScreen(
-    onNavigateBack: () -> Unit,
-    onNavigateToOrders: () -> Unit,
-    viewModel: MarketViewModel = koinViewModel()
+fun MarketEkrani(
+    durum: MarketDurumu,
+    urunYonetebilir: Boolean,
+    urunEklemeAcik: Boolean,
+    duzenlenenUrun: ProductEntity?,
+    odemeAcik: Boolean,
+    onGeri: () -> Unit,
+    onSiparisGecmisi: () -> Unit,
+    onUrunEklemeAc: () -> Unit,
+    onUrunEklemeKapat: () -> Unit,
+    onUrunDuzenle: (ProductEntity?) -> Unit,
+    onSepeteEkle: (ProductEntity) -> Unit,
+    onSepettenCikar: (String) -> Unit,
+    onUrunSil: (String) -> Unit,
+    onUrunKaydet: (urunId: String?, ad: String, kategori: String, fiyat: Double, stok: Int) -> Unit,
+    onOdemeAc: () -> Unit,
+    onOdemeKapat: () -> Unit,
+    onUyeSec: (String?) -> Unit,
+    onOdemeTuru: (String) -> Unit,
+    onOdemeDurumu: (PaymentState) -> Unit,
+    onTeslimDurumu: (String) -> Unit,
+    onIskonto: (String) -> Unit,
+    onNotlar: (String) -> Unit,
+    onOdemeOnayla: () -> Unit,
+    snackbarDurumu: SnackbarHostState = remember { SnackbarHostState() },
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val canManageProducts by viewModel.canManageProducts.collectAsState()
-    var showAddDialog by remember { mutableStateOf(false) }
-    var showCheckoutSheet by remember { mutableStateOf(false) }
-    var productToEdit by remember { mutableStateOf<ProductEntity?>(null) }
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    // Sipariş sonucu her durumda kullanıcıya bildirilir.
-    LaunchedEffect(Unit) {
-        viewModel.events.collect { event ->
-            when (event) {
-                is MarketEvent.OrderCompleted -> {
-                    showCheckoutSheet = false
-                    snackbarHostState.showSnackbar("Sipariş tamamlandı (#${event.orderId.take(8)})")
-                }
-                is MarketEvent.ProductSaved ->
-                    snackbarHostState.showSnackbar("Ürün kaydedildi.")
-                is MarketEvent.ProductDeleted ->
-                    snackbarHostState.showSnackbar("Ürün silindi.")
-                is MarketEvent.Failed ->
-                    snackbarHostState.showSnackbar(event.message)
-            }
-        }
-    }
-
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarDurumu) },
         topBar = {
             TopAppBar(
                 title = { Text("Market / POS", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = onGeri) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
                 },
                 actions = {
-                    IconButton(onClick = onNavigateToOrders) {
+                    IconButton(onClick = onSiparisGecmisi) {
                         Icon(Icons.Default.History, contentDescription = "Sipariş Geçmişi")
                     }
                     // Ürün tanımı yetkisi olmayanda bu giriş hiç çizilmiyor.
-                    // Satış (sepet, ödeme) etkilenmiyor: eğitmen satış
-                    // yapabilmeli, ürünün fiyatını değiştirememeli.
-                    if (canManageProducts) {
-                        IconButton(onClick = { showAddDialog = true }) {
+                    // Satış (sepet, ödeme) etkilenmiyor.
+                    if (urunYonetebilir) {
+                        IconButton(onClick = onUrunEklemeAc) {
                             Icon(Icons.Default.AddBusiness, contentDescription = "Ürün Yönetimi")
                         }
                     }
-                }
+                },
             )
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        },
+    ) { bosluk ->
+        Box(modifier = Modifier.fillMaxSize().padding(bosluk)) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 100.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             ) {
-                items(uiState.products) { product ->
-                    ProductGridItem(
-                        product = product,
-                        onHand = uiState.stockOf(product.id),
-                        cartCount = uiState.cart[product.id] ?: 0,
-                        onAdd = { viewModel.addToCart(product) },
-                        onRemove = { viewModel.removeFromCart(product.id) },
-                        onEdit = { productToEdit = product },
-                        onDelete = { viewModel.deleteProduct(product.id) },
-                        canManage = canManageProducts,
+                items(durum.products) { urun ->
+                    UrunKarti(
+                        product = urun,
+                        onHand = durum.stockOf(urun.id),
+                        cartCount = durum.cart[urun.id] ?: 0,
+                        onAdd = { onSepeteEkle(urun) },
+                        onRemove = { onSepettenCikar(urun.id) },
+                        onEdit = { onUrunDuzenle(urun) },
+                        onDelete = { onUrunSil(urun.id) },
+                        canManage = urunYonetebilir,
                     )
                 }
             }
 
-            if (uiState.cart.isNotEmpty()) {
+            if (durum.cart.isNotEmpty()) {
                 Surface(
                     modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
                     tonalElevation = 8.dp,
                     shadowElevation = 16.dp,
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                 ) {
-                    val totalItems = uiState.cart.values.sum()
-                    // Ara toplam (iskonto ödeme sayfasında giriliyor). Tutar
-                    // artık burada hesaplanmıyor: ekran kuruş yerine `Double`
-                    // ile topluyordu ve gerçek tutardan sapabiliyordu.
-
+                    val adet = durum.cart.values.sum()
                     Row(
                         modifier = Modifier.padding(24.dp).fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column {
-                            Text("$totalItems Ürün", style = MaterialTheme.typography.labelMedium)
-                            Text(ParaBicimi.tl(uiState.cartTotal), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text("$adet Ürün", style = MaterialTheme.typography.labelMedium)
+                            Text(
+                                ParaBicimi.tl(durum.cartTotal),
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
                         }
                         Button(
-                            onClick = { showCheckoutSheet = true },
+                            onClick = onOdemeAc,
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.height(56.dp).padding(start = 16.dp)
+                            modifier = Modifier.height(56.dp).padding(start = 16.dp),
                         ) {
                             Text("ÖDEME AL", fontWeight = FontWeight.Bold)
                             Spacer(Modifier.width(8.dp))
@@ -148,60 +204,47 @@ fun MarketScreen(
         }
     }
 
-    if (showAddDialog) {
-        AddProductDialog(
-            onDismiss = { showAddDialog = false },
-            onConfirm = { name, category, price, stock ->
-                viewModel.saveProduct(name = name, category = category, price = price, stock = stock)
-                showAddDialog = false
-            }
+    if (urunEklemeAcik) {
+        UrunDiyalogu(
+            onDismiss = onUrunEklemeKapat,
+            onConfirm = { ad, kategori, fiyat, stok -> onUrunKaydet(null, ad, kategori, fiyat, stok) },
         )
     }
 
-    if (productToEdit != null) {
-        AddProductDialog(
-            product = productToEdit,
-            currentStock = uiState.stockOf(productToEdit!!.id),
-            onDismiss = { productToEdit = null },
-            onConfirm = { name, category, price, stock ->
-                viewModel.saveProduct(
-                    productId = productToEdit!!.id,
-                    name = name,
-                    category = category,
-                    price = price,
-                    stock = stock
-                )
-                productToEdit = null
-            }
+    duzenlenenUrun?.let { urun ->
+        UrunDiyalogu(
+            product = urun,
+            currentStock = durum.stockOf(urun.id),
+            onDismiss = { onUrunDuzenle(null) },
+            onConfirm = { ad, kategori, fiyat, stok -> onUrunKaydet(urun.id, ad, kategori, fiyat, stok) },
         )
     }
 
-    if (showCheckoutSheet) {
+    if (odemeAcik) {
         ModalBottomSheet(
-            onDismissRequest = { showCheckoutSheet = false },
-            sheetState = rememberModalBottomSheetState()
+            onDismissRequest = onOdemeKapat,
+            sheetState = rememberModalBottomSheetState(),
         ) {
-            CheckoutContent(
-                uiState = uiState,
-                onMemberSelect = viewModel::selectMember,
-                onPaymentTypeSelect = viewModel::setPaymentType,
-                onPaymentStatusSelect = viewModel::setPaymentStatus,
-                onDeliveryStatusSelect = viewModel::setDeliveryStatus,
-                onDiscountChange = { viewModel.setDiscount(Decimals.parseOrDefault(it)) },
-                onNotesChange = viewModel::setNotes,
-                // Sheet burada kapatılmaz: sonuç OrderCompleted olayıyla gelince kapanır,
-                // böylece başarısız sipariş sessizce "başarılı" gibi görünmez.
-                onConfirm = viewModel::checkout
+            OdemeIcerigi(
+                durum = durum,
+                onMemberSelect = onUyeSec,
+                onPaymentTypeSelect = onOdemeTuru,
+                onPaymentStatusSelect = onOdemeDurumu,
+                onDeliveryStatusSelect = onTeslimDurumu,
+                onDiscountChange = onIskonto,
+                onNotesChange = onNotlar,
+                // Sheet burada kapatılmıyor: sonuç olayla gelince kapanıyor,
+                // böylece başarısız sipariş sessizce "başarılı" gibi görünmüyor.
+                onConfirm = onOdemeOnayla,
             )
         }
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CheckoutContent(
-    uiState: MarketUiState,
+private fun OdemeIcerigi(
+    durum: MarketDurumu,
     onMemberSelect: (String?) -> Unit,
     onPaymentTypeSelect: (String) -> Unit,
     onPaymentStatusSelect: (PaymentState) -> Unit,
@@ -211,7 +254,7 @@ fun CheckoutContent(
     onConfirm: () -> Unit
 ) {
     var memberExpanded by remember { mutableStateOf(false) }
-    var discountText by remember { mutableStateOf(if (uiState.discount > 0) uiState.discount.toString() else "") }
+    var discountText by remember { mutableStateOf(if (durum.discount > 0) durum.discount.toString() else "") }
 
     Column(
         modifier = Modifier.padding(16.dp).fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -224,7 +267,7 @@ fun CheckoutContent(
             expanded = memberExpanded,
             onExpandedChange = { memberExpanded = it }
         ) {
-            val selectedMemberName = uiState.members.find { it.id == uiState.selectedMemberId }?.fullName ?: "Misafir (Guest)"
+            val selectedMemberName = durum.members.find { it.id == durum.selectedMemberId }?.fullName ?: "Misafir (Guest)"
             OutlinedTextField(
                 value = selectedMemberName,
                 onValueChange = {},
@@ -244,7 +287,7 @@ fun CheckoutContent(
                         memberExpanded = false
                     }
                 )
-                uiState.members.forEach { member ->
+                durum.members.forEach { member ->
                     DropdownMenuItem(
                         text = { Text(member.fullName) },
                         onClick = {
@@ -272,7 +315,7 @@ fun CheckoutContent(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("CASH" to "Nakit", "CARD" to "Kart").forEach { (valStr, label) ->
                 FilterChip(
-                    selected = uiState.paymentType == valStr,
+                    selected = durum.paymentType == valStr,
                     onClick = { onPaymentTypeSelect(valStr) },
                     label = { Text(label) }
                 )
@@ -286,7 +329,7 @@ fun CheckoutContent(
             // ekran kendiliğinden güncel kalıyor ve etiket tek yerden geliyor.
             PaymentState.entries.forEach { durum ->
                 FilterChip(
-                    selected = uiState.paymentStatus == durum,
+                    selected = durum.paymentStatus == durum,
                     onClick = { onPaymentStatusSelect(durum) },
                     label = { Text(durum.labelTr()) }
                 )
@@ -298,7 +341,7 @@ fun CheckoutContent(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("PRE_DELIVERY" to "Teslimden Önce", "POST_DELIVERY" to "Teslimden Sonra").forEach { (valStr, label) ->
                 FilterChip(
-                    selected = uiState.deliveryStatus == valStr,
+                    selected = durum.deliveryStatus == valStr,
                     onClick = { onDeliveryStatusSelect(valStr) },
                     label = { Text(label) }
                 )
@@ -309,7 +352,7 @@ fun CheckoutContent(
         // (`orders.notes`) zaten vardı, yalnızca girilecek kutu eklenmemişti.
         // Her sipariş notsuz kaydediliyordu.
         OutlinedTextField(
-            value = uiState.notes,
+            value = durum.notes,
             onValueChange = onNotesChange,
             label = { Text("Sipariş Notu") },
             placeholder = { Text("Örn: kasadan teslim alınacak") },
@@ -320,28 +363,28 @@ fun CheckoutContent(
         Spacer(Modifier.height(16.dp))
 
         Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
-            Text("Ara Toplam: ${ParaBicimi.tl(uiState.cartTotal)}", style = MaterialTheme.typography.bodyMedium)
-            if (uiState.cartDiscount.isPositive) {
-                Text("İndirim: -${ParaBicimi.tl(uiState.cartDiscount)}", style = MaterialTheme.typography.bodyMedium, color = Color.Red)
+            Text("Ara Toplam: ${ParaBicimi.tl(durum.cartTotal)}", style = MaterialTheme.typography.bodyMedium)
+            if (durum.cartDiscount.isPositive) {
+                Text("İndirim: -${ParaBicimi.tl(durum.cartDiscount)}", style = MaterialTheme.typography.bodyMedium, color = Color.Red)
             }
             // Girilen iskonto sepeti aşıyorsa sessizce kırpmak yerine söyleniyor:
             // kasiyer 80 yazıp 50 uygulandığını görmeliyse, görmeli.
-            if (Money.ofMajor(uiState.discount) > uiState.cartDiscount) {
+            if (Money.ofMajor(durum.discount) > durum.cartDiscount) {
                 Text(
-                    "Girilen indirim sepeti aşıyor; ${ParaBicimi.tl(uiState.cartDiscount)} uygulandı.",
+                    "Girilen indirim sepeti aşıyor; ${ParaBicimi.tl(durum.cartDiscount)} uygulandı.",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Red,
                 )
             }
-            Text("Genel Toplam: ${ParaBicimi.tl(uiState.cartFinal)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text("Genel Toplam: ${ParaBicimi.tl(durum.cartFinal)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         }
 
         Button(
             onClick = onConfirm,
-            enabled = !uiState.isCheckingOut,
+            enabled = !durum.isCheckingOut,
             modifier = Modifier.fillMaxWidth().height(56.dp)
         ) {
-            if (uiState.isCheckingOut) {
+            if (durum.isCheckingOut) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     strokeWidth = 2.dp,
@@ -355,7 +398,7 @@ fun CheckoutContent(
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun ProductGridItem(
+private fun UrunKarti(
     product: ProductEntity,
     /** Eldeki stok — ürün satırındaki sayaçtan değil, hareket toplamından gelir. */
     onHand: Int,
@@ -457,7 +500,7 @@ fun ProductGridItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddProductDialog(
+private fun UrunDiyalogu(
     product: ProductEntity? = null,
     onDismiss: () -> Unit,
     onConfirm: (String, String, Double, Int) -> Unit,

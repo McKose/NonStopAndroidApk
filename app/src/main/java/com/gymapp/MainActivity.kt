@@ -30,6 +30,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.gymapp.domain.Decimals
 import com.gymapp.data.local.entity.AppointmentEntity
+import com.gymapp.data.local.entity.ProductEntity
 import com.gymapp.data.local.entity.StaffEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Money
@@ -63,7 +64,9 @@ import com.gymapp.arayuz.uyeler.UyeKayitEkrani
 import com.gymapp.arayuz.finans.FinansEkrani
 import com.gymapp.presentation.finance.FinanceEvent
 import com.gymapp.presentation.finance.FinanceViewModel
-import com.gymapp.presentation.market.MarketScreen
+import com.gymapp.arayuz.market.MarketEkrani
+import com.gymapp.presentation.market.MarketEvent
+import com.gymapp.presentation.market.MarketViewModel
 import com.gymapp.arayuz.market.SiparisGecmisiEkrani
 import com.gymapp.presentation.market.OrderHistoryViewModel
 import com.gymapp.arayuz.ayarlar.AyarlarEkrani
@@ -193,10 +196,7 @@ class MainActivity : ComponentActivity() {
                                 FinansBagla(navController)
                             }
                             composable("market") {
-                                MarketScreen(
-                                    onNavigateBack = { navController.popBackStack() },
-                                    onNavigateToOrders = { navController.navigate("order_history") }
-                                )
+                                MarketBagla(navController)
                             }
                             composable("order_history") {
                                 val siparisModeli: OrderHistoryViewModel = koinViewModel()
@@ -772,6 +772,72 @@ private fun FinansBagla(navController: androidx.navigation.NavHostController) {
             )
             eklemeAcik = false
         },
+        snackbarDurumu = snackbarDurumu,
+    )
+}
+
+/** Market / POS ekranının Android bağlaması. */
+@Composable
+private fun MarketBagla(navController: androidx.navigation.NavHostController) {
+    val model: MarketViewModel = koinViewModel()
+    val durum by model.uiState.collectAsState()
+    val urunYonetebilir by model.canManageProducts.collectAsState()
+    val snackbarDurumu = remember { SnackbarHostState() }
+
+    var urunEklemeAcik by remember { mutableStateOf(false) }
+    var duzenlenenUrun by remember { mutableStateOf<ProductEntity?>(null) }
+    var odemeAcik by remember { mutableStateOf(false) }
+
+    // Sipariş sonucu her durumda bildiriliyor. Ödeme sayfası yalnızca
+    // BAŞARIDA kapanıyor: başarısız sipariş sessizce "başarılı" görünmesin.
+    LaunchedEffect(Unit) {
+        model.events.collect { olay ->
+            when (olay) {
+                is MarketEvent.OrderCompleted -> {
+                    odemeAcik = false
+                    snackbarDurumu.showSnackbar("Sipariş tamamlandı (#${olay.orderId.take(8)})")
+                }
+                is MarketEvent.ProductSaved -> snackbarDurumu.showSnackbar("Ürün kaydedildi.")
+                is MarketEvent.ProductDeleted -> snackbarDurumu.showSnackbar("Ürün silindi.")
+                is MarketEvent.Failed -> snackbarDurumu.showSnackbar(olay.message)
+            }
+        }
+    }
+
+    MarketEkrani(
+        durum = durum,
+        urunYonetebilir = urunYonetebilir,
+        urunEklemeAcik = urunEklemeAcik,
+        duzenlenenUrun = duzenlenenUrun,
+        odemeAcik = odemeAcik,
+        onGeri = { navController.popBackStack() },
+        onSiparisGecmisi = { navController.navigate("order_history") },
+        onUrunEklemeAc = { urunEklemeAcik = true },
+        onUrunEklemeKapat = { urunEklemeAcik = false },
+        onUrunDuzenle = { duzenlenenUrun = it },
+        onSepeteEkle = { model.addToCart(it) },
+        onSepettenCikar = { model.removeFromCart(it) },
+        onUrunSil = { model.deleteProduct(it) },
+        onUrunKaydet = { urunId, ad, kategori, fiyat, stok ->
+            model.saveProduct(
+                productId = urunId,
+                name = ad,
+                category = kategori,
+                price = fiyat,
+                stock = stok,
+            )
+            urunEklemeAcik = false
+            duzenlenenUrun = null
+        },
+        onOdemeAc = { odemeAcik = true },
+        onOdemeKapat = { odemeAcik = false },
+        onUyeSec = { model.selectMember(it) },
+        onOdemeTuru = { model.setPaymentType(it) },
+        onOdemeDurumu = { model.setPaymentStatus(it) },
+        onTeslimDurumu = { model.setDeliveryStatus(it) },
+        onIskonto = { model.setDiscount(Decimals.parseOrDefault(it)) },
+        onNotlar = { model.setNotes(it) },
+        onOdemeOnayla = { model.checkout() },
         snackbarDurumu = snackbarDurumu,
     )
 }
