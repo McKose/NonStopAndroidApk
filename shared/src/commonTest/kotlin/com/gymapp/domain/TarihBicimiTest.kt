@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.gymapp.domain
 
 import kotlinx.datetime.TimeZone

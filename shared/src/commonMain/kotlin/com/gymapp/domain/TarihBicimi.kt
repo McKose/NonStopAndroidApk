@@ -1,3 +1,7 @@
+// `Instant` artık `kotlin.time.Instant`'a takma ad (kotlinx-datetime 0.7);
+// o tip henüz deneysel işaretli olduğu için opt-in gerekiyor.
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.gymapp.domain
 
 import kotlinx.datetime.Instant
