@@ -1,10 +1,11 @@
-// `Instant` artık `kotlin.time.Instant`'a takma ad (kotlinx-datetime 0.7);
-// o tip henüz deneysel işaretli olduğu için opt-in gerekiyor.
+// `Instant` kotlinx-datetime 0.7'den beri `kotlin.time.Instant`'a takma ad.
+// Takma ad yerine asıl tip yazılıyor: kullanım aynı, ama kullanımdan kaldırma
+// uyarısı üretmiyor. Tip bu Kotlin sürümünde henüz deneysel işaretli.
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.gymapp.domain
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
