@@ -61,7 +61,15 @@ kotlin {
         // karşılığı tek yere indi ama iOS karşılıkları hiçbir hedefe bağlanmadı.
         // Tek satırlık tekrar bu bedelden ucuz.
         commonMain.dependencies {
-            implementation(libs.kotlinx.datetime)
+            // `TarihBicimi`'nin her fonksiyonu `zaman: TimeZone = ...` varsayılan
+            // parametresi taşıyor, yani `TimeZone` modülün DIŞA AÇIK imzasında
+            // görünüyor — aşağıdaki `Flow` gerekçesinin aynısı, dolayısıyla `api`.
+            //
+            // `implementation` iken çağıran modül derleniyordu (varsayılan
+            // parametre yazılmadığında tip imzada geçmiyor) ama çalışma anında
+            // sınıfı bulamıyordu: `arayuz`'un sipariş geçmişi testi tam bu
+            // yüzden `NoClassDefFoundError` ile düştü.
+            api(libs.kotlinx.datetime)
             api(libs.koin.core)
             // Repository'ler dışarıya `Flow` döndürüyor; tip imzada göründüğü
             // için `api`. `implementation` olsaydı uygulama tarafı bu tipi

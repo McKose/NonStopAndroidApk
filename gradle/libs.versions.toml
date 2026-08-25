@@ -44,7 +44,7 @@ ktor            = "3.3.1"
 kotlinxSerialization = "1.9.0"
 
 # Kotlin Multiplatform
-kotlinxDatetime = "0.6.1"
+kotlinxDatetime = "0.7.1"
 kotlinxCoroutines = "1.9.0"
 
 # Room'un KMP tarafında kullandığı SQLite sürücüsü (Room 2.7.x ile eşleşir)

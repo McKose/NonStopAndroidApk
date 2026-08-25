@@ -270,6 +270,8 @@ jobs:
             shared/build/test-results/
             app/build/reports/tests/
             app/build/test-results/
+            arayuz/build/reports/tests/
+            arayuz/build/test-results/
           retention-days: 7
           if-no-files-found: ignore
 
