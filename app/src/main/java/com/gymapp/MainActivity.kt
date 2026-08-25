@@ -58,7 +58,7 @@ import com.gymapp.presentation.members.MemberDetailScreen
 import com.gymapp.arayuz.uyeler.UyeListesiEkrani
 import com.gymapp.presentation.members.MemberEvent
 import com.gymapp.presentation.members.MemberViewModel
-import com.gymapp.presentation.members.RegisterMemberScreen
+import com.gymapp.arayuz.uyeler.UyeKayitEkrani
 import com.gymapp.presentation.finance.FinanceScreen
 import com.gymapp.presentation.market.MarketScreen
 import com.gymapp.arayuz.market.SiparisGecmisiEkrani
@@ -210,20 +210,14 @@ class MainActivity : ComponentActivity() {
                                 PersonnelScreen(onNavigateBack = { navController.popBackStack() })
                             }
                             composable("register_member") {
-                                RegisterMemberScreen(
-                                    onNavigateBack = { navController.popBackStack() }
-                                )
+                                UyeKayitBagla(navController, yenileme = false, uyeId = "")
                             }
                             composable(
                                 route = "renew_package/{memberId}",
                                 arguments = listOf(navArgument("memberId") { type = NavType.StringType })
                             ) { backStackEntry ->
                                 val memberId = backStackEntry.arguments?.getString("memberId").orEmpty()
-                                RegisterMemberScreen(
-                                    isRenewal = true,
-                                    memberId = memberId,
-                                    onNavigateBack = { navController.popBackStack() }
-                                )
+                                UyeKayitBagla(navController, yenileme = true, uyeId = memberId)
                             }
                             composable(
                                 route = "member_detail/{memberId}",
@@ -604,5 +598,59 @@ private fun TakvimBagla(navController: androidx.navigation.NavHostController) {
             model.updateAppointmentStatus(randevuId, yeniDurum, not)
         },
         snackbarDurumu = snackbarDurumu,
+    )
+}
+
+/**
+ * Üye kaydı / paket yenilemenin Android bağlaması.
+ *
+ * Tek bağlama iki rotayı da karşılıyor; aralarındaki fark yalnızca
+ * [yenileme] ve [uyeId].
+ *
+ * Ekran ViewModel tanımıyor: form durumunu bütün hâlde alıyor,
+ * değişiklikleri alan alan bildiriyor. Doğrulama ve fiyat hesabı burada
+ * değil ViewModel'de kalıyor — ekranın işi "kullanıcı bu alana bunu yazdı"
+ * demek.
+ */
+@Composable
+private fun UyeKayitBagla(
+    navController: androidx.navigation.NavHostController,
+    yenileme: Boolean,
+    uyeId: String,
+) {
+    val model: MemberViewModel = koinViewModel()
+    val form by model.formState.collectAsState()
+    val paketler by model.packages.collectAsState()
+
+    LaunchedEffect(yenileme, uyeId) {
+        if (yenileme && uyeId.isNotBlank()) model.loadMemberForRenewal(uyeId)
+        else if (!yenileme) model.resetForm()
+    }
+
+    // Kayıt başarılıysa ekran kapanıyor; başarısızsa form (ve yazılanlar)
+    // duruyor ve hata kartı görünüyor.
+    LaunchedEffect(form.submitSuccess) {
+        if (form.submitSuccess) navController.popBackStack()
+    }
+
+    UyeKayitEkrani(
+        form = form,
+        paketler = paketler,
+        taksitSecenekleri = model.installmentOptions,
+        yenileme = yenileme,
+        onGeri = { navController.popBackStack() },
+        onAdSoyad = model::onFullNameChange,
+        onTelefon = model::onPhoneChange,
+        onEposta = model::onEmailChange,
+        onSaglikRiskleri = model::onHealthRisksChange,
+        onSaglikNotlari = model::onHealthNotesChange,
+        onPaketSecildi = { model.onPackageSelected(it) },
+        onDevir = model::onCarryOverChange,
+        onIskonto = model::onDiscountChange,
+        onOdemeTuru = model::onPaymentTypeChange,
+        onOdemeDurumu = model::onPaymentStatusChange,
+        onTaksit = model::onInstallmentChange,
+        onNotlar = model::onNotesChange,
+        onKaydet = model::submitRegistration,
     )
 }
