@@ -24,6 +24,7 @@ import com.gymapp.domain.PaymentState
 import com.gymapp.domain.Decimals
 import com.gymapp.domain.LedgerType
 import com.gymapp.domain.Membership
+import com.gymapp.arayuz.uyeler.TahsilatDiyalogu
 import com.gymapp.domain.Money
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.SessionQuota
@@ -167,14 +168,14 @@ fun GeneralInfoTab(member: MemberEntity, viewModel: MemberViewModel = koinViewMo
 
                 var tahsilatAcik by remember { mutableStateOf(false) }
                 if (tahsilatAcik) {
-                    PaymentDialog(
-                        memberName = member.fullName,
-                        outstanding = kalanBorc ?: Money.ZERO,
-                        onConfirm = { tutar ->
+                    TahsilatDiyalogu(
+                        uyeAdi = member.fullName,
+                        kalanBorc = kalanBorc ?: Money.ZERO,
+                        onOnayla = { tutar ->
                             tahsilatAcik = false
                             viewModel.markAsPaid(member.id, tutar)
                         },
-                        onDismiss = { tahsilatAcik = false },
+                        onVazgec = { tahsilatAcik = false },
                     )
                 }
 

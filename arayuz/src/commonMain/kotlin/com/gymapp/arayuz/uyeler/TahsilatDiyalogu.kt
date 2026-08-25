@@ -1,4 +1,4 @@
-package com.gymapp.presentation.members
+package com.gymapp.arayuz.uyeler
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -38,29 +38,29 @@ import com.gymapp.domain.Money
  * listelerde uyarı üretmeye devam ediyor.
  */
 @Composable
-fun PaymentDialog(
-    memberName: String,
-    outstanding: Money,
-    onConfirm: (Money) -> Unit,
-    onDismiss: () -> Unit,
+fun TahsilatDiyalogu(
+    uyeAdi: String,
+    kalanBorc: Money,
+    onOnayla: (Money) -> Unit,
+    onVazgec: () -> Unit,
 ) {
     // Varsayılan kalan borcun tamamı: eski davranış, ama artık görünür.
-    var tutarMetni by remember(outstanding) { mutableStateOf(outstanding.toString()) }
+    var tutarMetni by remember(kalanBorc) { mutableStateOf(kalanBorc.toString()) }
 
     val girilen = Money.parseOrNull(tutarMetni)
     val hata: String? = when {
         girilen == null -> "Geçerli bir tutar girin."
         !girilen.isPositive -> "Tutar sıfırdan büyük olmalı."
-        girilen > outstanding -> "Kalan borçtan fazla tahsil edilemez."
+        girilen > kalanBorc -> "Kalan borçtan fazla tahsil edilemez."
         else -> null
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = onVazgec,
         title = { Text("Tahsilat") },
         text = {
             Column {
-                Text("$memberName için kalan borç: ₺$outstanding")
+                Text("$uyeAdi için kalan borç: ₺$kalanBorc")
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = tutarMetni,
@@ -75,10 +75,10 @@ fun PaymentDialog(
                     Spacer(Modifier.height(4.dp))
                     Text(hata, color = MaterialTheme.colorScheme.error)
                 }
-                if (hata == null && girilen != null && girilen < outstanding) {
+                if (hata == null && girilen != null && girilen < kalanBorc) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Kısmi tahsilat: ₺${outstanding - girilen} borç kalmaya devam edecek.",
+                        "Kısmi tahsilat: ₺${kalanBorc - girilen} borç kalmaya devam edecek.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -87,11 +87,11 @@ fun PaymentDialog(
         confirmButton = {
             TextButton(
                 enabled = hata == null,
-                onClick = { girilen?.let(onConfirm) },
+                onClick = { girilen?.let(onOnayla) },
             ) { Text("Tahsil et") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Vazgeç") }
+            TextButton(onClick = onVazgec) { Text("Vazgeç") }
         },
     )
 }

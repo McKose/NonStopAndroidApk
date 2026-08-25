@@ -29,7 +29,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.gymapp.domain.Decimals
+import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Money
+import com.gymapp.domain.Now
 import com.gymapp.domain.labelTr
 import com.gymapp.data.auth.SessionManager
 import com.gymapp.data.sync.ArkaPlanSenkronizasyonu
@@ -50,7 +52,9 @@ import com.gymapp.arayuz.paketler.PaketListesiEkrani
 import com.gymapp.presentation.packages.PackageEvent
 import com.gymapp.presentation.packages.PackageViewModel
 import com.gymapp.presentation.members.MemberDetailScreen
-import com.gymapp.presentation.members.MemberListScreen
+import com.gymapp.arayuz.uyeler.UyeListesiEkrani
+import com.gymapp.presentation.members.MemberEvent
+import com.gymapp.presentation.members.MemberViewModel
 import com.gymapp.presentation.members.RegisterMemberScreen
 import com.gymapp.presentation.finance.FinanceScreen
 import com.gymapp.presentation.market.MarketScreen
@@ -174,29 +178,7 @@ class MainActivity : ComponentActivity() {
                                 CalendarScreen(onNavigateBack = { navController.popBackStack() })
                             }
                             composable("member_list") {
-                                MemberListScreen(
-                                    onNavigateToRegister = {
-                                        navController.navigate("register_member")
-                                    },
-                                    onNavigateToDetail = { memberId ->
-                                        navController.navigate("member_detail/$memberId")
-                                    },
-                                    onNavigateToPackages = {
-                                        navController.navigate("package_list")
-                                    },
-                                    onNavigateToFinance = {
-                                        navController.navigate("finance")
-                                    },
-                                    onNavigateToMarket = {
-                                        navController.navigate("market")
-                                    },
-                                    onNavigateToSettings = {
-                                        navController.navigate("settings")
-                                    },
-                                    onNavigateToRenew = { memberId ->
-                                        navController.navigate("renew_package/$memberId")
-                                    }
-                                )
+                                UyeListesiBagla(navController)
                             }
                             composable("finance") {
                                 FinanceScreen(onNavigateBack = { navController.popBackStack() })
@@ -478,5 +460,81 @@ private fun PanoBagla(navController: androidx.navigation.NavHostController) {
         onTakvim = { navController.navigate("calendar") },
         onPaketler = { navController.navigate("package_list") },
         onAyarlar = { navController.navigate("settings") },
+    )
+}
+
+/**
+ * Üye listesinin Android bağlaması.
+ *
+ * Ekran `arayuz` modülünde. Burada üç şey yapılıyor:
+ *
+ *  1. Saat okunuyor. Ekran `System.currentTimeMillis()` çağırıyordu; artık
+ *     değer ortak `Now`'dan gelip parametre olarak geçiyor.
+ *  2. Tahsilat diyaloğunun kalan borcu **askıya alınabilir** bir çağrıyla
+ *     getiriliyor. Ekran bunu yapamaz; hangi üye için diyalog istendiğini
+ *     bildiriyor, borcu buradaki etki getiriyor.
+ *  3. Olaylar Snackbar'a bağlanıyor. Tahsilat sonucu önceden yutuluyordu,
+ *     yani reddedilen bir tahsilat başarılı olandan ayırt edilemiyordu.
+ */
+@Composable
+private fun UyeListesiBagla(navController: androidx.navigation.NavHostController) {
+    val model: MemberViewModel = koinViewModel()
+    val durum by model.listUiState.collectAsState()
+    val snackbarDurumu = remember { SnackbarHostState() }
+
+    var tahsilatUyesi by remember { mutableStateOf<MemberEntity?>(null) }
+    var tahsilatBorcu by remember { mutableStateOf<Money?>(null) }
+
+    // Borç, diyalog istendiğinde okunuyor. `null` kaldığı sürece ekran
+    // diyaloğu çizmiyor: yanlış bir tutar göstermektense beklemek doğru.
+    LaunchedEffect(tahsilatUyesi?.id) {
+        val uye = tahsilatUyesi
+        tahsilatBorcu = if (uye == null) null else model.outstandingBalance(uye.id)
+    }
+
+    LaunchedEffect(Unit) {
+        model.events.collect { olay ->
+            when (olay) {
+                is MemberEvent.Saved -> snackbarDurumu.showSnackbar(olay.message)
+                is MemberEvent.Failed -> snackbarDurumu.showSnackbar(olay.message)
+                // Silme detay ekranından yapılıyor.
+                is MemberEvent.Deleted -> Unit
+            }
+        }
+    }
+
+    fun tahsilatiKapat() {
+        tahsilatUyesi = null
+        tahsilatBorcu = null
+    }
+
+    UyeListesiEkrani(
+        uyeler = durum.members,
+        yukleniyor = durum.isLoading,
+        arama = durum.searchQuery,
+        rol = durum.role,
+        kapsam = durum.kapsam,
+        kapsamSecilebilir = durum.kapsamSecilebilir,
+        personelBaglantisiYok = durum.personelBaglantisiYok,
+        simdiMs = Now.epochMillis(),
+        tahsilatUyesi = tahsilatUyesi,
+        tahsilatBorcu = tahsilatBorcu,
+        onAramaDegisti = { model.onSearchQueryChange(it) },
+        onKapsamDegisti = { model.onKapsamChange(it) },
+        onUyeAc = { navController.navigate("member_detail/$it") },
+        onYeniUye = { navController.navigate("register_member") },
+        onYenile = { navController.navigate("renew_package/$it") },
+        onTahsilatIste = { tahsilatUyesi = it },
+        onTahsilatOnayla = { tutar ->
+            val uye = tahsilatUyesi
+            tahsilatiKapat()
+            if (uye != null) model.markAsPaid(uye.id, tutar)
+        },
+        onTahsilatVazgec = { tahsilatiKapat() },
+        onPaketler = { navController.navigate("package_list") },
+        onFinans = { navController.navigate("finance") },
+        onMarket = { navController.navigate("market") },
+        onAyarlar = { navController.navigate("settings") },
+        snackbarDurumu = snackbarDurumu,
     )
 }
