@@ -30,6 +30,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.gymapp.domain.Decimals
 import com.gymapp.data.local.entity.AppointmentEntity
+import com.gymapp.data.local.entity.StaffEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Money
 import com.gymapp.domain.Now
@@ -65,7 +66,10 @@ import com.gymapp.arayuz.market.SiparisGecmisiEkrani
 import com.gymapp.presentation.market.OrderHistoryViewModel
 import com.gymapp.arayuz.ayarlar.AyarlarEkrani
 import com.gymapp.presentation.settings.SettingsViewModel
-import com.gymapp.presentation.settings.PersonnelScreen
+import com.gymapp.arayuz.personel.PersonelEkrani
+import com.gymapp.arayuz.personel.PersonelFormHedefi
+import com.gymapp.presentation.settings.PersonnelEvent
+import com.gymapp.presentation.settings.PersonnelViewModel
 
 import com.gymapp.ui.theme.GymAppTheme
 
@@ -207,7 +211,7 @@ class MainActivity : ComponentActivity() {
                                 AyarlarBagla(navController)
                             }
                             composable("personnel") {
-                                PersonnelScreen(onNavigateBack = { navController.popBackStack() })
+                                PersonelBagla(navController)
                             }
                             composable("register_member") {
                                 UyeKayitBagla(navController, yenileme = false, uyeId = "")
@@ -652,5 +656,65 @@ private fun UyeKayitBagla(
         onTaksit = model::onInstallmentChange,
         onNotlar = model::onNotesChange,
         onKaydet = model::submitRegistration,
+    )
+}
+
+/**
+ * Personel yönetiminin Android bağlaması.
+ *
+ * Diyalogların açık/kapalı hâli burada tutuluyor çünkü kapatma kararı
+ * SONUCA bağlı: kayıt başarılıysa diyalog kapanıyor, reddedilirse açık
+ * kalıyor ki kullanıcı yazdıklarını kaybetmesin.
+ */
+@Composable
+private fun PersonelBagla(navController: androidx.navigation.NavHostController) {
+    val model: PersonnelViewModel = koinViewModel()
+    val personeller by model.staffList.collectAsState(initial = emptyList())
+    val yazabilir by model.canWrite.collectAsState()
+    val snackbarDurumu = remember { SnackbarHostState() }
+
+    var formHedefi by remember { mutableStateOf<PersonelFormHedefi?>(null) }
+    var silinecek by remember { mutableStateOf<StaffEntity?>(null) }
+
+    LaunchedEffect(Unit) {
+        model.events.collect { olay ->
+            when (olay) {
+                is PersonnelEvent.Saved -> formHedefi = null
+                is PersonnelEvent.Deleted -> snackbarDurumu.showSnackbar("Personel silindi.")
+                is PersonnelEvent.Failed -> snackbarDurumu.showSnackbar(olay.message)
+            }
+        }
+    }
+
+    PersonelEkrani(
+        personeller = personeller,
+        yazabilir = yazabilir,
+        formHedefi = formHedefi,
+        silinecek = silinecek,
+        onGeri = { navController.popBackStack() },
+        onYeniPersonel = { formHedefi = PersonelFormHedefi(null) },
+        onPersonelSec = { formHedefi = PersonelFormHedefi(it) },
+        onFormKapat = { formHedefi = null },
+        onKaydet = { personelId, form ->
+            model.saveStaff(
+                staffId = personelId,
+                name = form.name,
+                title = form.title,
+                branch = form.branch,
+                commissionPercent = form.commissionPercent,
+                salary = form.salary,
+                phone = form.phone,
+                nickname = form.nickname,
+                role = form.role,
+                authUserId = form.authUserId,
+            )
+        },
+        onSilIste = { silinecek = it },
+        onSilOnayla = { id ->
+            model.deleteStaff(id)
+            silinecek = null
+        },
+        onSilVazgec = { silinecek = null },
+        snackbarDurumu = snackbarDurumu,
     )
 }
