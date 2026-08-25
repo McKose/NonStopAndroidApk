@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.gymapp.data.access.AppDestination
 import com.gymapp.data.auth.CurrentUser
 import com.gymapp.data.repository.FinanceRepository
+import com.gymapp.arayuz.finans.FinansKaydi
+import com.gymapp.arayuz.finans.finansKaydinaCevir
 import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
@@ -15,7 +17,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 data class FinanceUiState(
-    val entries: List<FinanceEntry> = emptyList(),
+    val entries: List<FinansKaydi> = emptyList(),
     val totalIncome: Money = Money.ZERO,
     val totalExpense: Money = Money.ZERO,
     val totalProfit: Money = Money.ZERO,
@@ -71,11 +73,11 @@ class FinanceViewModel(
      * Ters kayıtla iptal edilmiş kayıtlar listede görünür (denetim izi) ama
      * toplamlara girmez.
      */
-    private val allEntries: Flow<List<FinanceEntry>> =
+    private val allEntries: Flow<List<FinansKaydi>> =
         repository.observeLedgerBetween(startMs = 0L, endMs = Long.MAX_VALUE)
             .map { ledger ->
                 val reversedIds = ledger.mapNotNull { it.reversesId }.toSet()
-                ledger.map { it.toFinanceEntry(reversedIds) }
+                ledger.map { it.finansKaydinaCevir(reversedIds) }
                     .sortedByDescending { entry -> entry.occurredAtMs }
             }
 
@@ -188,7 +190,7 @@ class FinanceViewModel(
     }
 
     /** Hatalı kaydı ters kayıtla iptal eder; kayıt silinmez, denetim izi korunur. */
-    fun voidEntry(entry: FinanceEntry, reason: String = "Kullanıcı düzeltmesi") {
+    fun voidEntry(entry: FinansKaydi, reason: String = "Kullanıcı düzeltmesi") {
         viewModelScope.launch {
             repository.voidEntry(entry.id, reason).fold(
                 onSuccess = { _events.send(FinanceEvent.Saved) },

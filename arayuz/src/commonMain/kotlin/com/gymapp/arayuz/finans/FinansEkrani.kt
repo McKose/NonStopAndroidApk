@@ -1,8 +1,17 @@
-package com.gymapp.presentation.finance
+package com.gymapp.arayuz.finans
 
-import com.gymapp.domain.ParaBicimi
-import com.gymapp.domain.TarihBicimi
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -18,192 +27,197 @@ import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import org.koin.androidx.compose.koinViewModel
 import com.gymapp.arayuz.ortak.SaltOkunurSerit
 import com.gymapp.domain.Money
+import com.gymapp.domain.ParaBicimi
 import com.gymapp.domain.PaymentMethod
+import com.gymapp.domain.TarihBicimi
+
+/** Tür süzgecinin değerleri; ViewModel de aynı metinleri bekliyor. */
+object FinansSuzgeci {
+    const val TUMU = "ALL"
+    const val GELIR = "INCOME"
+    const val GIDER = "EXPENSE"
+    const val BEKLEYEN = "PENDING"
+}
 
 /**
- * Finans ekranına yetkisiz gelindiğinde gösterilen ekran.
+ * Finans ekranı — `app`'teki `FinanceScreen`'in ortak modüle taşınmış hâli.
  *
- * Boş bir liste ya da sıfır dolu bir özet göstermek daha kötü olurdu: eğitmen
- * salonun hiç geliri olmadığını sanırdı.
+ * ### Yetkisiz görünüm ekranın içinde
+ * [gorebilir] `false` iken defter hiç çizilmiyor; yerine sebebi yazan bir
+ * ekran geliyor. Boş liste ya da sıfır dolu bir özet göstermek daha kötü
+ * olurdu: eğitmen salonun hiç geliri olmadığını sanırdı. Giriş noktalarının
+ * gizlenmesine ek bir kat — gizlenmiş düğme kural değil, yalnızca görüntü.
+ *
+ * ### Durum sınıfı yerine parametreler
+ * `FinanceUiState` `app`'te kalıyor: varsayılan değerleri `LocalDate.now()`
+ * kullanıyor ve o çağrı JVM'e özgü. Sınıfı taşımak, ortak modülde
+ * derlenmeyen bir varsayılanı da beraberinde getirirdi.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun YetkiYokEkrani(onNavigateBack: () -> Unit) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Finansal Durum", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Box(
-            modifier = Modifier.padding(padding).fillMaxSize().padding(24.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            SaltOkunurSerit(
-                "Finans ekranı salon sahibi ve yöneticiye açık. Kendi hakediş " +
-                    "kayıtlarınızı üye ve randevu ekranlarından görebilirsiniz."
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun FinanceScreen(
-    onNavigateBack: () -> Unit,
-    viewModel: FinanceViewModel = koinViewModel()
+fun FinansEkrani(
+    gorebilir: Boolean,
+    ay: Int,
+    yil: Int,
+    aylikCiro: Money,
+    ucAylikCiro: Money,
+    altiAylikCiro: Money,
+    yillikCiro: Money,
+    gelir: Money,
+    gider: Money,
+    netKar: Money,
+    turSuzgeci: String,
+    yontemSuzgeci: String,
+    kayitlar: List<FinansKaydi>,
+    eklemeAcik: Boolean,
+    onGeri: () -> Unit,
+    onDonemDegisti: (ay: Int, yil: Int) -> Unit,
+    onTurSuzgeci: (String) -> Unit,
+    onYontemSuzgeci: (String) -> Unit,
+    onEklemeAc: () -> Unit,
+    onEklemeKapat: () -> Unit,
+    onKayitEkle: (tutar: String, kategori: String, aciklama: String, yontem: String, gelirMi: Boolean) -> Unit,
+    snackbarDurumu: SnackbarHostState = remember { SnackbarHostState() },
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val gorebilir by viewModel.gorebilir.collectAsState()
-    var showAddDialog by remember { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    // Yetkisi olmayana defter hiç çizilmiyor. Giriş noktalarının gizlenmesine
-    // ek bir kat: gizlenmiş düğme kural değil, yalnızca görüntü.
     if (!gorebilir) {
-        YetkiYokEkrani(onNavigateBack)
+        YetkiYokEkrani(onGeri)
         return
     }
 
-    // Kayıt sonucu her durumda kullanıcıya bildirilir.
-    LaunchedEffect(Unit) {
-        viewModel.events.collect { event ->
-            when (event) {
-                is FinanceEvent.Saved -> snackbarHostState.showSnackbar("Kayıt eklendi.")
-                is FinanceEvent.Failed -> snackbarHostState.showSnackbar(event.message)
-            }
-        }
-    }
-
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarDurumu) },
         topBar = {
             TopAppBar(
                 title = { Text("Finansal Durum", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = onGeri) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
-                }
+                },
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }, containerColor = MaterialTheme.colorScheme.primary) {
+            FloatingActionButton(
+                onClick = onEklemeAc,
+                containerColor = MaterialTheme.colorScheme.primary,
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "İşlem Ekle", tint = Color.White)
             }
-        }
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            // ─── Dönem Seçici ──────────────────────────────────────────
-            MonthYearPicker(
-                selectedMonth = uiState.selectedMonth,
-                selectedYear = uiState.selectedYear,
-                onMonthChanged = { month, year ->
-                    viewModel.setPeriod(month, year)
-                }
-            )
+        },
+    ) { bosluk ->
+        Column(modifier = Modifier.padding(bosluk).fillMaxSize()) {
+            DonemSecici(ay = ay, yil = yil, onDonemDegisti = onDonemDegisti)
 
-            // ─── Ciro Kartları (Aylık, 3 Aylık, 6 Aylık, Yıllık) ───────────────────
             LazyRow(
                 modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(vertical = 8.dp)
+                contentPadding = PaddingValues(vertical = 8.dp),
             ) {
-                item { RevenueCard("Aylık Ciro", uiState.monthlyRevenue) }
-                item { RevenueCard("3 Aylık Ciro", uiState.quarterlyRevenue) }
-                item { RevenueCard("6 Aylık Ciro", uiState.halfYearlyRevenue) }
-                item { RevenueCard("Yıllık Ciro", uiState.yearlyRevenue) }
+                item { CiroKarti("Aylık Ciro", aylikCiro) }
+                item { CiroKarti("3 Aylık Ciro", ucAylikCiro) }
+                item { CiroKarti("6 Aylık Ciro", altiAylikCiro) }
+                item { CiroKarti("Yıllık Ciro", yillikCiro) }
             }
 
-            // ─── Finansal Özet Kartları ─────────────────────────────────
             Row(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                FinanceSummaryCard(
-                    label = "Aylık Gelir",
-                    amount = uiState.totalIncome,
-                    icon = Icons.Default.TrendingUp,
-                    color = Color(0xFF4CAF50),
-                    modifier = Modifier.weight(1f)
+                OzetKarti(
+                    etiket = "Aylık Gelir",
+                    tutar = gelir,
+                    ikon = Icons.Default.TrendingUp,
+                    renk = Color(0xFF4CAF50),
+                    modifier = Modifier.weight(1f),
                 )
-                FinanceSummaryCard(
-                    label = "Aylık Gider",
-                    amount = uiState.totalExpense,
-                    icon = Icons.Default.TrendingDown,
-                    color = Color(0xFFF44336),
-                    modifier = Modifier.weight(1f)
+                OzetKarti(
+                    etiket = "Aylık Gider",
+                    tutar = gider,
+                    ikon = Icons.Default.TrendingDown,
+                    renk = Color(0xFFF44336),
+                    modifier = Modifier.weight(1f),
                 )
-                FinanceSummaryCard(
-                    label = "Net Kâr",
-                    amount = uiState.totalProfit,
-                    icon = Icons.Default.AccountBalanceWallet,
-                    color = if (!uiState.totalProfit.isNegative) Color(0xFF2196F3) else Color(0xFFFF9800),
-                    modifier = Modifier.weight(1f)
+                OzetKarti(
+                    etiket = "Net Kâr",
+                    tutar = netKar,
+                    ikon = Icons.Default.AccountBalanceWallet,
+                    renk = if (!netKar.isNegative) Color(0xFF2196F3) else Color(0xFFFF9800),
+                    modifier = Modifier.weight(1f),
                 )
             }
 
-            // ─── Filtre Çipleri ──────────────────────────────────────────
             Row(
                 modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                FilterChip(
-                    selected = uiState.selectedFilter == "ALL",
-                    onClick = { viewModel.setFilter("ALL") },
-                    label = { Text("Tümü") }
-                )
-                FilterChip(
-                    selected = uiState.selectedFilter == "INCOME",
-                    onClick = { viewModel.setFilter("INCOME") },
-                    label = { Text("Gelir") }
-                )
-                FilterChip(
-                    selected = uiState.selectedFilter == "EXPENSE",
-                    onClick = { viewModel.setFilter("EXPENSE") },
-                    label = { Text("Gider") }
-                )
-                FilterChip(
-                    selected = uiState.selectedFilter == "PENDING",
-                    onClick = { viewModel.setFilter("PENDING") },
-                    label = { Text("Bekleyen") }
-                )
-            }
-
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf("ALL" to "Tümü", "CASH" to "Nakit", "CARD" to "Kart", "MULTISPORT" to "Multi").forEach { (id, label) ->
+                listOf(
+                    FinansSuzgeci.TUMU to "Tümü",
+                    FinansSuzgeci.GELIR to "Gelir",
+                    FinansSuzgeci.GIDER to "Gider",
+                    FinansSuzgeci.BEKLEYEN to "Bekleyen",
+                ).forEach { (deger, etiket) ->
                     FilterChip(
-                        selected = uiState.selectedPaymentMethod == id,
-                        onClick = { viewModel.setMethodFilter(id) },
-                        label = { Text(label) }
+                        selected = turSuzgeci == deger,
+                        onClick = { onTurSuzgeci(deger) },
+                        label = { Text(etiket) },
                     )
                 }
             }
 
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf("ALL" to "Tümü", "CASH" to "Nakit", "CARD" to "Kart", "MULTISPORT" to "Multi")
+                    .forEach { (deger, etiket) ->
+                        FilterChip(
+                            selected = yontemSuzgeci == deger,
+                            onClick = { onYontemSuzgeci(deger) },
+                            label = { Text(etiket) },
+                        )
+                    }
+            }
+
             Spacer(Modifier.height(8.dp))
 
-            // ─── İşlem Listesi ──────────────────────────────────────────
-            if (uiState.entries.isEmpty()) {
+            if (kayitlar.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Bu dönemde işlem bulunamadı.", color = Color.Gray)
                 }
@@ -211,39 +225,60 @@ fun FinanceScreen(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(uiState.entries) { transaction ->
-                        TransactionListItem(transaction)
-                    }
+                    items(kayitlar) { kayit -> KayitSatiri(kayit) }
                 }
             }
         }
     }
 
-    if (showAddDialog) {
-        AddExpenseDialog(
-            onDismiss = { showAddDialog = false },
-            onConfirm = { amountText, category, desc, method, isIncome ->
-                // Yeni yazımların tamamı deftere gider.
-                viewModel.addEntry(
-                    amountText = amountText,
-                    categoryName = category,
-                    description = desc,
-                    paymentMethodName = method,
-                    isIncome = isIncome,
-                )
-                showAddDialog = false
-            }
+    if (eklemeAcik) {
+        KayitEklemeDiyalogu(
+            onKapat = onEklemeKapat,
+            onKaydet = onKayitEkle,
         )
     }
 }
 
+/**
+ * Finans ekranına yetkisiz gelindiğinde gösterilen ekran.
+ *
+ * Boş bir liste ya da sıfır dolu bir özet göstermek daha kötü olurdu:
+ * eğitmen salonun hiç geliri olmadığını sanırdı.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MonthYearPicker(
-    selectedMonth: Int,
-    selectedYear: Int,
-    onMonthChanged: (Int, Int) -> Unit
+private fun YetkiYokEkrani(onGeri: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Finansal Durum", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onGeri) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                    }
+                },
+            )
+        },
+    ) { bosluk ->
+        Box(
+            modifier = Modifier.padding(bosluk).fillMaxSize().padding(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            SaltOkunurSerit(
+                "Finans ekranı salon sahibi ve yöneticiye açık. Kendi hakediş " +
+                    "kayıtlarınızı üye ve randevu ekranlarından görebilirsiniz.",
+            )
+        }
+    }
+}
+
+@Composable
+private fun DonemSecici(
+    ay: Int,
+    yil: Int,
+    onDonemDegisti: (ay: Int, yil: Int) -> Unit,
 ) {
     val months = listOf("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık")
     
@@ -257,15 +292,15 @@ fun MonthYearPicker(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = {
-                if (selectedMonth == 0) onMonthChanged(11, selectedYear - 1)
-                else onMonthChanged(selectedMonth - 1, selectedYear)
+                if (ay == 0) onDonemDegisti(11, yil - 1)
+                else onDonemDegisti(ay - 1, yil)
             }) {
                 Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Önceki Ay")
             }
             
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "${months[selectedMonth]} $selectedYear",
+                    text = "${months[ay]} $yil",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -273,8 +308,8 @@ fun MonthYearPicker(
             }
             
             IconButton(onClick = {
-                if (selectedMonth == 11) onMonthChanged(0, selectedYear + 1)
-                else onMonthChanged(selectedMonth + 1, selectedYear)
+                if (ay == 11) onDonemDegisti(0, yil + 1)
+                else onDonemDegisti(ay + 1, yil)
             }) {
                 Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Sonraki Ay")
             }
@@ -283,36 +318,42 @@ fun MonthYearPicker(
 }
 
 @Composable
-fun FinanceSummaryCard(label: String, amount: Money, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier) {
+private fun OzetKarti(
+    etiket: String,
+    tutar: Money,
+    ikon: ImageVector,
+    renk: Color,
+    modifier: Modifier,
+) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f)),
+        colors = CardDefaults.cardColors(containerColor = renk.copy(alpha = 0.1f)),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Icon(icon, contentDescription = null, tint = color)
+            Icon(ikon, contentDescription = null, tint = renk)
             Spacer(Modifier.height(8.dp))
-            Text(label, style = MaterialTheme.typography.labelMedium, color = color)
+            Text(etiket, style = MaterialTheme.typography.labelMedium, color = renk)
             Text(
-                ParaBicimi.tl(amount),
+                ParaBicimi.tl(tutar),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = color
+                color = renk
             )
         }
     }
 }
 
 @Composable
-fun RevenueCard(label: String, amount: Money) {
+private fun CiroKarti(etiket: String, tutar: Money) {
     Card(
         modifier = Modifier.width(140.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall)
+            Text(etiket, style = MaterialTheme.typography.labelSmall)
             Text(
-                ParaBicimi.tlYuvarlak(amount),
+                ParaBicimi.tlYuvarlak(tutar),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -321,10 +362,10 @@ fun RevenueCard(label: String, amount: Money) {
 }
 
 @Composable
-fun TransactionListItem(transaction: FinanceEntry) {
-    val isIncome = transaction.isIncome
+private fun KayitSatiri(kayit: FinansKaydi) {
+    val gelirMi = kayit.isIncome
     
-    val containerColor = if (transaction.isPending) {
+    val containerColor = if (kayit.isPending) {
         Color(0xFFFF9800).copy(alpha = 0.05f)
     } else {
         Color.Transparent
@@ -340,15 +381,15 @@ fun TransactionListItem(transaction: FinanceEntry) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                color = if (isIncome) Color(0xFF4CAF50).copy(alpha = 0.1f) else Color(0xFFF44336).copy(alpha = 0.1f),
+                color = if (gelirMi) Color(0xFF4CAF50).copy(alpha = 0.1f) else Color(0xFFF44336).copy(alpha = 0.1f),
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.size(40.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        if (isIncome) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                        if (gelirMi) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
                         contentDescription = null,
-                        tint = if (isIncome) Color(0xFF4CAF50) else Color(0xFFF44336),
+                        tint = if (gelirMi) Color(0xFF4CAF50) else Color(0xFFF44336),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -358,8 +399,8 @@ fun TransactionListItem(transaction: FinanceEntry) {
             
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(transaction.description, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                    if (transaction.isPending) {
+                    Text(kayit.description, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    if (kayit.isPending) {
                         Surface(
                             color = Color(0xFFFF9800),
                             shape = RoundedCornerShape(4.dp),
@@ -376,13 +417,13 @@ fun TransactionListItem(transaction: FinanceEntry) {
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
                     Text(
-                        text = transaction.categoryLabel,
+                        text = kayit.categoryLabel,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(end = 8.dp)
                     )
                     Text(
-                        text = when (transaction.paymentMethod) {
+                        text = when (kayit.paymentMethod) {
                             PaymentMethod.CARD -> "💳 Kart"
                             PaymentMethod.MULTISPORT -> "🏢 Multi"
                             PaymentMethod.CASH -> "💵 Nakit"
@@ -391,9 +432,9 @@ fun TransactionListItem(transaction: FinanceEntry) {
                         color = Color.Gray,
                         modifier = Modifier.padding(end = 8.dp)
                     )
-                    Text(TarihBicimi.gunKisaAySaat(transaction.occurredAtMs), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Text(TarihBicimi.gunKisaAySaat(kayit.occurredAtMs), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 }
-                transaction.note?.let {
+                kayit.note?.let {
                     if (it.isNotBlank()) {
                         Text(
                             text = "Not: $it",
@@ -406,10 +447,10 @@ fun TransactionListItem(transaction: FinanceEntry) {
             }
             
             Text(
-                "${if (isIncome) "+" else "-"}${ParaBicimi.tl(transaction.amount)}",
+                "${if (gelirMi) "+" else "-"}${ParaBicimi.tl(kayit.amount)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = if (isIncome) Color(0xFF4CAF50) else Color(0xFFF44336)
+                color = if (gelirMi) Color(0xFF4CAF50) else Color(0xFFF44336)
             )
         }
     }
@@ -417,16 +458,16 @@ fun TransactionListItem(transaction: FinanceEntry) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddExpenseDialog(
-    onDismiss: () -> Unit,
+private fun KayitEklemeDiyalogu(
+    onKapat: () -> Unit,
     /** (tutar metni, kategori, açıklama, ödeme yöntemi, gelir mi?) */
-    onConfirm: (String, String, String, String, Boolean) -> Unit
+    onKaydet: (String, String, String, String, Boolean) -> Unit,
 ) {
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("OTHER") }
     var selectedMethod by remember { mutableStateOf("CASH") }
-    var isIncome by remember { mutableStateOf(false) }
+    var gelirMi by remember { mutableStateOf(false) }
 
     // (LedgerCategory adı, görünen etiket) — seçim enum adını taşır, ekranda Türkçesi görünür.
     val categories = listOf(
@@ -442,20 +483,20 @@ fun AddExpenseDialog(
     var expanded by remember { mutableStateOf(false) }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (isIncome) "Gelir Ekle" else "Gider Ekle") },
+        onDismissRequest = onKapat,
+        title = { Text(if (gelirMi) "Gelir Ekle" else "Gider Ekle") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
-                        selected = !isIncome,
-                        onClick = { isIncome = false },
+                        selected = !gelirMi,
+                        onClick = { gelirMi = false },
                         label = { Text("Gider") },
                         modifier = Modifier.weight(1f)
                     )
                     FilterChip(
-                        selected = isIncome,
-                        onClick = { isIncome = true },
+                        selected = gelirMi,
+                        onClick = { gelirMi = true },
                         label = { Text("Gelir") },
                         modifier = Modifier.weight(1f)
                     )
@@ -524,14 +565,14 @@ fun AddExpenseDialog(
             Button(
                 onClick = {
                     // Doğrulama artık ViewModel'de; hata mesajı Snackbar ile gösteriliyor.
-                    onConfirm(amount, selectedCategory, description, selectedMethod, isIncome)
+                    onKaydet(amount, selectedCategory, description, selectedMethod, gelirMi)
                 }
             ) {
                 Text("Kaydet")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onKapat) {
                 Text("İptal")
             }
         }

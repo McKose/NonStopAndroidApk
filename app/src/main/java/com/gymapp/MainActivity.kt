@@ -60,7 +60,9 @@ import com.gymapp.arayuz.uyeler.UyeListesiEkrani
 import com.gymapp.presentation.members.MemberEvent
 import com.gymapp.presentation.members.MemberViewModel
 import com.gymapp.arayuz.uyeler.UyeKayitEkrani
-import com.gymapp.presentation.finance.FinanceScreen
+import com.gymapp.arayuz.finans.FinansEkrani
+import com.gymapp.presentation.finance.FinanceEvent
+import com.gymapp.presentation.finance.FinanceViewModel
 import com.gymapp.presentation.market.MarketScreen
 import com.gymapp.arayuz.market.SiparisGecmisiEkrani
 import com.gymapp.presentation.market.OrderHistoryViewModel
@@ -188,7 +190,7 @@ class MainActivity : ComponentActivity() {
                                 UyeListesiBagla(navController)
                             }
                             composable("finance") {
-                                FinanceScreen(onNavigateBack = { navController.popBackStack() })
+                                FinansBagla(navController)
                             }
                             composable("market") {
                                 MarketScreen(
@@ -715,6 +717,61 @@ private fun PersonelBagla(navController: androidx.navigation.NavHostController) 
             silinecek = null
         },
         onSilVazgec = { silinecek = null },
+        snackbarDurumu = snackbarDurumu,
+    )
+}
+
+/** Finans ekranının Android bağlaması. */
+@Composable
+private fun FinansBagla(navController: androidx.navigation.NavHostController) {
+    val model: FinanceViewModel = koinViewModel()
+    val durum by model.uiState.collectAsState()
+    val gorebilir by model.gorebilir.collectAsState()
+    val snackbarDurumu = remember { SnackbarHostState() }
+    var eklemeAcik by remember { mutableStateOf(false) }
+
+    // Kayıt sonucu her durumda kullanıcıya bildiriliyor.
+    LaunchedEffect(Unit) {
+        model.events.collect { olay ->
+            when (olay) {
+                is FinanceEvent.Saved -> snackbarDurumu.showSnackbar("Kayıt eklendi.")
+                is FinanceEvent.Failed -> snackbarDurumu.showSnackbar(olay.message)
+            }
+        }
+    }
+
+    FinansEkrani(
+        gorebilir = gorebilir,
+        ay = durum.selectedMonth,
+        yil = durum.selectedYear,
+        aylikCiro = durum.monthlyRevenue,
+        ucAylikCiro = durum.quarterlyRevenue,
+        altiAylikCiro = durum.halfYearlyRevenue,
+        yillikCiro = durum.yearlyRevenue,
+        gelir = durum.totalIncome,
+        gider = durum.totalExpense,
+        netKar = durum.totalProfit,
+        turSuzgeci = durum.selectedFilter,
+        yontemSuzgeci = durum.selectedPaymentMethod,
+        kayitlar = durum.entries,
+        eklemeAcik = eklemeAcik,
+        onGeri = { navController.popBackStack() },
+        onDonemDegisti = { ay, yil -> model.setPeriod(ay, yil) },
+        onTurSuzgeci = { model.setFilter(it) },
+        onYontemSuzgeci = { model.setMethodFilter(it) },
+        onEklemeAc = { eklemeAcik = true },
+        onEklemeKapat = { eklemeAcik = false },
+        onKayitEkle = { tutar, kategori, aciklama, yontem, gelirMi ->
+            // Yeni yazımların tamamı deftere gider.
+            model.addEntry(
+                amountText = tutar,
+                categoryName = kategori,
+                description = aciklama,
+                paymentMethodName = yontem,
+                isIncome = gelirMi,
+            )
+            eklemeAcik = false
+        },
         snackbarDurumu = snackbarDurumu,
     )
 }

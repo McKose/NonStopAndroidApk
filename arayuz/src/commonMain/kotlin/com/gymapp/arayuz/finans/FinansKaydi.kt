@@ -1,4 +1,4 @@
-package com.gymapp.presentation.finance
+package com.gymapp.arayuz.finans
 
 import com.gymapp.data.local.entity.LedgerEntryEntity
 import com.gymapp.domain.LedgerCategory
@@ -14,7 +14,7 @@ import com.gymapp.domain.PaymentMethod
  * besleniyor. Ekranı entity'ye doğrudan bağlamamak, ileriki şema değişikliklerinde
  * UI'ı korumaya devam ediyor.
  */
-data class FinanceEntry(
+data class FinansKaydi(
     val id: String,
     val isIncome: Boolean,
     val amount: Money,
@@ -50,7 +50,7 @@ private val categoryLabels = mapOf(
  *
  * @param reversedIds ters kayıtla iptal edilmiş kayıtların kimlikleri
  */
-fun LedgerEntryEntity.toFinanceEntry(reversedIds: Set<String>): FinanceEntry = FinanceEntry(
+fun LedgerEntryEntity.finansKaydinaCevir(reversedIds: Set<String>): FinansKaydi = FinansKaydi(
     id = id,
     isIncome = type != LedgerType.EXPENSE,
     amount = Money(amountMinor),
