@@ -43,28 +43,48 @@ jobs:
       # yoksa aynı hatayı ancak 10x ücretli macOS işinde görürdük. Bu adım
       # tam olarak PR #18'de Koin 4.2.2 ile yaşanan turu önlemek için var.
       - name: Ortak kod (metadata) derle — KMP bağımlılık uyumu
-        run: ./gradlew --no-daemon :shared:compileCommonMainKotlinMetadata
+        run: |
+          # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
+          # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
+          set -o pipefail
+          ./gradlew --no-daemon :shared:compileCommonMainKotlinMetadata 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
       # Ortak modülün testleri iş kurallarının tamamını kapsıyor; Android'e özgü
       # kod barındırmadığı için buradaki sonuç iOS için de geçerli.
       - name: Ortak modül testleri
-        run: ./gradlew --no-daemon :shared:testDebugUnitTest
+        run: |
+          # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
+          # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
+          set -o pipefail
+          ./gradlew --no-daemon :shared:testDebugUnitTest 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
       # Veritabanı testleri JVM hedefinde: gerçek SQLite üzerinde koşuyorlar.
       # Android birim testlerinde koşamazlar (gömülü sürücünün Android sürümü
       # masaüstü JVM'de yüklenemiyor), iOS'ta koşsalar 10x ücretli olurlardı.
       - name: Veritabanı testleri (JVM)
-        run: ./gradlew --no-daemon :shared:jvmTest
+        run: |
+          # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
+          # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
+          set -o pipefail
+          ./gradlew --no-daemon :shared:jvmTest 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
       # Ortak arayüz (Compose Multiplatform) ve masaüstü kabuğu. Görüntü
       # testleri ekranı GERÇEKTEN çiziyor — Skia ile, ekransız; pencere ya da
       # xvfb gerekmiyor. Derlenen ama çizilmeyen ekran mümkün olduğu için
       # derleme tek başına kanıt sayılmıyor.
       - name: Ortak arayüz derle (Android + masaüstü)
-        run: ./gradlew --no-daemon :arayuz:compileDebugKotlinAndroid :masaustu:compileKotlinJvm
+        run: |
+          # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
+          # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
+          set -o pipefail
+          ./gradlew --no-daemon :arayuz:compileDebugKotlinAndroid :masaustu:compileKotlinJvm 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
       - name: Ortak arayüz görüntü testleri (ekransız çizim)
-        run: ./gradlew --no-daemon :arayuz:jvmTest
+        run: |
+          # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
+          # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
+          set -o pipefail
+          ./gradlew --no-daemon :arayuz:jvmTest 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
       # Düşen testlerin özeti, günlüğün SONUNDA.
       #
@@ -92,8 +112,17 @@ jobs:
                       for s in ilk:
                           print("   " + s.strip())
           if not bulundu:
-              print("XML'de düşen test yok — hata derleme aşamasında olabilir.")
+              print("XML'de düşen test yok — derleme hatası olabilir, aşağıya bakın.")
           PY
+
+          # Derleme hataları XML üretmiyor; Gradle onları `e:` önekiyle
+          # stdout'a yazıyor ve o satırlar yüzlerce satır yapıt kaydının
+          # altında kalıyor. Adımların çıktısı tek dosyaya biriktiriliyor,
+          # burada yalnızca hata satırları basılıyor.
+          if [ -f "$RUNNER_TEMP/gradle.log" ]; then
+            grep -E "^(e: |w: .*error)" "$RUNNER_TEMP/gradle.log" | sed 's/^/::error::/' | head -40 \
+              || echo "Günlükte derleme hatası satırı yok."
+          fi
 
       # PNG'ler yapıt olarak: ekranların nasıl göründüğü, kod çalıştırmadan
       # buradan indirilip bakılabiliyor. `if: always()` — testler düştüğünde
@@ -177,7 +206,11 @@ jobs:
           exit 1
 
       - name: Uygulama birim testleri
-        run: ./gradlew --no-daemon :app:testDebugUnitTest
+        run: |
+          # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
+          # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
+          set -o pipefail
+          ./gradlew --no-daemon :app:testDebugUnitTest 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
       # Sunucu ayarları depoya işlenmiyor; CI'da depo gizli anahtarlarından
       # (Settings → Secrets → Actions) okunuyor. Yoksa derleme yine geçiyor ve
@@ -210,7 +243,11 @@ jobs:
           fi
 
       - name: Debug APK derle
-        run: ./gradlew --no-daemon :app:assembleDebug
+        run: |
+          # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
+          # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
+          set -o pipefail
+          ./gradlew --no-daemon :app:assembleDebug 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
       # Kurulabilir APK. Android Studio kurmadan denemenin tek yolu bu: Actions
       # sekmesinden koşuyu açıp aşağıdaki dosyayı indirmek yeterli.
@@ -503,21 +540,37 @@ jobs:
       # "iOS'ta çalışıyor" iddiası doğrulanmamış kalırdı: ortak kodun gerçekten
       # Apple hedefine derlendiğini kanıtlayan tek yer burası.
       - name: Simülatör framework'ü (arm64)
-        run: ./gradlew --no-daemon :shared:linkDebugFrameworkIosSimulatorArm64
+        run: |
+          # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
+          # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
+          set -o pipefail
+          ./gradlew --no-daemon :shared:linkDebugFrameworkIosSimulatorArm64 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
       # Gerçek cihaz hedefi yalnızca master'da: simülatör derlemesi Kotlin/Native
       # ön ucunun geçtiğini zaten kanıtlıyor, bu adım son bir güvence.
       - name: Cihaz framework'ü (arm64)
-        run: ./gradlew --no-daemon :shared:linkDebugFrameworkIosArm64
+        run: |
+          # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
+          # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
+          set -o pipefail
+          ./gradlew --no-daemon :shared:linkDebugFrameworkIosArm64 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
       # Aynı testler Kotlin/Native üzerinde de koşuyor: JVM'de geçip Native'de
       # patlayan bir davranış farkı (yuvarlama, tarih, metin) burada yakalanır.
       - name: Ortak modül testleri (Kotlin/Native)
-        run: ./gradlew --no-daemon :shared:iosSimulatorArm64Test
+        run: |
+          # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
+          # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
+          set -o pipefail
+          ./gradlew --no-daemon :shared:iosSimulatorArm64Test 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
       # Ortak ARAYÜZ de Apple hedefine derleniyor. i1'de yalnızca derleme
       # (klib) — framework'e i4'te, iOS kabuğu gelince bağlanacak. Şimdiden
       # buradaki sebebi: Compose Multiplatform'un Kotlin/Native tarafında bir
       # uyumsuzluk varsa 13 ekran taşındıktan sonra değil, ilk PR'da görülsün.
       - name: Ortak arayüz (Kotlin/Native derlemesi)
-        run: ./gradlew --no-daemon :arayuz:compileKotlinIosSimulatorArm64 :arayuz:compileKotlinIosArm64
+        run: |
+          # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
+          # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
+          set -o pipefail
+          ./gradlew --no-daemon :arayuz:compileKotlinIosSimulatorArm64 :arayuz:compileKotlinIosArm64 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
