@@ -34,6 +34,19 @@ class UyeKayitGoruntuTesti {
 
     private val taksitler = listOf(1, 3, 6, 9, 12)
 
+    /**
+     * Test tuvalinin yüksekliği.
+     *
+     * Varsayılan 880 piksel bu ekran için yetmiyor: form kaydırmalı ve ödeme
+     * bölümü görünür alanın altında kalıyor. İlk yazılışında `taksit secimi
+     * odeme turune bagli` testi tam bu yüzden düştü — nakit ve kart görüntüleri
+     * birbirinin aynısıydı, çünkü ARALARINDAKİ FARK HİÇ ÇİZİLMEMİŞTİ.
+     *
+     * Kaydırmalı bir ekranı kısa tuvalde sınamak, sınadığını sandığın şeyi
+     * hiç sınamamak demek; test yeşil kalsaydı fark edilmezdi.
+     */
+    private val TUVAL = 2400
+
     private fun ekran(
         form: UyeKayitFormu = UyeKayitFormu(),
         yenileme: Boolean = false,
@@ -52,7 +65,7 @@ class UyeKayitGoruntuTesti {
 
     @Test
     fun `bos kayit formu ciziliyor`() {
-        cizildiginiDogrula(ekraniCiz("uye-kayit", icerik = ekran()))
+        cizildiginiDogrula(ekraniCiz("uye-kayit", yukseklik = TUVAL, icerik = ekran()))
     }
 
     @Test
@@ -62,7 +75,7 @@ class UyeKayitGoruntuTesti {
             phone = "5001112233",
             selectedPackage = paket,
         )
-        cizildiginiDogrula(ekraniCiz("uye-kayit-paketli", icerik = ekran(form)))
+        cizildiginiDogrula(ekraniCiz("uye-kayit-paketli", yukseklik = TUVAL, icerik = ekran(form)))
     }
 
     /**
@@ -74,9 +87,10 @@ class UyeKayitGoruntuTesti {
      */
     @Test
     fun `fiyat karti pakete bagli`() {
-        val paketsiz = ekraniCiz("uye-kayit", icerik = ekran()).readBytes()
+        val paketsiz = ekraniCiz("uye-kayit", yukseklik = TUVAL, icerik = ekran()).readBytes()
         val paketli = ekraniCiz(
             "uye-kayit-paketli",
+            yukseklik = TUVAL,
             icerik = ekran(UyeKayitFormu(selectedPackage = paket)),
         ).readBytes()
 
@@ -96,10 +110,13 @@ class UyeKayitGoruntuTesti {
     fun `taksit secimi odeme turune bagli`() {
         val nakit = ekraniCiz(
             "uye-kayit-nakit",
+            yukseklik = TUVAL,
             icerik = ekran(UyeKayitFormu(selectedPackage = paket, paymentType = PaymentMethod.CASH)),
         ).readBytes()
+
         val kart = ekraniCiz(
             "uye-kayit-kart",
+            yukseklik = TUVAL,
             icerik = ekran(UyeKayitFormu(selectedPackage = paket, paymentType = PaymentMethod.CARD)),
         ).readBytes()
 
@@ -120,6 +137,7 @@ class UyeKayitGoruntuTesti {
     fun `devir secimi yenilemede ve kalan seans varken cikiyor`() {
         val devirsiz = ekraniCiz(
             "uye-kayit-yenileme-devirsiz",
+            yukseklik = TUVAL,
             icerik = ekran(
                 UyeKayitFormu(
                     selectedPackage = paket,
@@ -132,6 +150,7 @@ class UyeKayitGoruntuTesti {
 
         val devirli = ekraniCiz(
             "uye-kayit-yenileme-devirli",
+            yukseklik = TUVAL,
             icerik = ekran(
                 UyeKayitFormu(
                     selectedPackage = paket,
@@ -159,11 +178,13 @@ class UyeKayitGoruntuTesti {
     fun `asiri iskonto uyarisi ciziliyor`() {
         val normal = ekraniCiz(
             "uye-kayit-iskonto-normal",
+            yukseklik = TUVAL,
             icerik = ekran(UyeKayitFormu(selectedPackage = paket, discount = "500")),
         ).readBytes()
 
         val asiri = ekraniCiz(
             "uye-kayit-iskonto-asiri",
+            yukseklik = TUVAL,
             icerik = ekran(UyeKayitFormu(selectedPackage = paket, discount = "99999")),
         ).readBytes()
 
