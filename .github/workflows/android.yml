@@ -66,6 +66,35 @@ jobs:
       - name: Ortak arayüz görüntü testleri (ekransız çizim)
         run: ./gradlew --no-daemon :arayuz:jvmTest
 
+      # Düşen testlerin özeti, günlüğün SONUNDA.
+      #
+      # Gradle'ın kendi çıktısı yüzlerce satır yapıt yükleme kaydının altında
+      # kalıyor ve hangi testin neden düştüğünü bulmak için günlüğü geriye
+      # doğru taramak gerekiyor. JUnit XML'i zaten üretiliyor; buradan okunan
+      # üç satır (sınıf, test, mesaj) aramayı tamamen gereksiz kılıyor.
+      - name: Düşen testlerin özeti
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          bulundu = False
+          for yol in sorted(glob.glob("*/build/test-results/**/*.xml", recursive=True)):
+              try:
+                  kok = ET.parse(yol).getroot()
+              except ET.ParseError:
+                  continue
+              for test in kok.iter("testcase"):
+                  for kotu in list(test.findall("failure")) + list(test.findall("error")):
+                      bulundu = True
+                      print(f"::error::{test.get('classname')} > {test.get('name')}")
+                      print("   " + (kotu.get("message") or "").strip()[:500])
+                      ilk = [s for s in (kotu.text or "").splitlines() if "com.gymapp" in s][:3]
+                      for s in ilk:
+                          print("   " + s.strip())
+          if not bulundu:
+              print("XML'de düşen test yok — hata derleme aşamasında olabilir.")
+          PY
+
       # PNG'ler yapıt olarak: ekranların nasıl göründüğü, kod çalıştırmadan
       # buradan indirilip bakılabiliyor. `if: always()` — testler düştüğünde
       # görüntü daha da değerli, çünkü NEDEN düştüğünü gösteriyor.

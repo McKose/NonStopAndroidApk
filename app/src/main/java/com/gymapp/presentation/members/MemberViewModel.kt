@@ -17,6 +17,8 @@ import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.PriceBreakdown
 import com.gymapp.domain.Pricing
 import com.gymapp.domain.SessionCarryOver
+import com.gymapp.arayuz.uyeler.UyeKayitFormu
+import com.gymapp.domain.MemberScope
 import com.gymapp.domain.StaffRole
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
@@ -32,20 +34,6 @@ sealed interface MemberEvent {
 
 // ─── UI State ────────────────────────────────────────────────────────────────
 
-/**
- * Üye listesinin kapsamı.
- *
- * Eğitmen için varsayılan [MINE]: panonun sayaçları baştan beri "kendi üyelerim"
- * diyordu, liste ise salonun tamamını gösteriyordu. Aynı ekranda iki farklı
- * cevap veren bir uygulamada hangisinin doğru olduğu anlaşılmıyor.
- *
- * Seçim **görünür**, çünkü sessiz süzme bu ekranda gerçek bir işi bozardı:
- * eğitmenin yeni kaydettiği üyenin henüz randevusu yok, yani "benim üyem"
- * sayılmaz ve listeden kaybolurdu. Kullanıcı da onu bir daha bulamazdı.
- * Yönetici rollerinde seçim hiç gösterilmiyor; onlar için kapsam zaten salon.
- */
-enum class MemberScope { MINE, ALL }
-
 data class MemberListUiState(
     val members: List<MemberEntity> = emptyList(),
     val isLoading: Boolean = false,
@@ -59,69 +47,6 @@ data class MemberListUiState(
 ) {
     /** Çekmecedeki hedeflerin görünürlüğü tek kaynaktan. */
     fun gorebilir(destination: AppDestination): Boolean = destination.isVisibleTo(role)
-}
-
-data class RegisterFormState(
-    val fullName: String = "",
-    val phone: String = "",
-    val email: String = "",
-    val paymentType: PaymentMethod = PaymentMethod.CASH,
-    val installmentCount: Int = 1,
-    val selectedPackage: PackageEntity? = null,
-    val discount: String = "0",
-    val paymentStatus: PaymentState = PaymentState.PAID,
-    val paymentDateMs: Long? = System.currentTimeMillis(),
-    val healthRisks: String = "",
-    val healthNotes: String = "",
-    val notes: String = "",
-    // Validation
-    val fullNameError: String? = null,
-    val phoneError: String? = null,
-    val isSubmitting: Boolean = false,
-    val submitSuccess: Boolean = false,
-    val submitError: String? = null,
-    val isRenewal: Boolean = false,
-    val memberId: String? = null,
-    /**
-     * Yenilemede kalan seansların ne olacağı.
-     *
-     * Varsayılan [SessionCarryOver.CARRY]: üye o seansların parasını ödemiş.
-     * Seçim ekranda açıkça duruyor, yani varsayılan bir politika dayatması değil
-     * yalnızca imlecin başladığı yer.
-     */
-    val carryOver: SessionCarryOver = SessionCarryOver.CARRY,
-    /**
-     * Üyenin şu anki kalan seansı; `null` sınırsız paket ya da bilinmiyor.
-     *
-     * Ekranda seçimin gösterilip gösterilmeyeceğini bu belirliyor: devredecek
-     * sayılabilir bir hak yoksa kullanıcıya sorulacak bir şey de yok.
-     */
-    val currentRemainingSessions: Int? = null,
-) {
-    /**
-     * Ücretin kalemleri — **saklanmıyor, durumdan türetiliyor**.
-     *
-     * Önceden `previewPrice` bir alandı ve fiyatı etkileyen dört ayrı işleyicinin
-     * her biri onu yeniden hesaplamakla yükümlüydü. Beşinci bir işleyici eklemek
-     * (ya da mevcut birinde hesabı unutmak) ekranda eski tutarın kalması demekti;
-     * türetilmiş değerde o hata mümkün değil.
-     */
-    val breakdown: PriceBreakdown
-        get() = Pricing.breakdown(
-            basePrice = Money(selectedPackage?.basePriceMinor ?: 0L),
-            discount = Money.ofMajor(Decimals.parseOrDefault(discount)),
-            paymentType = paymentType,
-            installmentCount = installmentCount,
-        )
-
-    /**
-     * Yazılan iskonto paket fiyatını aşıyor mu?
-     *
-     * Aşınca sessizce kırpmak, kartta "1.000 − 5.000 = 0" gibi kendi içinde
-     * tutarsız bir aritmetik bırakıyordu. Kırpma duruyor ama artık görünür.
-     */
-    val discountCapped: Boolean
-        get() = breakdown.discountWasCapped(Money.ofMajor(Decimals.parseOrDefault(discount)))
 }
 
 class MemberViewModel(
@@ -216,8 +141,8 @@ class MemberViewModel(
         _kapsam.value = kapsam
     }
 
-    private val _formState = MutableStateFlow(RegisterFormState())
-    val formState: StateFlow<RegisterFormState> = _formState.asStateFlow()
+    private val _formState = MutableStateFlow(UyeKayitFormu())
+    val formState: StateFlow<UyeKayitFormu> = _formState.asStateFlow()
 
     /** Taksit seçenekleri vade farkı tablosuyla aynı kaynaktan gelir; ikisi sapamaz. */
     val installmentOptions: List<Int> = Pricing.installmentOptions
@@ -323,10 +248,19 @@ class MemberViewModel(
         viewModelScope.launch {
             _formState.update { it.copy(isSubmitting = true, submitError = null) }
             
-            val result = if (state.isRenewal && state.memberId != null && state.selectedPackage != null) {
+            // Yerel değişkenler ŞART, akıllı dönüşüm burada çalışmıyor:
+            // `UyeKayitFormu` artık başka bir modülde (`:arayuz`) ve Kotlin
+            // farklı modüldeki bir `val`in iki okuma arasında değişmeyeceğini
+            // garanti edemiyor. Aynı kod sınıf `app` içindeyken derleniyordu;
+            // tipi modül sınırının ötesine taşımak derleyicinin kanıtlayabildiği
+            // şeyi daralttı.
+            val yenilenecekUye = state.memberId
+            val secilenPaket = state.selectedPackage
+
+            val result = if (state.isRenewal && yenilenecekUye != null && secilenPaket != null) {
                 repository.renewPackage(
-                    memberId = state.memberId,
-                    selectedPackage = state.selectedPackage,
+                    memberId = yenilenecekUye,
+                    selectedPackage = secilenPaket,
                     paymentType = state.paymentType,
                     installmentCount = state.installmentCount,
                     discount = Decimals.parseOrDefault(state.discount),
@@ -453,7 +387,7 @@ class MemberViewModel(
     }
 
     fun resetForm() {
-        _formState.value = RegisterFormState()
+        _formState.value = UyeKayitFormu()
     }
 
     // KALDIRILDI: `dismissError`. Hiçbir ekran çağırmıyordu; asıl sorun olan
@@ -481,5 +415,5 @@ class MemberViewModel(
 }
 
 // KALDIRILDI: `basePriceMajor`. Fiyat önizlemesi TL (`Double`) üzerinden
-// hesaplanmıyor artık; kalemler kuruş cinsinden `RegisterFormState.breakdown`
+// hesaplanmıyor artık; kalemler kuruş cinsinden `UyeKayitFormu.breakdown`
 // ile geliyor ve ekran onları doğrudan yazıyor.
