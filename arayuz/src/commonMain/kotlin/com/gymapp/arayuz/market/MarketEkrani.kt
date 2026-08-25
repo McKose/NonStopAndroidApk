@@ -70,6 +70,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.gymapp.data.local.entity.ProductEntity
+import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
 import com.gymapp.domain.ParaBicimi
 import com.gymapp.domain.PaymentState
@@ -332,11 +333,14 @@ private fun OdemeIcerigi(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             // Sabit metin listesi yerine enum: yeni bir durum eklendiğinde
             // ekran kendiliğinden güncel kalıyor ve etiket tek yerden geliyor.
-            PaymentState.entries.forEach { durum ->
+            // `secenek`, ekranın `durum` parametresiyle çakışmasın diye:
+            // lambda değişkeni de `durum` olsaydı hangisinin okunduğu
+            // görünmez biçimde değişirdi.
+            PaymentState.entries.forEach { secenek ->
                 FilterChip(
-                    selected = durum.paymentStatus == durum,
-                    onClick = { onPaymentStatusSelect(durum) },
-                    label = { Text(durum.labelTr()) }
+                    selected = durum.paymentStatus == secenek,
+                    onClick = { onPaymentStatusSelect(secenek) },
+                    label = { Text(secenek.labelTr()) }
                 )
             }
         }
