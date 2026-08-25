@@ -1,6 +1,16 @@
-package com.gymapp.presentation.settings
+package com.gymapp.arayuz.personel
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -13,156 +23,170 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import org.koin.androidx.compose.koinViewModel
+import com.gymapp.arayuz.ortak.SaltOkunurSerit
+import com.gymapp.data.access.yetkiOzetiTr
 import com.gymapp.data.local.entity.StaffEntity
 import com.gymapp.domain.Decimals
 import com.gymapp.domain.Money
 import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.Rate
 import com.gymapp.domain.StaffRole
-import com.gymapp.data.access.yetkiOzetiTr
-import com.gymapp.arayuz.ortak.SaltOkunurSerit
 import com.gymapp.domain.labelTr
 
+/**
+ * Personel yönetimi — `app`'teki `PersonnelScreen`'in ortak modüle taşınmış hâli.
+ *
+ * ### Diyalogların açık/kapalı hâli neden dışarıda
+ * Kaydetme diyaloğu, kayıt BAŞARILI olduğunda kapanıyor; reddedildiğinde
+ * (doğrulama, yetki) açık kalıyor ki kullanıcı yazdıklarını kaybetmesin. Bu
+ * kararı ekran veremez — sonucu yalnızca olayları dinleyen taraf bilir.
+ * Takvimdeki randevu sheet'iyle aynı gerekçe.
+ *
+ * Diyaloğun İÇİNDEKİ alanlar ekranda kalıyor: onlar yazma durumu.
+ *
+ * ### Yetki
+ * [yazabilir] `false` iken ekleme düğmesi, satır tıklaması ve silme simgesi
+ * hiç çizilmiyor; sebebi listenin başındaki şeritte yazıyor. Gizlenen bir
+ * düğmenin sebebini yazmamak, kullanıcıya "uygulama bozuk" dedirtiyordu.
+ *
+ * @param formHedefi diyalog kapalıysa `null`; içindeki personel `null` ise
+ *   yeni kayıt
+ * @param silinecek silme onayı bekleyen personel, yoksa `null`
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PersonnelScreen(
-    onNavigateBack: () -> Unit,
-    viewModel: PersonnelViewModel = koinViewModel()
+fun PersonelEkrani(
+    personeller: List<StaffEntity>,
+    yazabilir: Boolean,
+    formHedefi: PersonelFormHedefi?,
+    silinecek: StaffEntity?,
+    onGeri: () -> Unit,
+    onYeniPersonel: () -> Unit,
+    onPersonelSec: (StaffEntity) -> Unit,
+    onFormKapat: () -> Unit,
+    onKaydet: (personelId: String?, form: PersonelFormu) -> Unit,
+    onSilIste: (StaffEntity) -> Unit,
+    onSilOnayla: (String) -> Unit,
+    onSilVazgec: () -> Unit,
+    snackbarDurumu: SnackbarHostState = remember { SnackbarHostState() },
 ) {
-    val staffList by viewModel.staffList.collectAsState(initial = emptyList())
-    val snackbarHostState = remember { SnackbarHostState() }
-    val canWrite by viewModel.canWrite.collectAsState()
-
-    /** `null` = diyalog kapalı; `StaffEntity?` içeren değer = düzenleme (veya yeni kayıt). */
-    var editing by remember { mutableStateOf<StaffFormTarget?>(null) }
-    var pendingDelete by remember { mutableStateOf<StaffEntity?>(null) }
-
-    LaunchedEffect(Unit) {
-        viewModel.events.collect { event ->
-            when (event) {
-                is PersonnelEvent.Saved -> editing = null
-                is PersonnelEvent.Deleted -> snackbarHostState.showSnackbar("Personel silindi.")
-                is PersonnelEvent.Failed -> snackbarHostState.showSnackbar(event.message)
-            }
-        }
-    }
-
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarDurumu) },
         topBar = {
             TopAppBar(
                 title = { Text("Personel Yönetimi", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = onGeri) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
-                }
+                },
             )
         },
         floatingActionButton = {
             // Yetkisi olmayanda düğme hiç çizilmiyor; sebebi aşağıdaki şeritte.
-            if (canWrite) {
-                FloatingActionButton(onClick = { editing = StaffFormTarget(null) }) {
+            if (yazabilir) {
+                FloatingActionButton(onClick = onYeniPersonel) {
                     Icon(Icons.Default.Add, contentDescription = "Personel Ekle")
                 }
             }
-        }
-    ) { padding ->
+        },
+    ) { bosluk ->
         LazyColumn(
-            modifier = Modifier.padding(padding).fillMaxSize(),
+            modifier = Modifier.padding(bosluk).fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (!canWrite) {
+            if (!yazabilir) {
                 item {
                     SaltOkunurSerit(
                         "Personel listesini görüntüleyebilirsiniz. Değiştirmek " +
-                            "salon sahibi yetkisi gerektiriyor."
+                            "salon sahibi yetkisi gerektiriyor.",
                     )
                 }
             }
-            items(staffList, key = { it.id }) { staff ->
-                PersonnelItem(
-                    staff = staff,
+            items(personeller, key = { it.id }) { personel ->
+                PersonelSatiri(
+                    personel = personel,
                     // Yetki yoksa satır düzenleme diyaloğunu açmıyor ve silme
                     // simgesi çizilmiyor.
-                    onClick = { if (canWrite) editing = StaffFormTarget(staff) },
-                    onDelete = if (canWrite) ({ pendingDelete = staff }) else null,
+                    onTikla = { if (yazabilir) onPersonelSec(personel) },
+                    onSil = if (yazabilir) ({ onSilIste(personel) }) else null,
                 )
             }
         }
     }
 
-    editing?.let { target ->
-        StaffDialog(
-            staff = target.staff,
-            onDismiss = { editing = null },
-            onConfirm = { form ->
-                viewModel.saveStaff(
-                    staffId = target.staff?.id,
-                    name = form.name,
-                    title = form.title,
-                    branch = form.branch,
-                    commissionPercent = form.commissionPercent,
-                    salary = form.salary,
-                    phone = form.phone,
-                    nickname = form.nickname,
-                    role = form.role,
-                    authUserId = form.authUserId,
-                )
-            }
+    formHedefi?.let { hedef ->
+        PersonelDiyalogu(
+            personel = hedef.personel,
+            onKapat = onFormKapat,
+            onKaydet = { form -> onKaydet(hedef.personel?.id, form) },
         )
     }
 
-    pendingDelete?.let { staff ->
+    silinecek?.let { personel ->
         AlertDialog(
-            onDismissRequest = { pendingDelete = null },
+            onDismissRequest = onSilVazgec,
             title = { Text("Personeli sil") },
-            text = { Text("${staff.fullName} listeden kaldırılacak. Geçmiş randevu ve hakediş kayıtları korunur.") },
+            text = {
+                Text(
+                    "${personel.fullName} listeden kaldırılacak. " +
+                        "Geçmiş randevu ve hakediş kayıtları korunur.",
+                )
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    viewModel.deleteStaff(staff.id)
-                    pendingDelete = null
-                }) { Text("Sil", color = Color.Red) }
+                TextButton(onClick = { onSilOnayla(personel.id) }) {
+                    Text("Sil", color = Color.Red)
+                }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("Vazgeç") }
-            }
+                TextButton(onClick = onSilVazgec) { Text("Vazgeç") }
+            },
         )
     }
 }
 
-/** Diyaloğun hedefi: `staff == null` ise yeni kayıt. */
-private data class StaffFormTarget(val staff: StaffEntity?)
-
-/** Diyalogdan dönen form değerleri. */
-private data class StaffForm(
-    val name: String,
-    val title: String,
-    val branch: String,
-    val commissionPercent: Double,
-    val salary: Double,
-    val phone: String,
-    val nickname: String,
-    val role: StaffRole,
-    val authUserId: String?,
-)
-
 @Composable
-private fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit, onDelete: (() -> Unit)?) {
+private fun PersonelSatiri(
+    personel: StaffEntity,
+    onTikla: () -> Unit,
+    onSil: (() -> Unit)?,
+) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        onClick = onClick
+        onClick = onTikla
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -181,9 +205,9 @@ private fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit, onDelete: (()
             Spacer(Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(staff.fullName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(personel.fullName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
-                    "${staff.role.labelTr()} | ${staff.branch.ifBlank { "-" }}",
+                    "${personel.role.labelTr()} | ${personel.branch.ifBlank { "-" }}",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray
                 )
@@ -191,7 +215,7 @@ private fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit, onDelete: (()
                     Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color.Gray)
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        PhoneNumber.formatForDisplay(staff.phone),
+                        PhoneNumber.formatForDisplay(personel.phone),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray,
                     )
@@ -200,18 +224,18 @@ private fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit, onDelete: (()
 
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    "₺${Money(staff.monthlySalaryMinor)}",
+                    "₺${Money(personel.monthlySalaryMinor)}",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "Hakediş: %${Rate(staff.commissionBasisPoints).percentLabel}",
+                    "Hakediş: %${Rate(personel.commissionBasisPoints).percentLabel}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.secondary
                 )
             }
 
-            if (onDelete != null) IconButton(onClick = onDelete) {
+            if (onSil != null) IconButton(onClick = onSil) {
                 Icon(Icons.Default.Delete, contentDescription = "Sil", tint = Color.Red)
             }
         }
@@ -226,14 +250,14 @@ private fun PersonnelItem(staff: StaffEntity, onClick: () -> Unit, onDelete: (()
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StaffDialog(
-    staff: StaffEntity?,
-    onDismiss: () -> Unit,
-    onConfirm: (StaffForm) -> Unit
+private fun PersonelDiyalogu(
+    personel: StaffEntity?,
+    onKapat: () -> Unit,
+    onKaydet: (PersonelFormu) -> Unit,
 ) {
-    var name by remember { mutableStateOf(staff?.fullName ?: "") }
-    var title by remember { mutableStateOf(staff?.title ?: "") }
-    var branch by remember { mutableStateOf(staff?.branch ?: "") }
+    var name by remember { mutableStateOf(personel?.fullName ?: "") }
+    var title by remember { mutableStateOf(personel?.title ?: "") }
+    var branch by remember { mutableStateOf(personel?.branch ?: "") }
     // Hazır değerler uygulamanın kendi biçimiyle yazılıyor: ayıraç virgül ve
     // gereksiz ondalık yok.
     //
@@ -246,22 +270,22 @@ private fun StaffDialog(
     // maaş alanına hiç dokunulmadan kaydedildiğinde maaş **on katına**
     // çıkıyordu. Yeni biçim her değerde birebir geri okunuyor.
     var rate by remember {
-        mutableStateOf(staff?.let { Rate(it.commissionBasisPoints).percentLabel } ?: "")
+        mutableStateOf(personel?.let { Rate(it.commissionBasisPoints).percentLabel } ?: "")
     }
     var salary by remember {
-        mutableStateOf(staff?.let { Money(it.monthlySalaryMinor).toString() } ?: "")
+        mutableStateOf(personel?.let { Money(it.monthlySalaryMinor).toString() } ?: "")
     }
-    var phone by remember { mutableStateOf(staff?.phone ?: "") }
-    var nickname by remember { mutableStateOf(staff?.nickname ?: "") }
-    var authUserId by remember { mutableStateOf(staff?.authUserId ?: "") }
-    var role by remember { mutableStateOf(staff?.role ?: StaffRole.TRAINER) }
+    var phone by remember { mutableStateOf(personel?.phone ?: "") }
+    var nickname by remember { mutableStateOf(personel?.nickname ?: "") }
+    var authUserId by remember { mutableStateOf(personel?.authUserId ?: "") }
+    var role by remember { mutableStateOf(personel?.role ?: StaffRole.TRAINER) }
     var roleExpanded by remember { mutableStateOf(false) }
 
     val canSave = name.isNotBlank() && nickname.isNotBlank() && phone.isNotBlank()
 
     AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (staff == null) "Yeni Personel" else "Personel Düzenle") },
+        onDismissRequest = onKapat,
+        title = { Text(if (personel == null) "Yeni Personel" else "Personel Düzenle") },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -404,8 +428,8 @@ private fun StaffDialog(
             Button(
                 enabled = canSave,
                 onClick = {
-                    onConfirm(
-                        StaffForm(
+                    onKaydet(
+                        PersonelFormu(
                             name = name.trim(),
                             title = title.trim(),
                             branch = branch.trim(),
@@ -419,10 +443,10 @@ private fun StaffDialog(
                         )
                     )
                 }
-            ) { Text(if (staff == null) "Ekle" else "Güncelle") }
+            ) { Text(if (personel == null) "Ekle" else "Güncelle") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("İptal") }
+            TextButton(onClick = onKapat) { Text("İptal") }
         }
     )
 }

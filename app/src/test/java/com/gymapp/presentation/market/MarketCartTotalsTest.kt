@@ -1,5 +1,6 @@
 package com.gymapp.presentation.market
 
+import com.gymapp.arayuz.market.MarketDurumu
 import com.gymapp.data.local.entity.ProductEntity
 import com.gymapp.domain.Money
 import kotlin.test.Test
@@ -43,7 +44,7 @@ class MarketCartTotalsTest {
         urunler: List<ProductEntity>,
         sepet: Map<String, Int>,
         iskonto: Double = 0.0,
-    ) = MarketUiState(products = urunler, cart = sepet, discount = iskonto)
+    ) = MarketDurumu(products = urunler, cart = sepet, discount = iskonto)
 
     @Test
     fun `sepet toplami adetle carpiliyor`() {
