@@ -55,7 +55,8 @@ import com.gymapp.presentation.finance.FinanceScreen
 import com.gymapp.presentation.market.MarketScreen
 import com.gymapp.arayuz.market.SiparisGecmisiEkrani
 import com.gymapp.presentation.market.OrderHistoryViewModel
-import com.gymapp.presentation.settings.SettingsScreen
+import com.gymapp.arayuz.ayarlar.AyarlarEkrani
+import com.gymapp.presentation.settings.SettingsViewModel
 import com.gymapp.presentation.settings.PersonnelScreen
 
 import com.gymapp.ui.theme.GymAppTheme
@@ -224,15 +225,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             composable("settings") {
-                                SettingsScreen(
-                                    onNavigateBack = { navController.popBackStack() },
-                                    onNavigateToPersonnel = { navController.navigate("personnel") },
-                                    onLogout = {
-                                        navController.navigate("login") {
-                                            popUpTo(0) { inclusive = true }
-                                        }
-                                    }
-                                )
+                                AyarlarBagla(navController)
                             }
                             composable("personnel") {
                                 PersonnelScreen(onNavigateBack = { navController.popBackStack() })
@@ -425,5 +418,43 @@ private fun PaketFormuBagla(
         },
         onGeri = { navController.popBackStack() },
         snackbarDurumu = snackbarDurumu,
+    )
+}
+
+/**
+ * Ayarlar ekranının Android bağlaması.
+ *
+ * Ekran `arayuz` modülünde ve ViewModel tanımıyor; çıkış akışının üç adımı
+ * (iste / onayla / vazgeç) burada `SettingsViewModel`'e bağlanıyor.
+ *
+ * Çıkış sonrası gezinme `popUpTo(0)` ile tüm yığını siliyor: çıkmış bir
+ * kullanıcının geri tuşuyla panele dönebilmesi, çıkışın yaptığı her şeyi
+ * (veritabanı temizliği dahil) anlamsız kılardı.
+ */
+@Composable
+private fun AyarlarBagla(navController: androidx.navigation.NavHostController) {
+    val model: SettingsViewModel = koinViewModel()
+    val senkDurumu by model.syncState.collectAsState()
+    val bekleyen by model.pendingCount.collectAsState()
+    val cikistaBekleyen by model.cikistaBekleyen.collectAsState()
+
+    val cikisaGit: () -> Unit = {
+        navController.navigate("login") {
+            popUpTo(0) { inclusive = true }
+        }
+    }
+
+    AyarlarEkrani(
+        salonAdi = model.salonName,
+        senkDurumu = senkDurumu,
+        bekleyen = bekleyen,
+        cikistaBekleyen = cikistaBekleyen,
+        onGeri = { navController.popBackStack() },
+        onPersonel = { navController.navigate("personnel") },
+        onSimdiEsitle = { model.syncNow() },
+        onCikisIste = { model.requestLogout(cikisaGit) },
+        onCikisiOnayla = { model.confirmLogout(cikisaGit) },
+        onCikistanVazgec = { model.cancelLogout() },
+        onSalonAdiKaydet = { model.updateSalonName(it) },
     )
 }
