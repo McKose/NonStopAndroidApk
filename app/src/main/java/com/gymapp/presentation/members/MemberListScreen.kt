@@ -20,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.data.access.AppDestination
-import com.gymapp.presentation.common.ReadOnlyNotice
+import com.gymapp.arayuz.ortak.SaltOkunurSerit
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.domain.Membership
 import com.gymapp.domain.MembershipState
@@ -206,7 +206,7 @@ fun MemberListScreen(
                 // Bağlantısı olmayan eğitmende "üyelerim" tanımsız; liste
                 // süzülmüyor ve sebebi yazıyor.
                 if (uiState.personelBaglantisiYok) {
-                    ReadOnlyNotice(
+                    SaltOkunurSerit(
                         text = "Hesabınız bir personel kaydına bağlı olmadığı için " +
                             "\"üyelerim\" ayrımı yapılamıyor; salonun tamamı listeleniyor.",
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

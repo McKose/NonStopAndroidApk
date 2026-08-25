@@ -1,4 +1,4 @@
-package com.gymapp.presentation.common
+package com.gymapp.arayuz.ortak
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
  * kuralı da aynı ayrımı yapıyor — okuma salona bağlı herkese açık.
  */
 @Composable
-fun ReadOnlyNotice(
+fun SaltOkunurSerit(
     text: String,
     modifier: Modifier = Modifier,
 ) {

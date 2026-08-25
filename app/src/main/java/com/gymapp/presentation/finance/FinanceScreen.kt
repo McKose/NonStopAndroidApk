@@ -27,7 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
-import com.gymapp.presentation.common.ReadOnlyNotice
+import com.gymapp.arayuz.ortak.SaltOkunurSerit
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
 
@@ -56,7 +56,7 @@ private fun YetkiYokEkrani(onNavigateBack: () -> Unit) {
             modifier = Modifier.padding(padding).fillMaxSize().padding(24.dp),
             contentAlignment = Alignment.Center,
         ) {
-            ReadOnlyNotice(
+            SaltOkunurSerit(
                 "Finans ekranı salon sahibi ve yöneticiye açık. Kendi hakediş " +
                     "kayıtlarınızı üye ve randevu ekranlarından görebilirsiniz."
             )
