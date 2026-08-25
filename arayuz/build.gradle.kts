@@ -83,3 +83,21 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 }
+
+/**
+ * Düşen testin yığın izini CI günlüğüne bas.
+ *
+ * Gradle varsayılanı yalnızca istisnanın TÜRÜNÜ ve satır numarasını yazıyor.
+ * `ClassNotFoundException` gibi hatalarda tek işe yarar bilgi mesajın kendisi
+ * (eksik sınıfın adı) ve o mesaj kayboluyor. Ayrıntı yalnızca HTML raporunda
+ * duruyor, o da koşucuyla birlikte siliniyor — bir hata bu yüzden günlükten
+ * teşhis edilemedi.
+ */
+tasks.withType<Test>().configureEach {
+    testLogging {
+        events("failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStackTraces = true
+        showCauses = true
+    }
+}
