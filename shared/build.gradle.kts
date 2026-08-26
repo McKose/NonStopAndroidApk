@@ -41,17 +41,16 @@ kotlin {
     jvm()
 
     // Kotlin/Native hedefleri: gerçek cihaz (arm64) ve simülatör (Apple Silicon + Intel).
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64(),
-        iosX64(),
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "GymShared"
-            // Statik framework: Xcode tarafında ek gömme adımı gerektirmez.
-            isStatic = true
-        }
-    }
+    //
+    // FRAMEWORK BURADA ÜRETİLMİYOR (i4b'de `:arayuz`a taşındı). Sebebi: iOS
+    // kabuğunun açacağı şey ekran, ekran modeli ve gezinme grafiği ve bunların
+    // üçü de `:arayuz`da. İKİ framework olamazdı — ikisi de statik ve ikisi de
+    // Kotlin stdlib'i ile bu modülün kodunu içerirdi, bağlayıcı çift sembolden
+    // şikâyet ederdi. `:arayuz` bu modüle bağlı olduğu için buradaki kod
+    // framework'e zaten giriyor.
+    iosArm64()
+    iosSimulatorArm64()
+    iosX64()
 
     sourceSets {
         // NOT: android + jvm için elle bir ara kaynak kümesi (`dependsOn`)

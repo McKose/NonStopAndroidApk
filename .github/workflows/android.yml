@@ -539,12 +539,16 @@ jobs:
       # Kotlin/Native derlemesi yalnızca macOS'ta yapılabiliyor. Bu iş olmadan
       # "iOS'ta çalışıyor" iddiası doğrulanmamış kalırdı: ortak kodun gerçekten
       # Apple hedefine derlendiğini kanıtlayan tek yer burası.
+      # Framework `:arayuz`dan üretiliyor, `:shared`dan DEĞİL (i4b). İçinde
+      # `:shared` de var — `:arayuz` ona bağlı — ama Xcode'un açacağı ekranlar,
+      # ekran modelleri ve gezinme grafiği `:arayuz`da. İki modülün birden
+      # framework üretmesi olmazdı: ikisi de statik, çift sembol.
       - name: Simülatör framework'ü (arm64)
         run: |
           # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
           # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
           set -o pipefail
-          ./gradlew --no-daemon :shared:linkDebugFrameworkIosSimulatorArm64 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
+          ./gradlew --no-daemon :arayuz:linkDebugFrameworkIosSimulatorArm64 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
       # Gerçek cihaz hedefi yalnızca master'da: simülatör derlemesi Kotlin/Native
       # ön ucunun geçtiğini zaten kanıtlıyor, bu adım son bir güvence.
@@ -553,7 +557,7 @@ jobs:
           # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
           # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
           set -o pipefail
-          ./gradlew --no-daemon :shared:linkDebugFrameworkIosArm64 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
+          ./gradlew --no-daemon :arayuz:linkDebugFrameworkIosArm64 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
       # Aynı testler Kotlin/Native üzerinde de koşuyor: JVM'de geçip Native'de
       # patlayan bir davranış farkı (yuvarlama, tarih, metin) burada yakalanır.
@@ -564,10 +568,11 @@ jobs:
           set -o pipefail
           ./gradlew --no-daemon :shared:iosSimulatorArm64Test 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
-      # Ortak ARAYÜZ de Apple hedefine derleniyor. i1'de yalnızca derleme
-      # (klib) — framework'e i4'te, iOS kabuğu gelince bağlanacak. Şimdiden
-      # buradaki sebebi: Compose Multiplatform'un Kotlin/Native tarafında bir
-      # uyumsuzluk varsa 13 ekran taşındıktan sonra değil, ilk PR'da görülsün.
+      # Yukarıdaki bağlama adımları bu modülü zaten derliyor; bu adım
+      # `iosX64` dışındaki iki hedefin derlemesini AYRI raporluyor. Bağlama
+      # hatası ile derleme hatasını ayırt etmek teşhisi hızlandırıyor:
+      # derleme düşerse hata kodda, bağlama düşerse bağımlılıkta ya da klib
+      # ABI'sinde.
       - name: Ortak arayüz (Kotlin/Native derlemesi)
         run: |
           # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
