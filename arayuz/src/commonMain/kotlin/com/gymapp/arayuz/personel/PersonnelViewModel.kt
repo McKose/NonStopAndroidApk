@@ -1,4 +1,4 @@
-package com.gymapp.presentation.settings
+package com.gymapp.arayuz.personel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

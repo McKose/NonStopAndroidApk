@@ -18,10 +18,19 @@ plugins {
  *              olmayan makinelerde ekranları görmenin yolu bu
  *
  * ### Bu modülde ne YOK
- * Veri erişimi ve iş kuralı yok — onlar `shared`'da ve orada kalıyor. Buradaki
- * kod yalnızca çiziyor; durum dışarıdan geliyor (state hoisting). Bu ayrım
+ * Veri erişimi ve iş kuralı yok — onlar `shared`'da ve orada kalıyor. Bu ayrım
  * bilinçli: arayüzü üç platformda sınamak ucuz, iş kuralını üç platformda
  * sınamak pahalı.
+ *
+ * ### İki katman, tek modül (i3e)
+ * Modül artık yalnızca ekranlardan oluşmuyor; ekran modelleri (ViewModel) de
+ * burada. State hoisting bozulmadı — EKRANLAR hâlâ durumu parametre olarak
+ * alıyor ve hiçbir ViewModel çağırmıyor; görüntü testlerinin çalışabilmesinin
+ * sebebi de bu. Ekran modeli o durumu ÜRETEN ayrı katman, tüketen değil.
+ *
+ * Ekran modellerinin `shared`'a değil buraya konmasının sebebi: `shared`'ın
+ * Compose bağımlılığı yok ve olmamalı (veri katmanı orada), ekran modelleri ise
+ * Compose'a bağlı (`ViewModel`, ve Ayarlar'da `mutableStateOf`).
  */
 kotlin {
     androidTarget {
@@ -58,6 +67,27 @@ kotlin {
             // (bkz. docs/ios-plani.md, madde 2). Giriş ekranındaki tek ikon
             // o riskin turnusolü: tutmuyorsa ilk PR'da, tek dosyada görülür.
             implementation(compose.materialIconsExtended)
+
+            // Ekran modelleri (i3e). `ViewModel` + `viewModelScope` buradan
+            // geliyor; `api` DEĞİL çünkü kabukların ekran modellerini doğrudan
+            // görmesi gerekmiyor — gezinme grafiği de bu modülde (i3e-2).
+            implementation(libs.jb.lifecycle.viewmodel.compose)
+
+            // Ekran modellerinin Koin tanımları (`ekranModelleriModulu`) bu
+            // modülde yaşıyor: tanım ile kurucu yan yana durunca ikisi
+            // birbirinden sapamıyor. Repository ve platform bağlamaları
+            // kabuklarda kalıyor.
+            //
+            // `api`, çünkü `ekranModelleriModulu`nun TİPİ Koin'in `Module`ü ve
+            // bu tip modülün dışına çıkıyor — kabuklar onu `includes(...)` ile
+            // ekliyor. `implementation` olsaydı Android bugün yine derlenirdi
+            // (app zaten `koin-android` üzerinden koin-core'u görüyor), ama
+            // derlenmesinin sebebi tesadüf olurdu: iOS kabuğu koin-core'a
+            // kendisi bağlanmayı unutursa hata ancak orada çıkardı.
+            api(libs.koin.core)
+            // Yalnızca `viewModelOf` DSL'i için ve o da modül gövdesinin
+            // içinde kalıyor — dışa açık bir imzada görünmüyor.
+            implementation(libs.koin.core.viewmodel)
         }
 
         // Görüntü testi: ekran gerçek Skia ile ekransız (headless) çiziliyor

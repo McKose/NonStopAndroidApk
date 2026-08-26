@@ -27,6 +27,14 @@ data class MillisRange(val startInclusive: Long, val endExclusive: Long) {
 }
 
 /**
+ * Bir takvim ayının kimliği.
+ *
+ * @property ayIndeksi0 **0 tabanlı** ay (Ocak = 0) — [Periods.month] ile aynı
+ *           gelenek, böylece ikisi arasında dönüştürme gerekmiyor.
+ */
+data class Donem(val ayIndeksi0: Int, val yil: Int)
+
+/**
  * Dönem hesapları.
  *
  * API bilinçli olarak **epoch millis** üzerinden konuşur: her platform kendi tarih
@@ -83,6 +91,24 @@ object Periods {
             startInclusive = first.atStartOfDayIn(zone).toEpochMilliseconds(),
             endExclusive = first.plus(1, DateTimeUnit.MONTH).atStartOfDayIn(zone).toEpochMilliseconds(),
         )
+    }
+
+    /**
+     * Verilen anın içinde bulunduğu takvim ayı.
+     *
+     * Finans ekranı açılırken hangi dönemi göstereceğini buradan öğreniyor.
+     * Önceden `LocalDate.now().monthValue - 1` ve `LocalDate.now().year` diye
+     * **iki ayrı** çağrıyla hesaplanıyordu; ikisi JVM'e özgü olmasının yanında
+     * saati iki kez okuduğu için 31 Aralık gece yarısında araya girildiğinde
+     * "Aralık 2027" gibi var olmayan bir dönem üretebiliyordu. Tek `epochMillis`
+     * girdisiyle o sınıf hata yapısal olarak imkânsız.
+     */
+    fun donemOf(
+        epochMillis: Long,
+        zone: TimeZone = TimeZone.currentSystemDefault(),
+    ): Donem {
+        val t = Instant.fromEpochMilliseconds(epochMillis).toLocalDateTime(zone)
+        return Donem(ayIndeksi0 = t.monthNumber - 1, yil = t.year)
     }
 
     /**

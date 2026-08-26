@@ -1,4 +1,4 @@
-package com.gymapp.presentation.settings
+package com.gymapp.arayuz.ayarlar
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf

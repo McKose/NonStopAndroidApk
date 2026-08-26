@@ -1,4 +1,4 @@
-package com.gymapp.presentation.dashboard
+package com.gymapp.arayuz.pano
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -20,11 +20,8 @@ import com.gymapp.domain.PaymentState
 import com.gymapp.domain.Periods
 import com.gymapp.domain.StaffRole
 import kotlinx.coroutines.flow.*
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-import java.util.concurrent.TimeUnit
+import com.gymapp.domain.Now
+import com.gymapp.domain.TarihBicimi
 
 private const val LOW_STOCK_THRESHOLD = 5
 
@@ -107,7 +104,7 @@ class DashboardViewModel(
         val userRole = oturumBilgisi.role
         val staffLink = oturumBilgisi.link
 
-        val now = System.currentTimeMillis()
+        val now = Now.epochMillis()
         val today = Periods.dayOf(now)
 
         val isTrainer = userRole == StaffRole.TRAINER
@@ -154,15 +151,12 @@ class DashboardViewModel(
         // "0 aktif üye" yazarken altında salonun tamamının borç listesi
         // duruyordu — üstelik tutarlarıyla. Eğitmene Finans ekranını kapatıp
         // aynı bilgiyi panoda vermek, kısıtı anlamsız kılıyordu.
-        val expiryFormatter = DateTimeFormatter.ofPattern("dd/MM", Locale.getDefault())
-        val threeDaysLater = now + TimeUnit.DAYS.toMillis(3)
+        val threeDaysLater = now + Periods.daysInMillis(3)
         filteredMembers.forEach { member ->
             val endDate = member.endDateMs ?: return@forEach
             val isActive = Membership.stateOf(member.status, endDate, now) == MembershipState.ACTIVE
             if (isActive && endDate <= threeDaysLater) {
-                val formatted = Instant.ofEpochMilli(endDate)
-                    .atZone(ZoneId.systemDefault())
-                    .format(expiryFormatter)
+                val formatted = TarihBicimi.gunAy(endDate)
                 alerts.add("Üyelik Bitiyor: ${member.fullName} ($formatted)")
             }
         }
