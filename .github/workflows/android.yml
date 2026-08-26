@@ -603,11 +603,20 @@ jobs:
           # sürümüyle değişiyor ve isimle hedef seçmek ("iPhone 15") koşucu
           # imajı güncellendiğinde sessizce kırılıyor. Yalnızca DERLEME
           # doğrulanıyor, uygulama çalıştırılmıyor.
+          #
+          # ARCHS TEK MİMARİYE SABİT. `-sdk iphonesimulator` varsayılanı hem
+          # arm64 hem x86_64 derliyor; framework'ü üreten Gradle görevi ise
+          # `$ARCHS`e bakıyor ve iki mimarili bir istekte hangi hedefi
+          # üreteceği belirsizleşiyor. Koşucu Apple Silicon, doğrulanması
+          # gereken de arm64 — ikinci mimari yalnızca süre ve belirsizlik
+          # ekliyordu.
           xcodebuild \
             -project iosApp/GymApp.xcodeproj \
             -scheme GymApp \
             -sdk iphonesimulator \
             -configuration Debug \
+            -arch arm64 \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
             build 2>&1 | tee -a "$RUNNER_TEMP/xcodebuild.log" | tail -40
 
@@ -618,4 +627,24 @@ jobs:
             grep -E "error:|BUILD FAILED|\*\* BUILD" "$RUNNER_TEMP/xcodebuild.log" \
               | sed 's/^/::error::/' | head -40 \
               || echo "Günlükte xcodebuild hata satırı yok."
+          fi
+
+          # Framework'ün Swift'e GERÇEKTEN ne açtığını yazar.
+          #
+          # Buradaki ilk hata "cannot find 'IosGirisKt' in scope" oldu: Kotlin
+          # üst düzey fonksiyonlarını Objective-C'ye bir sarmalayıcı sınıfla
+          # açıyor ve o sınıfın adı tahmin edilmemeli. Üretilen başlık dosyası
+          # doğru adı zaten yazıyor; bu adım onu günlüğün SONUNA koyuyor,
+          # çünkü sorun ancak orası okunabildiğinde teşhis edilebiliyor.
+          BASLIK=arayuz/build/bin/iosSimulatorArm64/debugFramework/GymApp.framework/Headers/GymApp.h
+          if [ -f "$BASLIK" ]; then
+            echo "::group::Framework'ün dışa açtığı giriş noktası"
+            grep -n -B4 "GymUygulamasiViewController" "$BASLIK" | head -30 \
+              || echo "Başlıkta GymUygulamasiViewController geçmiyor."
+            echo "--- sarmalayıcı sınıflar ---"
+            grep -nE "^@interface [A-Za-z0-9_]+Kt " "$BASLIK" | head -20 \
+              || echo "Kt sarmalayıcı sınıf bulunamadı."
+            echo "::endgroup::"
+          else
+            echo "::error::Framework başlığı yok: $BASLIK"
           fi
