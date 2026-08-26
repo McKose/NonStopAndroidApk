@@ -1,4 +1,4 @@
-package com.gymapp.presentation.market
+package com.gymapp.arayuz.market
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

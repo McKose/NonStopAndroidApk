@@ -1,4 +1,4 @@
-package com.gymapp.presentation.login
+package com.gymapp.arayuz.giris
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

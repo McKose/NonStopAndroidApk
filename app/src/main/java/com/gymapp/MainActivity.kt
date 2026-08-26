@@ -50,12 +50,12 @@ import com.gymapp.presentation.calendar.CalendarEvent
 import com.gymapp.presentation.calendar.CalendarViewModel
 import com.gymapp.arayuz.pano.PanoEkrani
 import com.gymapp.presentation.dashboard.DashboardViewModel
-import com.gymapp.presentation.login.LoginViewModel
+import com.gymapp.arayuz.giris.LoginViewModel
 import com.gymapp.arayuz.paketler.PaketFormu
 import com.gymapp.arayuz.paketler.PaketFormuEkrani
 import com.gymapp.arayuz.paketler.PaketListesiEkrani
-import com.gymapp.presentation.packages.PackageEvent
-import com.gymapp.presentation.packages.PackageViewModel
+import com.gymapp.arayuz.paketler.PackageEvent
+import com.gymapp.arayuz.paketler.PackageViewModel
 import com.gymapp.arayuz.uyeler.UyeDetayEkrani
 import com.gymapp.arayuz.uyeler.UyeListesiEkrani
 import com.gymapp.presentation.members.MemberEvent
@@ -68,13 +68,13 @@ import com.gymapp.arayuz.market.MarketEkrani
 import com.gymapp.presentation.market.MarketEvent
 import com.gymapp.presentation.market.MarketViewModel
 import com.gymapp.arayuz.market.SiparisGecmisiEkrani
-import com.gymapp.presentation.market.OrderHistoryViewModel
+import com.gymapp.arayuz.market.OrderHistoryViewModel
 import com.gymapp.arayuz.ayarlar.AyarlarEkrani
-import com.gymapp.presentation.settings.SettingsViewModel
+import com.gymapp.arayuz.ayarlar.SettingsViewModel
 import com.gymapp.arayuz.personel.PersonelEkrani
 import com.gymapp.arayuz.personel.PersonelFormHedefi
-import com.gymapp.presentation.settings.PersonnelEvent
-import com.gymapp.presentation.settings.PersonnelViewModel
+import com.gymapp.arayuz.personel.PersonnelEvent
+import com.gymapp.arayuz.personel.PersonnelViewModel
 
 import com.gymapp.ui.theme.GymAppTheme
 

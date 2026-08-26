@@ -1,4 +1,4 @@
-package com.gymapp.presentation.packages
+package com.gymapp.arayuz.paketler
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
