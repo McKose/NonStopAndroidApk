@@ -79,6 +79,9 @@ kotlin {
             // karşılaması gerekiyor.
             api(libs.jb.navigation.compose)
 
+            // Rota argümanlarını okumak için (`SavedState.read`).
+            implementation(libs.jb.savedstate)
+
             // Bağlama composable'ları `koinViewModel()` çağırıyor.
             implementation(libs.koin.compose.viewmodel)
 

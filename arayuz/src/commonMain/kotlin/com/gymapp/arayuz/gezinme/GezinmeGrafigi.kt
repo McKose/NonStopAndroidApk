@@ -15,12 +15,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.savedstate.read
 import com.gymapp.data.local.entity.AppointmentEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.ProductEntity
@@ -61,6 +63,25 @@ import com.gymapp.arayuz.uyeler.UyeDetayEkrani
 import com.gymapp.arayuz.uyeler.UyeKayitEkrani
 import com.gymapp.arayuz.uyeler.UyeListesiEkrani
 import org.koin.compose.viewmodel.koinViewModel
+
+/**
+ * Rota argümanını okur.
+ *
+ * `backStackEntry.arguments?.getString(...)` YAZILAMIYOR ve sebebi ilk bakışta
+ * görünmüyor: `arguments`ın tipi `SavedState` ve bu tip Android'de
+ * `android.os.Bundle`a takma ad. Yani `getString` Android'de vardı, ortak kodda
+ * yok. Grafik `MainActivity` içindeyken bu satırlar sorunsuz derleniyordu; hata
+ * ancak modül taşınıp `compileKotlinJvm` çalıştığında çıktı (Android derlemesi
+ * aynı koşuda hâlâ geçiyordu).
+ *
+ * Gövde, navigation'ın kendi `NavType.StringType.get` gerçeklemesinin birebir
+ * aynısı: önce anahtar var mı ve null mu diye bakılıyor, çünkü `getString`
+ * olmayan anahtarda fırlatıyor.
+ */
+private fun NavBackStackEntry.rotaArgumani(anahtar: String): String? =
+    arguments?.read {
+        if (!contains(anahtar) || isNull(anahtar)) null else getString(anahtar)
+    }
 
 /**
  * Uygulamanın gezinme grafiği — **ortak**, yani Android ve iOS aynı grafiği
@@ -181,14 +202,14 @@ fun GymGezinme(oturumVar: Boolean) {
                 route = "renew_package/{memberId}",
                 arguments = listOf(navArgument("memberId") { type = NavType.StringType })
             ) { backStackEntry ->
-                val memberId = backStackEntry.arguments?.getString("memberId").orEmpty()
+                val memberId = backStackEntry.rotaArgumani("memberId").orEmpty()
                 UyeKayitBagla(navController, yenileme = true, uyeId = memberId)
             }
             composable(
                 route = "member_detail/{memberId}",
                 arguments = listOf(navArgument("memberId") { type = NavType.StringType })
             ) { backStackEntry ->
-                val memberId = backStackEntry.arguments?.getString("memberId").orEmpty()
+                val memberId = backStackEntry.rotaArgumani("memberId").orEmpty()
                 UyeDetayBagla(navController, memberId)
             }
             composable("package_list") {
@@ -237,7 +258,7 @@ fun GymGezinme(oturumVar: Boolean) {
                 arguments = listOf(navArgument("packageId") { type = NavType.StringType })
             ) { backStackEntry ->
                 PaketFormuBagla(
-                    paketId = backStackEntry.arguments?.getString("packageId"),
+                    paketId = backStackEntry.rotaArgumani("packageId"),
                     navController = navController,
                 )
             }
