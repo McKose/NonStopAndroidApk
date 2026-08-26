@@ -115,3 +115,104 @@ function tarihYaz(ms) {
 }
 
 duyurulariYukle();
+
+// ─── Karşılama: video ve kaydırma animasyonu ──────────────────────────────
+//
+// Bu bölümün tamamı İSTEĞE BAĞLI süs. Hiçbiri çalışmazsa banner yine de
+// fotoğraf + metin olarak tam görünüyor; CSS'teki varsayılan hâl bu.
+// Bu yüzden burada hata yakalama sessiz: ziyaretçinin yapabileceği bir şey yok.
+
+/** Kullanıcı hareket azaltma istiyor mu. */
+const hareketAzalt =
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+
+/**
+ * Videoyu arka planda yükler, oynayabilir hâle gelince gösterir.
+ *
+ * ### Sıra neden böyle
+ * Fotoğraf `fetchpriority="high"` ile hemen iniyor ve banner anında doluyor.
+ * Video ise `preload="none"` ile bekliyor; yüklemeyi BURADAN başlatıyoruz.
+ * Tersi olsaydı tarayıcı ikisini birden çeker, fotoğraf gecikir ve ziyaretçi
+ * ilk saniyede boş bir alan görürdü.
+ *
+ * ### Neden `canplaythrough` değil de `canplay`
+ * `canplaythrough` videonun SONUNA kadar kesintisiz oynayabileceğini bekliyor;
+ * yavaş bağlantıda bu olay hiç gelmeyebiliyor ve video sonsuza kadar gizli
+ * kalıyordu. `canplay` "oynatmaya başlanabilir" demek ve döngüye alınmış
+ * sessiz bir arka plan videosu için doğru eşik — takılırsa altındaki fotoğraf
+ * zaten duruyor.
+ *
+ * ### Otomatik oynatma reddedilebilir
+ * `play()` bir Promise döndürüyor ve tarayıcı reddedebiliyor (iOS'ta düşük
+ * güç modu, bazı veri tasarrufu ayarları). Reddedilirse video GÖSTERİLMİYOR:
+ * donmuş tek kare, hareketli fotoğraftan daha kötü görünürdü.
+ */
+function kahramanVideosu() {
+  const video = document.getElementById("kahraman-video");
+  if (!video) return;
+
+  // Yol boşsa video henüz eklenmemiş demektir; fotoğrafta kalınıyor ve
+  // HİÇBİR istek atılmıyor. (Neden `src` değil de `data-kaynak`: index.html.)
+  const kaynak = video.dataset.kaynak?.trim();
+  if (!kaynak) return;
+
+  // Hareket azaltma tercihinde video hiç yüklenmiyor: hem tercih gereği hem
+  // de boşuna indirilen birkaç megabayt olmasın diye.
+  if (hareketAzalt) return;
+
+  video.addEventListener("canplay", () => {
+    video.play().then(
+      () => video.classList.add("hazir"),
+      () => { /* otomatik oynatma reddedildi; fotoğrafta kalınıyor */ },
+    );
+  }, { once: true });
+
+  // Dosya yoksa (henüz eklenmedi) ya da ağ hatasında sessizce fotoğrafta
+  // kalınıyor. `error` olayı `<source>` üzerinde tetikleniyor.
+  video.addEventListener("error", () => {}, { once: true });
+
+  video.preload = "auto";
+  video.src = kaynak;
+  video.load();
+}
+
+/**
+ * Kaydırma animasyonunun JS yedeği.
+ *
+ * YALNIZCA `animation-timeline: view()` desteklenmiyorsa devreye giriyor.
+ * Destekleniyorsa animasyon tamamen CSS'te koşuyor ve ana iş parçacığına
+ * hiç dokunmuyor — kaydırma akıcılığı için bu fark gözle görülür.
+ *
+ * `.js-kaydirma` sınıfı GÖVDEYE burada ekleniyor, HTML'de değil: sınıf
+ * baştan HTML'de olsaydı ve bu betik yüklenmeseydi (ağ hatası, `type=module`
+ * desteklemeyen tarayıcı) içerik `opacity: 0` ile gizli kalır ve banner boş
+ * görünürdü.
+ */
+function kahramanKaydirma() {
+  if (hareketAzalt) return;
+  if (CSS.supports?.("animation-timeline: view()")) return;
+  if (!("IntersectionObserver" in window)) return;
+
+  const icerik = document.querySelector(".kahraman-icerik");
+  if (!icerik) return;
+
+  // Sıralı geliş: her çocuk bir öncekinden 90 ms sonra.
+  [...icerik.children].forEach((cocuk, sira) => {
+    cocuk.style.setProperty("--gecikme", `${sira * 90}ms`);
+  });
+
+  document.body.classList.add("js-kaydirma");
+
+  const gozlemci = new IntersectionObserver((girisler) => {
+    for (const giris of girisler) {
+      if (!giris.isIntersecting) continue;
+      giris.target.classList.add("gorunur");
+      gozlemci.unobserve(giris.target);
+    }
+  }, { threshold: 0.15 });
+
+  gozlemci.observe(icerik);
+}
+
+kahramanVideosu();
+kahramanKaydirma();

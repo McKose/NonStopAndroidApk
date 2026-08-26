@@ -37,18 +37,70 @@
     <a href="#iletisim">İletişim</a>
   </nav>
 
+  <!-- Panel bağlantısı BİLEREK yok. Panel duruyor (`web/panel/`), yalnızca
+       herkese açık sayfada tanıtılmıyor: ziyaretçinin işine yaramıyor ve
+       personel oraya kendi adresinden giriyor. Aynı sebeple alt bilgideki
+       "Personel paneli" bağlantısı da kaldırıldı. -->
   <div class="ust-girisler">
-    <a class="dugme dugme-ikincil" href="panel/">Admin Paneli</a>
     <a class="dugme dugme-birincil" href="uye/">Üye Girişi</a>
   </div>
 </header>
 
 <main>
   <!-- ─── Karşılama ─────────────────────────────────────────────────────── -->
+  <!--
+    Görsel katman İKİ parçalı ve sırası önemli:
+
+      1. `<img>` hemen görünür. Karşılama alanı sayfanın ilk gördüğü yer;
+         video hazır olana kadar boş ya da siyah kalması, sitenin yavaş
+         olduğu izlenimi verirdi.
+      2. `<video>` arkada yüklenir ve OYNAYABİLECEK hâle geldiğinde imajın
+         üstüne çıkar (`site.js`). Yüklenemezse imajda kalınır — bağlantısı
+         zayıf ziyaretçi bozuk bir banner değil, duran bir fotoğraf görür.
+
+    `preload="none"`: yükleme kararı JS'e bırakıldı. `auto` olsaydı tarayıcı
+    videoyu ilk baytlardan itibaren çekmeye başlar ve imajın önceliğini
+    (`fetchpriority="high"`) elinden alırdı.
+
+    Video dosyası depoda YOK; eklendiğinde kendiliğinden devreye girer
+    (bkz. web/varliklar/BENIOKU.md).
+  -->
   <section class="kahraman">
-    <img class="kahraman-foto" src="varliklar/salon-ic.jpg"
-         alt="Non Stop GYM salon içi: siyah dokulu duvarlar, ışıklı tabela ve ekipmanlar"
-         width="1024" height="1536" fetchpriority="high">
+    <!-- `aria-hidden` YOK: içindeki fotoğrafın `alt` metni salonu anlatıyor ve
+         ekran okuyucudan gizlenmemeli. Video ile filtre zaten dekoratif ve
+         ikisi de erişilebilirlik ağacına ad vermiyor. -->
+    <div class="kahraman-gorsel">
+      <img class="kahraman-foto" src="varliklar/salon-ic.jpg"
+           alt="Non Stop GYM salon içi: siyah dokulu duvarlar, ışıklı tabela ve ekipmanlar"
+           width="1024" height="1536" fetchpriority="high">
+      <!--
+        VİDEO YOLU BOŞ ve bu bilinçli: dosya henüz depoda yok.
+
+        Dolu bırakılsaydı her ziyaretçinin tarayıcısı var olmayan bir dosya
+        için 404 isteği atardı. Görünürde bir bozukluk olmazdı (altında
+        fotoğraf duruyor) ve tam bu yüzden kimse fark etmezdi — sessiz
+        israf.
+
+        AÇMAK İÇİN tek adım: videoyu `varliklar/kahraman.mp4` olarak ekleyin
+        ve aşağıdaki `data-kaynak`ı doldurun:
+
+            data-kaynak="varliklar/kahraman.mp4"
+
+        `src` yerine `data-kaynak`: `src` dolu olsaydı tarayıcı `preload`
+        ayarına bakmadan yüklemeye başlayabilirdi. Yükleme kararı `site.js`te.
+        Yayın listesi `data-kaynak`ı da tarıyor, yani yanlış bir yol
+        yazılırsa test bunu yakalar (bkz. yayin-dosyalari.mjs).
+      -->
+      <video class="kahraman-video" id="kahraman-video"
+             muted playsinline loop preload="none"
+             data-kaynak=""
+             poster="varliklar/salon-ic.jpg"></video>
+      <!-- Karartma ayrı bir katman: opaklığı scroll'a bağlı değişiyor ve
+           bunu `::after` üzerinden yapmak, aynı elemanın hem gradyanını hem
+           animasyonunu tek yerde tutmayı zorlaştırırdı. -->
+      <div class="kahraman-filtre"></div>
+    </div>
+
     <div class="kahraman-icerik">
       <p class="ust-baslik">Kartepe</p>
       <h1>Denge, Güç ve <span class="altin">Akışın</span> Buluştuğu Nokta</h1>
@@ -153,8 +205,11 @@
 <footer class="alt-bilgi">
   <p>© <span id="yil">2026</span> Non Stop Studio — Kartepe</p>
   <p class="alt-bilgi-baglantilar">
-    <a href="panel/">Personel paneli</a> ·
     <a href="uye/">Üye girişi</a>
+  </p>
+  <p class="yapimci">
+    Tasarım ve yazılım
+    <a href="https://syntrixcode.com/tr" target="_blank" rel="noopener noreferrer">Syntrixcode</a>
   </p>
 </footer>
 

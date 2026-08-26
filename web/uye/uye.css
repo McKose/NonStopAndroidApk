@@ -87,3 +87,50 @@
 }
 
 #uye-adi { align-self: center; }
+
+/* ─── Giriş sayfası: iki yol ────────────────────────────────────────────── */
+/*
+  "Üyeliğim var" ve "henüz üye değilim" yan yana iki kart.
+
+  Dikey bir liste de olurdu ama yan yana durmaları kasıtlı: ziyaretçi hangi
+  durumda olduğuna bakıp SEÇİYOR. Alt alta olsaydı üstteki varsayılan gibi
+  okunur ve üye olmayanlar da kayıt formuna girerdi — düzeltilmek istenen
+  davranış tam olarak buydu.
+*/
+.yol-ayrimi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 26px;
+  max-width: 760px;
+}
+
+.yol-kart {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+.yol-baslik { margin: 0; font-size: 17px; }
+/* Düğme kartın en altına yapışıyor; iki kartın metni farklı uzunlukta
+   olduğunda düğmeler aynı hizada kalsın. */
+.yol-kart .dugme { margin-top: auto; }
+
+/*
+  Kayıt formunun üstündeki uyarı şeridi.
+
+  Renk `--altin` değil: altın bu sitede olumlu/vurgulu anlamda kullanılıyor
+  ve bu bir UYARI. Kenarlık soldan, çünkü metin okunurken gözün ilk gördüğü
+  yer orası.
+*/
+.uyari-serit {
+  max-width: 56ch;
+  margin: 18px 0 0;
+  padding: 12px 14px;
+  border-inline-start: 3px solid var(--altin-koyu);
+  background: var(--yuzey);
+  border-radius: 0 var(--yuvarlak) var(--yuvarlak) 0;
+  font-size: 14px;
+  color: var(--soluk);
+}
+.uyari-serit a { color: var(--altin); }

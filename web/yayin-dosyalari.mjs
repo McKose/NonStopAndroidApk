@@ -39,8 +39,19 @@ const URETILEN = new Set(["config.js"]);
 /** `import ... from "./x.js"` ve `import "./x.js"` biçimlerini yakalar. */
 const IMPORT_DESENI = /(?:from|import)\s+["'](\.\/[^"']+)["']/g;
 
-/** `<script src="x">` ve `<link href="x">` — yalnızca göreli yollar. */
-const HTML_DESENI = /(?:src|href)\s*=\s*["'](?!https?:|\/\/|#)([^"']+)["']/g;
+/**
+ * `<script src="x">`, `<link href="x">` ve `data-kaynak="x"` — göreli yollar.
+ *
+ * `data-kaynak` de taranıyor çünkü karşılama videosu `src` ile DEĞİL onunla
+ * veriliyor (yükleme kararı `site.js`te, bkz. index.html). Taranmasaydı iki
+ * şey birden kaybolurdu: dosya yayın listesine girmez (yayınlanan sitede 404)
+ * ve yanlış yazılmış bir yolu hiçbir test yakalamaz.
+ *
+ * Boş değer (`data-kaynak=""`) eşleşmiyor — desen en az bir karakter istiyor —
+ * yani "video henüz eklenmedi" hâli listeye hiç girmiyor.
+ */
+const HTML_DESENI =
+  /(?:src|href|data-kaynak)\s*=\s*["'](?!https?:|\/\/|#)([^"']+)["']/g;
 
 /**
  * Giriş noktalarını bulur: kökteki ve bir alt dizindeki her `index.html`.
@@ -101,7 +112,22 @@ export function yayinDosyalari(kok = BURADA, girisler = girisNoktalari(kok)) {
 
     bulunan.add(ad);
 
-    const icerik = readFileSync(yol, "utf8");
+    const hamIcerik = readFileSync(yol, "utf8");
+
+    // HTML yorumları taramadan ÇIKARILIYOR.
+    //
+    // Yorum içindeki bir yol tanım gereği canlı referans değil; tarayıcı onu
+    // istemiyor. Çıkarılmasaydı bir dosyayı "şöyle açılır" diye örnekleyen
+    // açıklama, olmayan bir dosyayı eksik gibi raporlardı — nitekim karşılama
+    // videosunun kullanım örneği tam bunu yaptı.
+    //
+    // Yalnızca HTML için: JS yorumlarında import benzeri metin bulunması
+    // pratikte olmuyor ve `IMPORT_DESENI` zaten `from`/`import` anahtar
+    // sözcüğü arıyor.
+    const icerik = ad.endsWith(".html")
+      ? hamIcerik.replace(/<!--[\s\S]*?-->/g, "")
+      : hamIcerik;
+
     const desen = ad.endsWith(".html") ? HTML_DESENI : IMPORT_DESENI;
     desen.lastIndex = 0;
     const dizin = posix.dirname(ad);
