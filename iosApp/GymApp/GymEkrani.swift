@@ -11,12 +11,22 @@ import GymApp
 struct GymEkrani: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UIViewController {
-        // `IosGirisKt` — sınıf adı FONKSİYONDAN değil, Kotlin DOSYASINDAN
-        // türüyor: `IosGiris.kt` -> `IosGirisKt`. Kotlin/Native üst düzey
-        // fonksiyonları böyle sarmalıyor. Dolayısıyla o dosyanın adı
-        // değiştirilirse bu satır da değişmeli; Swift derleyicisi hatayı
-        // "unresolved identifier" olarak verir.
-        IosGirisKt.GymUygulamasiViewController(
+        // `GymAppIosGirisKt` — ad ÜÇ parçadan oluşuyor ve üçü de tahmin
+        // edilecek şey değil, üretilen başlıktan okunuyor:
+        //
+        //     GymApp   framework adı (Kotlin/Native tüm dışa açılan sınıfların
+        //              başına ekliyor)
+        //     IosGiris Kotlin DOSYASININ adı — fonksiyonun adı değil
+        //     Kt       üst düzey fonksiyon sarmalayıcısı olduğunu belirtir
+        //
+        // İlk yazımda `IosGirisKt` denenmişti; framework öneki atlandığı için
+        // CI "cannot find 'IosGirisKt' in scope" verdi. Doğru ad
+        // `GymApp.framework/Headers/GymApp.h` içinde yazılı ve CI hata özeti
+        // artık o dosyadan okuyup günlüğe basıyor.
+        //
+        // Sonuç olarak `IosGiris.kt` yeniden adlandırılırsa ya da framework
+        // adı değişirse bu satır da değişmeli.
+        GymAppIosGirisKt.GymUygulamasiViewController(
             supabaseUrl: Ayarlar.supabaseUrl,
             supabaseAnonKey: Ayarlar.supabaseAnonKey
         )
