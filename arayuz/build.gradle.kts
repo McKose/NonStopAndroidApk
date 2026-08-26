@@ -73,6 +73,15 @@ kotlin {
             // görmesi gerekmiyor — gezinme grafiği de bu modülde (i3e-2).
             implementation(libs.jb.lifecycle.viewmodel.compose)
 
+            // Gezinme grafiği (i3e-2). `api`, çünkü `GymGezinme` kabuklardan
+            // çağrılıyor ve kabuk `NavHostController` tipini görmese de
+            // navigation'ın Compose çalışma zamanı gereksinimlerini
+            // karşılaması gerekiyor.
+            api(libs.jb.navigation.compose)
+
+            // Bağlama composable'ları `koinViewModel()` çağırıyor.
+            implementation(libs.koin.compose.viewmodel)
+
             // Ekran modellerinin Koin tanımları (`ekranModelleriModulu`) bu
             // modülde yaşıyor: tanım ile kurucu yan yana durunca ikisi
             // birbirinden sapamıyor. Repository ve platform bağlamaları

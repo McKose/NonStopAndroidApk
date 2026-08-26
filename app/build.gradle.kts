@@ -258,6 +258,8 @@ dependencies {
     // Ortak arayüz (Compose Multiplatform). Ekranlar buraya taşındıkça `app`
     // inceliyor; sonunda geriye yalnızca Android kabuğu kalacak (MainActivity,
     // GymApplication, WorkManager dikişi).
+    // Gezinme grafiği de artık burada (i3e-2): `androidx.navigation` doğrudan
+    // bağımlılık olmaktan çıktı, :arayuz `api` ile getiriyor.
     implementation(project(":arayuz"))
 
     implementation(libs.androidx.core.ktx)
@@ -265,7 +267,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.navigation.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
@@ -280,8 +281,10 @@ dependencies {
     // karşılığı BGTaskScheduler ve o da kendi platform modülüne girecek.
     // Ortak olan tek şey "tekrar denensin mi" kararı ve o `:shared` içinde.
     implementation(libs.androidx.work.runtime)
+    // Yalnızca `androidContext()` ve `by inject()` için. Compose tarafındaki
+    // `koinViewModel()` artık :arayuz'da ve ortak `koin-compose-viewmodel`
+    // kullanıyor, dolayısıyla `koin-androidx-compose` KALDIRILDI.
     implementation(libs.koin.android)
-    implementation(libs.koin.androidx.compose)
     testImplementation(libs.junit)
     // `kotlin.test` — `:shared` zaten bunu kullanıyor, `app` kullanmıyordu.
     // Sebebi basit: `app/src/test` BOŞTU. CI'daki "Uygulama birim testleri"
