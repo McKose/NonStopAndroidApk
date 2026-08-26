@@ -1,10 +1,14 @@
 package com.gymapp
 
 import android.app.Application
+import com.gymapp.arayuz.ekranModelleriModulu
 import com.gymapp.data.auth.AndroidSessionStore
-import com.gymapp.di.appModule
-import com.gymapp.di.databaseModule
+import com.gymapp.data.local.db.createGymDatabase
+import com.gymapp.data.local.preferences.AndroidTercihler
+import com.gymapp.data.sync.WorkManagerSenkronizasyonu
+import com.gymapp.di.cekirdekModul
 import com.gymapp.di.supabaseModule
+import com.gymapp.di.veritabaniModulu
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -37,8 +41,13 @@ class GymApplication : Application() {
             // Sunucu ayarları depoya işlenmiyor; `local.properties`ten okunup
             // BuildConfig üzerinden geliyor. Boş olmaları derlemeyi düşürmüyor —
             // o durumda giriş ekranı ne eklenmesi gerektiğini söylüyor.
+            // Modüllerin ÜÇÜ de ortak koddan geliyor; bu blokta Android'e özgü
+            // olan yalnızca fabrikalara geçirilen örnekler. `app/di/AppModules.kt`
+            // buna karşılık tamamen kalktı: içindeki repository ve DAO listesi
+            // Android'e çakılıydı ve iOS kabuğu aynı listeyi yeniden yazmak
+            // zorunda kalacaktı.
             modules(
-                databaseModule,
+                veritabaniModulu(createGymDatabase(this@GymApplication)),
                 supabaseModule(
                     url = BuildConfig.SUPABASE_URL,
                     anonKey = BuildConfig.SUPABASE_ANON_KEY,
@@ -46,7 +55,11 @@ class GymApplication : Application() {
                     // uygulama kapansa da giriş korunuyor.
                     sessionStore = AndroidSessionStore(this@GymApplication),
                 ),
-                appModule,
+                cekirdekModul(
+                    tercihler = AndroidTercihler(this@GymApplication),
+                    arkaPlan = WorkManagerSenkronizasyonu(this@GymApplication),
+                ),
+                ekranModelleriModulu,
             )
         }
     }

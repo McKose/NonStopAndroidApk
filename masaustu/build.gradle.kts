@@ -23,6 +23,14 @@ kotlin {
     sourceSets {
         jvmMain.dependencies {
             implementation(project(":arayuz"))
+            // i4a'dan beri ŞART: kabuk artık Koin grafiğini kendisi kuruyor ve
+            // bunun için `shared`ın tiplerine doğrudan dokunuyor
+            // (`createGymDatabase`, `JvmTercihler`, `SessionManager`,
+            // `cekirdekModul`, ...). `arayuz` `shared`ı `implementation` ile
+            // tutuyor, yani buraya sızdırmıyor — sızdırmaması da doğru: kabuk
+            // kendi kullandığı bağımlılığı kendisi bildirmeli. Aynı gerekçe
+            // aşağıdaki material3 satırında da yazılı.
+            implementation(project(":shared"))
             implementation(compose.desktop.currentOs)
             // `desktop.currentOs` material3'ü GETİRMİYOR (eski Material'i
             // getiriyor) ve `arayuz`'un material3'ü `implementation` olduğu
