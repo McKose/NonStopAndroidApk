@@ -47,11 +47,40 @@
       <p id="giris-hata" class="hata" hidden></p>
     </form>
 
-    <p class="alt" style="max-width:52ch;margin-top:20px">
-      Hesabınız yok mu?
-      <a href="#" id="kayda-git">Kayıt olun</a> — hesabınızı açtıktan sonra
-      salon üyeliğinize bağlar.
-    </p>
+    <!--
+      İKİ YOL AYRI ANLATILIYOR ve bu bilinçli.
+
+      Önceden tek satır vardı: "Hesabınız yok mu? Kayıt olun". Salona fiziki
+      olarak üye OLMAYAN biri de o bağlantıyı tıklıyor, kayıt oluyor, hesabı
+      hiçbir üyelik kaydına bağlanamıyor ve "hesabınız bağlanmamış" ekranında
+      takılıyordu. Ne yapması gerektiğini o noktada kimse söylemiyordu.
+
+      Artık ayrım girişte yapılıyor: kayıt YALNIZCA salonda üyeliği olanlar
+      için, üyeliği olmayan doğrudan talep kanalına (Instagram) gidiyor.
+    -->
+    <div class="yol-ayrimi">
+      <div class="kart yol-kart">
+        <h2 class="yol-baslik">Salonumuzda üyeliğiniz var mı?</h2>
+        <p class="alt">
+          Kayıt olun, ardından salon hesabınızı üyelik kaydınıza bağlasın.
+          Bağlandıktan sonra paket durumunuzu ve ölçümlerinizi buradan
+          takip edersiniz.
+        </p>
+        <a href="#" id="kayda-git" class="dugme dugme-birincil">Kayıt olun</a>
+      </div>
+
+      <div class="kart yol-kart">
+        <h2 class="yol-baslik">Henüz üye değil misiniz?</h2>
+        <p class="alt">
+          Üyelik talebinizi Instagram üzerinden iletin; sizi arayıp uygun
+          paketi birlikte belirleyelim. Üyeliğiniz açıldıktan sonra buradan
+          hesap oluşturabilirsiniz.
+        </p>
+        <a class="dugme dugme-ikincil"
+           href="https://www.instagram.com/nonstopkartepe"
+           target="_blank" rel="noopener noreferrer">Üyelik talebi oluşturun</a>
+      </div>
+    </div>
   </section>
 
   <!-- ─── Kayıt ─────────────────────────────────────────────────────────── -->
@@ -67,6 +96,19 @@
       Bilgilerinizi bırakın, salon hesabınızı üyelik kaydınıza bağlasın.
       Bağlandıktan sonra paket durumunuzu ve ölçümlerinizi buradan
       takip edebilirsiniz.
+    </p>
+
+    <!--
+      Uyarı formun ÜSTÜNDE, altında değil. Formu doldurduktan sonra "aslında
+      bu size göre değildi" demek, harcanan emeği boşa çıkarmak olurdu.
+    -->
+    <p class="uyari-serit">
+      Bu form <strong>salonumuzda üyeliği olanlar</strong> içindir. Henüz üye
+      değilseniz önce
+      <a href="https://www.instagram.com/nonstopkartepe"
+         target="_blank" rel="noopener noreferrer">Instagram üzerinden üyelik
+      talebi oluşturun</a> — açılan hesap bir üyelik kaydına bağlanamazsa
+      paket ve ölçüm bilgisi göremezsiniz.
     </p>
 
     <form id="kayit-formu" class="kart uye-form">

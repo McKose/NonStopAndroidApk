@@ -138,27 +138,74 @@ a { color: var(--altin); }
 .dugme:focus-visible { outline: 2px solid var(--altin-parlak); outline-offset: 3px; }
 
 /* ─── Karşılama ─────────────────────────────────────────────────────────── */
-.kahraman { position: relative; min-height: 74vh; display: grid; align-items: center; }
+/*
+  Yükseklik `100svh`: mobil tarayıcılarda adres çubuğu kaydırırken açılıp
+  kapanıyor ve `vh` o anda değiştiği için banner zıplıyordu. `svh` (small
+  viewport height) çubuk AÇIKKEN ki yüksekliği alıyor, yani değişmiyor.
+  `min-height` olarak veriliyor ki içerik taşarsa kırpılmasın.
+*/
+.kahraman {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  align-items: center;
+  overflow: hidden;
+}
 
-/* Fotoğraf mutlak konumda ve karartılıyor: metnin okunabilirliği fotoğrafın
-   parlaklığına bağlı kalmasın. Gradyan sağdan sola koyulaşıyor çünkü metin
-   solda ve fotoğrafın ilgi çekici kısmı (tabela) sağ üstte. */
-.kahraman-foto {
+/* Görsel katman: fotoğraf, video ve filtre üst üste. */
+.kahraman-gorsel { position: absolute; inset: 0; }
+
+.kahraman-foto,
+.kahraman-video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: brightness(.55) saturate(1.05);
 }
-.kahraman::after {
-  content: "";
+
+/*
+  Video başlangıçta GÖRÜNMEZ ve fotoğrafın üstünde duruyor.
+
+  `site.js` video oynayabilir hâle geldiğinde `.hazir` ekliyor ve video
+  yumuşak bir geçişle fotoğrafın yerini alıyor. Sıçrama olmaması için ikisi
+  aynı `object-fit` ve aynı kadrajda.
+
+  Fotoğraf ALTTA KALIYOR, kaldırılmıyor: video bir kare bile takılsa ya da
+  bellek baskısıyla boşaltılsa altında siyahlık değil fotoğraf olsun.
+*/
+.kahraman-video {
+  opacity: 0;
+  transition: opacity .9s ease;
+}
+.kahraman-video.hazir { opacity: 1; }
+
+/*
+  Filtre: karartma + gradyan.
+
+  Gradyan sağdan sola koyulaşıyor çünkü metin solda ve görselin ilgi çekici
+  kısmı (tabela) sağ üstte. Karartma metnin okunabilirliğini görselin
+  parlaklığından bağımsız kılıyor.
+
+  Ayrı bir katman — eskiden `.kahraman::after` idi. Ayrılmasının sebebi
+  scroll animasyonu: opaklığı kaydırmayla değişiyor ve bir sözde elemanı
+  `animation-timeline` ile sürmek hem okunaksız hem de bazı tarayıcılarda
+  desteklenmiyor.
+*/
+.kahraman-filtre {
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg,
-    var(--zemin) 8%,
-    color-mix(in srgb, var(--zemin) 70%, transparent) 46%,
-    transparent 100%);
+  background:
+    linear-gradient(100deg,
+      var(--zemin) 8%,
+      color-mix(in srgb, var(--zemin) 70%, transparent) 46%,
+      transparent 100%),
+    linear-gradient(to bottom,
+      color-mix(in srgb, var(--zemin) 35%, transparent),
+      color-mix(in srgb, var(--zemin) 55%, transparent));
+  /* Başlangıç: banner ilk açıldığında görsel neredeyse açık, kaydırdıkça
+     koyulaşıyor. Değeri JS/CSS animasyonu sürüyor. */
+  opacity: var(--filtre-opaklik, .55);
 }
 
 .kahraman-icerik {
@@ -197,6 +244,85 @@ a { color: var(--altin); }
 .kahraman-metin { margin: 0 0 30px; max-width: 52ch; color: var(--soluk); }
 
 .kahraman-dugmeler { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* ─── Karşılama: kaydırma animasyonu ────────────────────────────────────── */
+/*
+  İçerik kaydırdıkça sırayla beliriyor (fade & move).
+
+  ### Üç katmanlı kurgu ve neden böyle
+  1. VARSAYILAN: her şey GÖRÜNÜR. Animasyon eklenmeden önceki hâl bu ve
+     bilinçli — CSS yüklenip JS düşerse ya da tarayıcı ikisini de
+     desteklemezse ziyaretçi boş bir banner değil, duran bir banner görür.
+     Tersini yapmak (varsayılan gizli) en sık rastlanan "animasyon kütüphanesi
+     yüklenmedi, sayfa boş" hatasıdır.
+  2. `animation-timeline: view()` destekleniyorsa animasyon TAMAMEN CSS'te
+     koşuyor: ana iş parçacığına dokunmuyor, kaydırma akıcı kalıyor.
+  3. Desteklenmiyorsa `site.js` gövdeye `.js-kaydirma` ekliyor ve aynı
+     görünümü IntersectionObserver ile veriyor.
+
+  Sıra (`--gecikme`) elle veriliyor: üst başlık, h1, slogan, metin, düğmeler.
+  Hepsi aynı anda gelseydi hareket "kayma" değil "sıçrama" gibi görünürdü.
+*/
+@keyframes kahramanBelir {
+  from { opacity: 0; transform: translate3d(0, 28px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+@supports (animation-timeline: view()) {
+  .kahraman-icerik > * {
+    animation: kahramanBelir linear both;
+    animation-timeline: view();
+    /* Eleman görünüm alanına girerken başlayıp ortalanmadan biter. `cover`
+       yerine bu aralık: `cover` animasyonu elemanın TAMAMEN çıkışına kadar
+       yaydığı için yazılar okunurken hâlâ hareket ediyordu. */
+    animation-range: entry 10% cover 38%;
+  }
+
+  /* Filtre kaydırdıkça koyulaşıyor: banner ilk açılışta görseli gösteriyor,
+     sayfa aşağı indikçe metnin arkası koyulaşıp okunurluk artıyor. */
+  .kahraman-filtre {
+    animation: kahramanFiltre linear both;
+    animation-timeline: view();
+    animation-range: entry 0% exit 100%;
+  }
+}
+
+@keyframes kahramanFiltre {
+  from { opacity: .38; }
+  to   { opacity: .82; }
+}
+
+/* JS yedeği — yalnızca `animation-timeline` yokken devreye giriyor. */
+.js-kaydirma .kahraman-icerik > * {
+  opacity: 0;
+  transform: translate3d(0, 28px, 0);
+  transition:
+    opacity .7s ease var(--gecikme, 0s),
+    transform .7s cubic-bezier(.22, .61, .36, 1) var(--gecikme, 0s);
+}
+.js-kaydirma .kahraman-icerik.gorunur > * { opacity: 1; transform: none; }
+
+/*
+  Hareket azaltma tercihi.
+
+  `prefers-reduced-motion` yalnızca estetik bir tercih değil: vestibüler
+  rahatsızlığı olan kullanıcılarda kayan içerik baş dönmesi yapabiliyor.
+  Bu blok animasyonu kapatıyor ve içeriği DOĞRUDAN görünür bırakıyor —
+  gizli bırakmak, tercihi açık olan kullanıcıya boş sayfa göstermek olurdu.
+
+  Video da bu durumda otomatik oynamıyor (bkz. `site.js`).
+*/
+@media (prefers-reduced-motion: reduce) {
+  .kahraman-icerik > *,
+  .js-kaydirma .kahraman-icerik > * {
+    animation: none;
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+  .kahraman-filtre { animation: none; opacity: .6; }
+  .kahraman-video { transition: none; }
+}
 
 /* ─── Bölümler ──────────────────────────────────────────────────────────── */
 .bolum { max-width: var(--en-genis); margin: 0 auto; padding: 76px 24px; }
@@ -293,6 +419,25 @@ a.iletisim-kutu:hover { border-color: var(--altin); }
 .alt-bilgi p { margin: 0; }
 .alt-bilgi-baglantilar a { color: var(--soluk); text-decoration: none; }
 .alt-bilgi-baglantilar a:hover { color: var(--altin); }
+
+/*
+  Yapımcı kredisi. Telif satırından daha küçük ve daha soluk: sayfanın
+  bilgisi değil, imzası.
+
+  `flex-basis: 100%` ile kendi satırına iniyor — telif ve bağlantıların
+  yanına sıkıştığında üçü de aynı ağırlıkta görünüyordu.
+*/
+.yapimci {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--soluk) 70%, transparent);
+}
+.yapimci a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.yapimci a:hover { color: var(--altin); }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

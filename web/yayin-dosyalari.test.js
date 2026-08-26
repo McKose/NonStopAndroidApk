@@ -117,3 +117,50 @@ test("aynı modül iki yerden içe alınsa bile bir kez listelenir", () => {
   const { dosyalar } = yayinDosyalari();
   assert.equal(new Set(dosyalar).size, dosyalar.length, "listede tekrar eden dosya var");
 });
+
+/**
+ * HTML yorumlarındaki yollar referans sayılmıyor.
+ *
+ * Yaşanmış durum: karşılama videosunun nasıl açılacağını anlatan açıklama
+ * `data-kaynak="varliklar/kahraman.mp4"` örneğini içeriyordu. Tarayıcı ham
+ * metin okuduğu için bunu canlı referans sanıp "dosya eksik" dedi ve testi
+ * düşürdü — oysa yorumdaki yol için hiçbir tarayıcı istek atmaz.
+ *
+ * Bu test o davranışı sabitliyor. Olmasaydı yorum ayıklama bir sonraki
+ * düzenlemede sessizce geri alınabilir ve kimse fark etmezdi: belirtisi,
+ * dokümantasyon yazan birinin testi kırması olurdu.
+ */
+test("HTML yorumundaki yollar referans sayılmıyor", () => {
+  const kaynak = readFileSync(join(BURADA, "index.html"), "utf8");
+
+  // Açıklama gerçekten örnek bir yol içeriyor mu — testin sınadığı durum
+  // hâlâ var mı? Açıklama değişirse bu iddia sessizce anlamsızlaşmasın.
+  const yorumlar = kaynak.match(/<!--[\s\S]*?-->/g) ?? [];
+  const ornekliYorum = yorumlar.some((y) => /data-kaynak\s*=\s*"[^"]+"/.test(y));
+  assert.ok(
+    ornekliYorum,
+    "index.html yorumlarında örnek bir `data-kaynak` yolu bulunamadı — " +
+      "bu test o durumu sınıyor, açıklama değiştiyse test de güncellenmeli",
+  );
+
+  const { eksik } = yayinDosyalari();
+  assert.deepEqual(
+    eksik, [],
+    `yorum içindeki yol canlı referans sayılmış: ${eksik.join(", ")}`,
+  );
+});
+
+/**
+ * Boş `data-kaynak` listeye girmiyor.
+ *
+ * Karşılama videosu henüz eklenmedi ve yolu bilerek boş. Boş değer eşleşseydi
+ * yayın listesine `""` girer ve dosya arama saçmalardı.
+ */
+test("boş data-kaynak yayın listesine girmiyor", () => {
+  const { dosyalar } = yayinDosyalari();
+  assert.ok(!dosyalar.includes(""), "boş yol yayın listesine girmiş");
+  assert.ok(
+    !dosyalar.some((d) => d.trim() === ""),
+    "yalnızca boşluktan oluşan yol yayın listesine girmiş",
+  );
+});
