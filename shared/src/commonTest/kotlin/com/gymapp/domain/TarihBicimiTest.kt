@@ -54,6 +54,11 @@ class TarihBicimiTest {
     }
 
     @Test
+    fun `gun ay`() {
+        assertEquals("19/08", TarihBicimi.gunAy(an, istanbul))
+    }
+
+    @Test
     fun `saat`() {
         assertEquals("14:30", TarihBicimi.saat(an, istanbul))
     }
@@ -69,6 +74,7 @@ class TarihBicimiTest {
         // 5 Eylül 2026, 09:05 (İstanbul)
         val tekHaneli = 1788588300000L
         assertEquals("05.09.2026", TarihBicimi.gunAyYil(tekHaneli, istanbul))
+        assertEquals("05/09", TarihBicimi.gunAy(tekHaneli, istanbul))
         assertEquals("09:05", TarihBicimi.saat(tekHaneli, istanbul))
     }
 

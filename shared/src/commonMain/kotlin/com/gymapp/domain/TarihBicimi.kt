@@ -82,6 +82,23 @@ object TarihBicimi {
             "${iki(t.hour)}:${iki(t.minute)}"
     }
 
+    /**
+     * `19/08` — yıl yok.
+     *
+     * Panodaki "üyeliği bitiyor" uyarısı için. Uyarı yalnızca önümüzdeki üç gün
+     * içinde bitecek üyelikler için üretiliyor, dolayısıyla yıl her zaman
+     * içinde bulunulan yıl; yazmak yer kaplardı.
+     *
+     * Önceden `DateTimeFormatter.ofPattern("dd/MM", Locale.getDefault())` ile
+     * üretiliyordu. Buraya taşınmasının sebebi yalnızca JVM'e bağımlılık değil:
+     * o çağrı `Locale.getDefault()` aldığı için ayırıcı cihaz diline göre
+     * değişebiliyordu — aynı ekran iki telefonda iki farklı biçim gösteriyordu.
+     */
+    fun gunAy(epochMs: Long, zaman: TimeZone = TimeZone.currentSystemDefault()): String {
+        val t = yerel(epochMs, zaman)
+        return "${iki(t.dayOfMonth)}/${iki(t.monthNumber)}"
+    }
+
     /** `14:30` */
     fun saat(epochMs: Long, zaman: TimeZone = TimeZone.currentSystemDefault()): String {
         val t = yerel(epochMs, zaman)

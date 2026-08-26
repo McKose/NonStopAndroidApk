@@ -7,6 +7,11 @@ junit           = "4.13.2"
 junitVersion    = "1.2.1"
 espressoCore    = "3.6.1"
 lifecycleRuntimeKtx = "2.9.0"
+# JetBrains'in lifecycle çatallaması (Compose Multiplatform). Yukarıdaki
+# `lifecycleRuntimeKtx` Android'e özgü AndroidX sürümü; bu ise ortak koddaki
+# ViewModel'ler için. İkisi ayrı numaralandığı için tek sürüm satırında
+# birleştirilemiyor.
+lifecycleMultiplatform = "2.9.6"
 work                = "2.10.1"
 activityCompose = "1.10.1"
 composeBom      = "2026.02.01"
@@ -83,6 +88,29 @@ androidx-work-runtime = { group = "androidx.work", name = "work-runtime-ktx", ve
 koin-core             = { group = "io.insert-koin", name = "koin-core",             version.ref = "koin" }
 koin-android          = { group = "io.insert-koin", name = "koin-android",          version.ref = "koin" }
 koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
+# `viewModelOf(...)` DSL'inin ortak (KMP) karşılığı. `koin-android` bunu Android
+# tarafında zaten getiriyordu; ekran modelleri :arayuz'a taşınınca ortak kaynak
+# kümesinde de gerekli oldu. klib ABI'si 1.201.0 (derleyici 2.1.21) — Kotlin
+# 2.2.21 ile uyumlu, Maven Central'daki manifest'ten doğrulandı.
+koin-core-viewmodel   = { group = "io.insert-koin", name = "koin-core-viewmodel",   version.ref = "koin" }
+
+# ViewModel'in Compose Multiplatform karşılığı.
+#
+# `androidx.lifecycle.ViewModel` ve `viewModelScope` bu artefaktla ortak kodda
+# da var; on ekran modelinin taşınabilmesinin tek sebebi bu. Paket adları
+# Android'dekiyle aynı olduğu için taşınan dosyalarda import değişmiyor.
+#
+# Sürüm neden 2.9.6: `org.jetbrains.androidx.navigation:navigation-compose:2.9.2`
+# (i3e-2'de gelecek) tam bu sürümü istiyor; ikisini aynı satırda tutmak
+# çakışmayı baştan eliyor. Koin 2.9.3 istiyor, Gradle yükseği seçiyor — aynı
+# minor, uyumlu.
+#
+# DOĞRULANAMAYAN NOKTA: bu artefaktın kendi klib'i uyumlu (abi 1.201.0), ancak
+# iOS'ta `lifecycle-viewmodel`i `androidx.lifecycle:lifecycle-viewmodel:2.9.4`e
+# devrediyor ve o Google Maven'da. Google Maven ağ ilkesince kapalı olduğu için
+# ABI'si yerelde okunamıyor; uyumsuzsa `compileKotlinIosArm64` "KLIB resolver"
+# hatası verir ve CI günlüğünün sonunda ::error:: olarak görünür.
+jb-lifecycle-viewmodel-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleMultiplatform" }
 
 # Kotlin Multiplatform — ortak (commonMain) bağımlılıklar
 kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinxDatetime" }
