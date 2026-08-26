@@ -45,9 +45,27 @@ kotlin {
     // iOS kabuğu gelince bağlanacak. Derlemeyi şimdiden kurmanın sebebi,
     // Compose Multiplatform'un Kotlin/Native tarafındaki bir uyumsuzluğu
     // 13 ekran taşındıktan sonra değil, ilk PR'da görmek.
-    iosArm64()
-    iosSimulatorArm64()
-    iosX64()
+    // iOS hedefleri i1'de yalnızca klib üretiyordu; i4b'den beri **framework**
+    // de burada üretiliyor (önceden `:shared`daydı). Taşındı çünkü iOS
+    // kabuğunun açacağı şey ekran, ekran modeli ve gezinme grafiği ve bunların
+    // üçü de bu modülde. İkisinin birden framework üretmesi olmazdı: ikisi de
+    // statik ve ikisi de Kotlin stdlib'i ile `:shared` kodunu içerirdi.
+    //
+    // `export(...)` YOK ve gerekmiyor: Swift tarafı yalnızca tek bir fonksiyon
+    // görüyor (`GymUygulamasiViewController`) ve o da parametre olarak yalnızca
+    // `String` alıyor. `:shared` tipleri framework'ün içinde ama dışa açık
+    // yüzeyinde değil.
+    listOf(
+        iosArm64(),
+        iosSimulatorArm64(),
+        iosX64(),
+    ).forEach { iosHedefi ->
+        iosHedefi.binaries.framework {
+            baseName = "GymApp"
+            // Statik framework: Xcode tarafında ek gömme adımı gerektirmez.
+            isStatic = true
+        }
+    }
 
     sourceSets {
         commonMain.dependencies {
