@@ -20,11 +20,12 @@ import com.gymapp.data.auth.SessionManager
 import com.gymapp.data.local.db.createGymDatabase
 import com.gymapp.data.local.preferences.JvmTercihler
 import com.gymapp.data.sync.ArkaPlanYok
+import com.gymapp.data.sync.SyncCoordinator
 import com.gymapp.di.cekirdekModul
 import com.gymapp.di.supabaseModule
 import com.gymapp.di.veritabaniModulu
+import kotlinx.coroutines.delay
 import org.koin.core.context.startKoin
-import org.koin.mp.KoinPlatform
 
 /**
  * Masaüstü kabuğu — artık iskelet değil, uygulamanın kendisi.
@@ -57,7 +58,11 @@ import org.koin.mp.KoinPlatform
  * duran bir düzen telefonda taşabilir, tersi taşmaz.
  */
 fun main() {
-    startKoin {
+    // `startKoin`in DÖNDÜRDÜĞÜ örnek kullanılıyor, `KoinPlatform.getKoin()`
+    // gibi bir genel erişim noktası değil: dönüş değeri zaten elimizde ve
+    // genel erişim, grafiğin kurulmuş olduğunu varsayan sessiz bir bağımlılık
+    // yaratırdı.
+    val koin = startKoin {
         modules(
             veritabaniModulu(createGymDatabase()),
             supabaseModule(
@@ -67,13 +72,15 @@ fun main() {
             ),
             cekirdekModul(
                 tercihler = JvmTercihler(),
-                // Masaüstünde uygulama kapalıyken senkronizasyon yok; pencere
-                // açıkken zaten düzenli tetikleniyor (aşağıdaki döngü).
+                // Uygulama KAPALIYKEN senkronizasyon yok. Android'de bunu
+                // WorkManager yapıyor; masaüstünde karşılığı yok ve olması da
+                // gerekmiyor — kabuk bir geliştirme aracı. Pencere açıkken
+                // gönderim aşağıdaki döngüyle sürüyor.
                 arkaPlan = ArkaPlanYok,
             ),
             ekranModelleriModulu,
         )
-    }
+    }.koin
 
     application {
         Window(
@@ -81,7 +88,8 @@ fun main() {
             title = "Non Stop GYM",
             state = rememberWindowState(width = 420.dp, height = 880.dp),
         ) {
-            val oturumlar = remember { KoinPlatform.getKoin().get<SessionManager>() }
+            val oturumlar = remember { koin.get<SessionManager>() }
+            val senkronizasyon = remember { koin.get<SyncCoordinator>() }
 
             // Saklanan oturum okunana kadar hiçbir ekran gösterilmiyor —
             // Android kabuğundaki kararın aynısı: beklemeden başlansaydı giriş
@@ -90,6 +98,22 @@ fun main() {
             LaunchedEffect(Unit) {
                 oturumlar.restore()
                 oturumYuklendi = true
+                senkronizasyon.requestSync()
+            }
+
+            // Pencere açıkken düzenli gönderim — Android kabuğundakiyle aynı
+            // aralık ve aynı gerekçe: yazma anında tetiklemek yarış yaratıyor,
+            // çünkü kuyruğa alma satırı değiştiren yazmayla aynı transaction
+            // içinde ve o an başlayan bir tur henüz işlenmemiş kaydı göremez.
+            //
+            // Android'de bu döngü Activity'nin yaşam döngüsüne bağlı; burada
+            // pencereye bağlı — `LaunchedEffect` pencere kapanınca iptal
+            // oluyor, dolayısıyla arkada koşan bir zamanlayıcı kalmıyor.
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(SENKRONIZASYON_ARALIGI_MS)
+                    senkronizasyon.requestSync()
+                }
             }
 
             GymTema(koyu = true) {
@@ -103,3 +127,11 @@ fun main() {
         }
     }
 }
+
+/**
+ * Pencere açıkken gönderim tetikleme aralığı — Android kabuğundakiyle aynı.
+ *
+ * Kuyruk zaten boşsa tur neredeyse bedava (tek sorgu); doluysa zaten
+ * gönderilmesi gereken veri var.
+ */
+private const val SENKRONIZASYON_ARALIGI_MS = 60_000L
