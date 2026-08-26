@@ -579,3 +579,43 @@ jobs:
           # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
           set -o pipefail
           ./gradlew --no-daemon :arayuz:compileKotlinIosSimulatorArm64 :arayuz:compileKotlinIosArm64 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
+
+      # Xcode kabuğunun gerçekten derlendiğini kanıtlayan tek yer burası.
+      #
+      # Geliştirme ortamında Xcode YOK (Linux), dolayısıyla `iosApp/` altındaki
+      # hiçbir şey yerelde sınanamıyor: ne Swift kodu, ne proje ayarları, ne de
+      # framework'ün doğru yerden bulunup bulunmadığı. Bu adım olmasaydı
+      # "iosApp hazır" demek doğrulanmamış bir iddia olurdu ve ilk hata
+      # projeyi açan kişide çıkardı.
+      #
+      # İmza GEREKMİYOR: simülatör derlemesi sertifika istemiyor. Apple
+      # Developer üyeliği yalnızca gerçek cihaz ve TestFlight için (i5).
+      - name: Xcode projesini üret (XcodeGen)
+        run: |
+          set -o pipefail
+          brew install xcodegen 2>&1 | tail -5
+          cd iosApp && xcodegen generate
+
+      - name: iOS uygulamasını derle (simülatör)
+        run: |
+          set -o pipefail
+          # `-destination` yerine `-sdk`: koşucudaki simülatör listesi Xcode
+          # sürümüyle değişiyor ve isimle hedef seçmek ("iPhone 15") koşucu
+          # imajı güncellendiğinde sessizce kırılıyor. Yalnızca DERLEME
+          # doğrulanıyor, uygulama çalıştırılmıyor.
+          xcodebuild \
+            -project iosApp/GymApp.xcodeproj \
+            -scheme GymApp \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tee -a "$RUNNER_TEMP/xcodebuild.log" | tail -40
+
+      - name: Xcode hatalarının özeti
+        if: failure()
+        run: |
+          if [ -f "$RUNNER_TEMP/xcodebuild.log" ]; then
+            grep -E "error:|BUILD FAILED|\*\* BUILD" "$RUNNER_TEMP/xcodebuild.log" \
+              | sed 's/^/::error::/' | head -40 \
+              || echo "Günlükte xcodebuild hata satırı yok."
+          fi

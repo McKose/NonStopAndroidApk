@@ -1,0 +1,96 @@
+# Xcode projesinin KAYNAĞI budur — `GymApp.xcodeproj` bundan üretiliyor
+# (`xcodegen generate`) ve depoya İŞLENMİYOR.
+#
+# ### Neden üretiliyor da elle yazılmıyor
+# `project.pbxproj` her nesneye 24 haneli onaltılık kimlikler veren, elle
+# okunması ve birleştirilmesi zor bir biçim. İki somut sebep:
+#
+#  1. Bu depoda Xcode YOK (geliştirme Linux'ta). Elle yazılan bir pbxproj'un
+#     doğruluğu ancak birinin Xcode'da açmasıyla anlaşılırdı; bozuksa zaman
+#     kaybı karşı tarafa yıkılırdı. Buradaki YAML ise CI'da `xcodebuild` ile
+#     sınanıyor — hata varsa bende çıkıyor.
+#  2. pbxproj birleştirme çatışmalarında pratikte okunamaz. Dosya listesi ve
+#     ayarlar bu 40 satırda kalırsa çatışma da okunabilir kalıyor.
+#
+# ### Kurulum
+#     brew install xcodegen
+#     cd iosApp && xcodegen generate && open GymApp.xcodeproj
+name: GymApp
+
+options:
+  bundleIdPrefix: tr.nonstopstudio
+  deploymentTarget:
+    # iPhone 14 Pro iOS 16 ile çıktı; 16.0 tabanı o cihazı ve sonrasını
+    # kapsıyor. Compose Multiplatform'un kendi tabanı da bunun altında.
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    # Supabase ayarları derleme sırasında dışarıdan geliyor, depoya İŞLENMİYOR.
+    # Boş bırakılmaları uygulamayı düşürmüyor: ortak `supabaseModule` o durumda
+    # ne yapılması gerektiğini söyleyen karşılıkları bağlıyor ve giriş ekranı
+    # sebebi yazıyor. Android tarafındaki `local.properties` düzeninin aynısı.
+    SUPABASE_URL: ""
+    SUPABASE_ANON_KEY: ""
+
+targets:
+  GymApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: GymApp
+    info:
+      path: GymApp/Info.plist
+      properties:
+        CFBundleDisplayName: Non Stop GYM
+        UILaunchScreen: {}
+        # Ayarlar Info.plist üzerinden Swift'e geçiyor. Kotlin'in doğrudan
+        # okuması da mümkündü ama yanlış yer olurdu: yapılandırma kabuğun işi
+        # (bkz. `GymUygulamasiViewController` KDoc'u).
+        SUPABASE_URL: $(SUPABASE_URL)
+        SUPABASE_ANON_KEY: $(SUPABASE_ANON_KEY)
+        # Yalnızca dikey. Ekranlar 420 puanlık genişlikte tasarlandı ve yatayda
+        # sınanmadı; desteklermiş gibi görünüp bozuk çizmektense kapalı olması
+        # dürüst.
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        # Gradle'ın ürettiği framework buraya konuyor.
+        FRAMEWORK_SEARCH_PATHS:
+          - $(SRCROOT)/../arayuz/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)
+        # Statik framework: gömme adımı yok, bağlayıcı doğrudan içine alıyor.
+        OTHER_LDFLAGS:
+          - -framework
+          - GymApp
+    preBuildScripts:
+      # Framework'ü Xcode derlemesinin PARÇASI olarak üretir.
+      #
+      # Ayrı bir elle adım olsaydı (`./gradlew ... && open Xcode`), Kotlin
+      # tarafında yapılan bir değişiklikten sonra Xcode eski framework'le
+      # derlemeye devam eder ve bu SESSİZ olurdu — kod değişti sanılır, eski
+      # davranış görülürdü.
+      - name: Ortak framework'ü derle (Gradle)
+        script: |
+          set -euo pipefail
+          cd "$SRCROOT/.."
+          ./gradlew :arayuz:embedAndSignAppleFrameworkForXcode
+        basedOnDependencyAnalysis: false
+
+# Şema AÇIKÇA tanımlı.
+#
+# XcodeGen hedefler için kendiliğinden şema üretmiyor; Xcode ise projeyi ilk
+# açtığında üretiyor. Aradaki fark CI'da ısırırdı: `xcodebuild -scheme GymApp`
+# şemayı projede bulamayıp "scheme not found" derdi ve sebebi
+# "ama Xcode'da açılıyor" diye aranırdı. Burada yazılı olunca iki ortamda da
+# aynı şema var.
+schemes:
+  GymApp:
+    build:
+      targets:
+        GymApp: all
+    run:
+      config: Debug
+    archive:
+      config: Release

@@ -29,3 +29,10 @@ keystore.properties
 *.jks
 release.keystore
 app/release.keystore
+
+# Xcode projesi ÜRETİLİYOR (iosApp/project.yml -> xcodegen generate).
+# İşlenmiyor: pbxproj elle okunamayan kimliklerle dolu ve birleştirme
+# çatışmalarında pratikte çözülemez. Kaynak project.yml.
+iosApp/*.xcodeproj/
+iosApp/*.xcworkspace/
+iosApp/GymApp/Info.plist
