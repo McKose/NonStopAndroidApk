@@ -1,22 +1,30 @@
-package com.gymapp.presentation.finance
+package com.gymapp.arayuz.finans
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.access.AppDestination
 import com.gymapp.data.auth.CurrentUser
 import com.gymapp.data.repository.FinanceRepository
-import com.gymapp.arayuz.finans.FinansKaydi
-import com.gymapp.arayuz.finans.finansKaydinaCevir
 import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.Money
+import com.gymapp.domain.Now
 import com.gymapp.domain.PaymentMethod
 import com.gymapp.domain.Periods
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 
+/**
+ * @property selectedMonth **0 tabanlı** ay. Varsayılanı YOK ve olmamalı:
+ *           önceden `LocalDate.now().monthValue - 1` idi, yani veri sınıfının
+ *           varsayılan parametresi saati okuyordu. Bu hem JVM'e bağlıydı hem de
+ *           `FinanceUiState()`i saf olmayan bir çağrı hâline getiriyordu — aynı
+ *           argümanlarla iki kez kurulduğunda farklı nesne üretebiliyordu.
+ *           Açılış dönemini artık ViewModel bir kez hesaplayıp geçiriyor.
+ */
 data class FinanceUiState(
+    val selectedMonth: Int,
+    val selectedYear: Int,
     val entries: List<FinansKaydi> = emptyList(),
     val totalIncome: Money = Money.ZERO,
     val totalExpense: Money = Money.ZERO,
@@ -25,8 +33,6 @@ data class FinanceUiState(
     val quarterlyRevenue: Money = Money.ZERO,
     val halfYearlyRevenue: Money = Money.ZERO,
     val yearlyRevenue: Money = Money.ZERO,
-    val selectedMonth: Int = LocalDate.now().monthValue - 1, // 0 tabanlı
-    val selectedYear: Int = LocalDate.now().year,
     val selectedFilter: String = "ALL", // ALL, INCOME, EXPENSE, PENDING
     val selectedPaymentMethod: String = "ALL",
     val isLoading: Boolean = false,
@@ -61,8 +67,17 @@ class FinanceViewModel(
 
     private val _filter = MutableStateFlow("ALL")
     private val _methodFilter = MutableStateFlow("ALL")
-    private val _selectedMonth = MutableStateFlow(LocalDate.now().monthValue - 1)
-    private val _selectedYear = MutableStateFlow(LocalDate.now().year)
+
+    /**
+     * Ekranın açılışta gösterdiği dönem — saat **bir kez** okunuyor.
+     *
+     * Ay ve yıl ayrı ayrı `LocalDate.now()` çağırmıyor artık: iki okuma arasında
+     * yıl dönebilir ve ekran "Aralık 2027" gibi olmayan bir dönem açardı.
+     */
+    private val acilisDonemi = Periods.donemOf(Now.epochMillis())
+
+    private val _selectedMonth = MutableStateFlow(acilisDonemi.ayIndeksi0)
+    private val _selectedYear = MutableStateFlow(acilisDonemi.yil)
 
     private val _events = Channel<FinanceEvent>(Channel.BUFFERED)
     val events: Flow<FinanceEvent> = _events.receiveAsFlow()
@@ -88,7 +103,7 @@ class FinanceViewModel(
         _methodFilter,
         allEntries,
     ) { month, year, filter, method, entries ->
-        val nowMs = System.currentTimeMillis()
+        val nowMs = Now.epochMillis()
 
         /** Son [monthsBack] aylık tahsilat. Üst sınır `nowMs`: ileri tarihli kayıt ciroyu şişiremez. */
         fun revenue(monthsBack: Int): Money {
@@ -137,7 +152,11 @@ class FinanceViewModel(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = FinanceUiState(isLoading = true)
+        initialValue = FinanceUiState(
+            selectedMonth = acilisDonemi.ayIndeksi0,
+            selectedYear = acilisDonemi.yil,
+            isLoading = true,
+        )
     )
 
     fun setFilter(filter: String) { _filter.value = filter }
@@ -159,7 +178,7 @@ class FinanceViewModel(
         description: String,
         paymentMethodName: String,
         isIncome: Boolean,
-        occurredAtMs: Long = System.currentTimeMillis(),
+        occurredAtMs: Long = Now.epochMillis(),
     ) {
         val amount = Money.parseOrNull(amountText)
         if (amount == null || !amount.isPositive) {

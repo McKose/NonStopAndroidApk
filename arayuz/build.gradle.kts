@@ -77,7 +77,16 @@ kotlin {
             // modülde yaşıyor: tanım ile kurucu yan yana durunca ikisi
             // birbirinden sapamıyor. Repository ve platform bağlamaları
             // kabuklarda kalıyor.
-            implementation(libs.koin.core)
+            //
+            // `api`, çünkü `ekranModelleriModulu`nun TİPİ Koin'in `Module`ü ve
+            // bu tip modülün dışına çıkıyor — kabuklar onu `includes(...)` ile
+            // ekliyor. `implementation` olsaydı Android bugün yine derlenirdi
+            // (app zaten `koin-android` üzerinden koin-core'u görüyor), ama
+            // derlenmesinin sebebi tesadüf olurdu: iOS kabuğu koin-core'a
+            // kendisi bağlanmayı unutursa hata ancak orada çıkardı.
+            api(libs.koin.core)
+            // Yalnızca `viewModelOf` DSL'i için ve o da modül gövdesinin
+            // içinde kalıyor — dışa açık bir imzada görünmüyor.
             implementation(libs.koin.core.viewmodel)
         }
 

@@ -1,4 +1,4 @@
-package com.gymapp.presentation.market
+package com.gymapp.arayuz.market
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,7 +11,6 @@ import com.gymapp.data.sync.SyncTable
 import com.gymapp.domain.DeliveryStatus
 import com.gymapp.domain.Money
 import com.gymapp.domain.PaymentMethod
-import com.gymapp.arayuz.market.MarketDurumu
 import com.gymapp.domain.PaymentState
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*

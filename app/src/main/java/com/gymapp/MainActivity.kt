@@ -46,10 +46,10 @@ import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
 import com.gymapp.arayuz.giris.GirisEkrani
 import com.gymapp.arayuz.takvim.TakvimEkrani
-import com.gymapp.presentation.calendar.CalendarEvent
-import com.gymapp.presentation.calendar.CalendarViewModel
+import com.gymapp.arayuz.takvim.CalendarEvent
+import com.gymapp.arayuz.takvim.CalendarViewModel
 import com.gymapp.arayuz.pano.PanoEkrani
-import com.gymapp.presentation.dashboard.DashboardViewModel
+import com.gymapp.arayuz.pano.DashboardViewModel
 import com.gymapp.arayuz.giris.LoginViewModel
 import com.gymapp.arayuz.paketler.PaketFormu
 import com.gymapp.arayuz.paketler.PaketFormuEkrani
@@ -58,15 +58,15 @@ import com.gymapp.arayuz.paketler.PackageEvent
 import com.gymapp.arayuz.paketler.PackageViewModel
 import com.gymapp.arayuz.uyeler.UyeDetayEkrani
 import com.gymapp.arayuz.uyeler.UyeListesiEkrani
-import com.gymapp.presentation.members.MemberEvent
-import com.gymapp.presentation.members.MemberViewModel
+import com.gymapp.arayuz.uyeler.MemberEvent
+import com.gymapp.arayuz.uyeler.MemberViewModel
 import com.gymapp.arayuz.uyeler.UyeKayitEkrani
 import com.gymapp.arayuz.finans.FinansEkrani
-import com.gymapp.presentation.finance.FinanceEvent
-import com.gymapp.presentation.finance.FinanceViewModel
+import com.gymapp.arayuz.finans.FinanceEvent
+import com.gymapp.arayuz.finans.FinanceViewModel
 import com.gymapp.arayuz.market.MarketEkrani
-import com.gymapp.presentation.market.MarketEvent
-import com.gymapp.presentation.market.MarketViewModel
+import com.gymapp.arayuz.market.MarketEvent
+import com.gymapp.arayuz.market.MarketViewModel
 import com.gymapp.arayuz.market.SiparisGecmisiEkrani
 import com.gymapp.arayuz.market.OrderHistoryViewModel
 import com.gymapp.arayuz.ayarlar.AyarlarEkrani
@@ -542,9 +542,11 @@ private fun UyeListesiBagla(navController: androidx.navigation.NavHostController
 /**
  * Takvimin Android bağlaması.
  *
- * Ekran artık gün aritmetiği yapmıyor; ileri/geri/bugün burada
- * `java.time.LocalDate` ile hesaplanıyor (ViewModel de o tiple konuşuyor) ve
- * ekrana yalnızca seçili günün epoch milisaniyesi geçiyor.
+ * Gün aritmetiği artık burada da DEĞİL, ViewModel'in içinde: bağlama yalnızca
+ * `oncekiGun` / `sonrakiGun` / `bugune` çağırıyor ve seçili günü epoch
+ * milisaniye olarak alıyor. Önceden bu üç hesap `java.time.LocalDate` ile tam
+ * bu dosyada yapılıyordu; ViewModel ortak modüle taşınırken taşınamayacak tek
+ * parça oydu, dolayısıyla hesabın kendisi de içeri alındı.
  *
  * Sheet ve diyaloğun açık/kapalı hâli de burada: kayıt reddedildiğinde
  * (çakışma, seans hakkı yok) sheet açık kalmalı ve bunu yalnızca olayları
@@ -554,7 +556,7 @@ private fun UyeListesiBagla(navController: androidx.navigation.NavHostController
 private fun TakvimBagla(navController: androidx.navigation.NavHostController) {
     val model: CalendarViewModel = koinViewModel()
     val durum by model.uiState.collectAsState()
-    val secilenGun by model.selectedDate.collectAsState()
+    val secilenGunMs by model.secilenGunMs.collectAsState()
     val snackbarDurumu = remember { SnackbarHostState() }
 
     var eklemeAcik by remember { mutableStateOf(false) }
@@ -577,20 +579,17 @@ private fun TakvimBagla(navController: androidx.navigation.NavHostController) {
         }
     }
 
-    val gunMs = secilenGun.atStartOfDay(java.time.ZoneId.systemDefault())
-        .toInstant().toEpochMilli()
-
     TakvimEkrani(
-        secilenGunMs = gunMs,
+        secilenGunMs = secilenGunMs,
         randevular = durum.appointments,
         uyeler = durum.members,
         personeller = durum.staffList,
         randevuEklemeAcik = eklemeAcik,
         secilenRandevu = secilenRandevu,
         onGeri = { navController.popBackStack() },
-        onOncekiGun = { model.setDate(secilenGun.minusDays(1)) },
-        onSonrakiGun = { model.setDate(secilenGun.plusDays(1)) },
-        onBugun = { model.setDate(java.time.LocalDate.now()) },
+        onOncekiGun = model::oncekiGun,
+        onSonrakiGun = model::sonrakiGun,
+        onBugun = model::bugune,
         onRandevuEklemeAc = { eklemeAcik = true },
         onRandevuEklemeKapat = { eklemeAcik = false },
         onRandevuSec = { secilenRandevu = it },

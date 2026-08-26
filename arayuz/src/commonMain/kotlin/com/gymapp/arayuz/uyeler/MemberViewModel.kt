@@ -1,4 +1,4 @@
-package com.gymapp.presentation.members
+package com.gymapp.arayuz.uyeler
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,7 +17,6 @@ import com.gymapp.domain.PhoneNumber
 import com.gymapp.domain.PriceBreakdown
 import com.gymapp.domain.Pricing
 import com.gymapp.domain.SessionCarryOver
-import com.gymapp.arayuz.uyeler.UyeKayitFormu
 import com.gymapp.domain.MemberScope
 import com.gymapp.domain.StaffRole
 import kotlinx.coroutines.FlowPreview
@@ -248,12 +247,14 @@ class MemberViewModel(
         viewModelScope.launch {
             _formState.update { it.copy(isSubmitting = true, submitError = null) }
             
-            // Yerel değişkenler ŞART, akıllı dönüşüm burada çalışmıyor:
-            // `UyeKayitFormu` artık başka bir modülde (`:arayuz`) ve Kotlin
-            // farklı modüldeki bir `val`in iki okuma arasında değişmeyeceğini
-            // garanti edemiyor. Aynı kod sınıf `app` içindeyken derleniyordu;
-            // tipi modül sınırının ötesine taşımak derleyicinin kanıtlayabildiği
-            // şeyi daralttı.
+            // Yerel değişkenler bilinçli — artık derleyici zorlamıyor, tercih.
+            //
+            // Bunlar `UyeKayitFormu` :arayuz'a taşındığında ZORUNLU olarak
+            // eklenmişti: Kotlin farklı modüldeki bir `val`i akıllı dönüşüme
+            // sokmuyor. Bu sınıf da aynı modüle taşınınca kısıt kalktı ve
+            // `state.memberId!!` yeniden derlenir hâle geldi. Yine de duruyorlar:
+            // değeri bir kez okuyup adlandırmak, aşağıdaki çağrıda hangi alanın
+            // neden null olamadığını `!!` yığınından daha iyi anlatıyor.
             val yenilenecekUye = state.memberId
             val secilenPaket = state.selectedPackage
 
