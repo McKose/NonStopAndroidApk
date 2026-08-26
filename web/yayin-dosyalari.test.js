@@ -164,3 +164,72 @@ test("boş data-kaynak yayın listesine girmiyor", () => {
     "yalnızca boşluktan oluşan yol yayın listesine girmiş",
   );
 });
+
+// ─── Admin paketi (Turhost) ─────────────────────────────────────────────────
+//
+// Panel iki yere birden yayınlanıyor: GitHub Pages'te `nonstopstudio.tr/panel/`
+// altında, Turhost'ta `admin.nonstopstudio.tr` KÖKÜNDE. İkinci pakette
+// `panel/` öneki kırpılıyor. Aşağıdaki testler o paketin doğru kurulduğunu
+// sabitliyor — yanlış kurulmasının belirtisi, panelin açılmaması olurdu ve
+// bunu ancak yayından sonra tarayıcıda görebilirdik.
+
+test("panel yüzeyi tek başına türetilebiliyor", () => {
+  const { dosyalar, eksik } = yayinDosyalari(BURADA, ["panel/index.html"]);
+
+  assert.deepEqual(eksik, [], `panel paketinde eksik dosya: ${eksik.join(", ")}`);
+  assert.ok(dosyalar.includes("panel/index.html"), "giriş noktası pakette yok");
+  assert.ok(dosyalar.includes("panel/app.js"), `app.js pakette yok: ${dosyalar}`);
+  assert.ok(dosyalar.includes("panel/styles.css"), `styles.css pakette yok: ${dosyalar}`);
+
+  // Panelin dışındaki yüzeyler bu pakete AİT DEĞİL. Girseydi admin adresine
+  // açılış sayfası ve üye alanı da kopyalanır, salonun yönetim adresi
+  // gereksizce ikinci bir tam site yayınlardı.
+  assert.ok(!dosyalar.includes("index.html"), "açılış sayfası admin paketine girmiş");
+  assert.ok(!dosyalar.includes("uye/index.html"), "üye alanı admin paketine girmiş");
+});
+
+/**
+ * Panelin `../varliklar/...` yazımı iki hedefte de çalışıyor.
+ *
+ * Pages'te panel `/panel/` altında ve `..` bir üste çıkıp `/varliklar/`e
+ * gidiyor. Admin adresinde panel kökte; kökteki `..` atılıyor (RFC 3986) ve
+ * yol yine `/varliklar/` oluyor. Yani tek yazım iki yerde de doğru — AMA
+ * yalnızca dosya her iki pakete de kopyalanırsa. Bu test onu sabitliyor:
+ * varlık pakete girmezse panelin simgesi 404 alır.
+ */
+test("panel paketinde varlıklar da var", () => {
+  const { dosyalar } = yayinDosyalari(BURADA, ["panel/index.html"]);
+  assert.ok(
+    dosyalar.includes("varliklar/nonstop-gym.svg"),
+    `panelin kullandığı varlık pakete girmemiş: ${dosyalar}`,
+  );
+});
+
+/**
+ * `panel/` öneki kırpılınca iki dosya aynı ada düşmemeli.
+ *
+ * Admin paketi `panel/app.js`i `app.js` yapıyor. Bir gün panelin dışında
+ * `app.js` adında bir dosyaya referans verilirse ikisi aynı hedefe yazılır ve
+ * biri diğerini sessizce ezer — panel çalışmaya devam ettiği için de fark
+ * edilmez. Bugün böyle bir çakışma yok; bu test öyle kalmasını sağlıyor.
+ */
+test("admin paketinde önek kırpma çakışma üretmiyor", () => {
+  const { dosyalar } = yayinDosyalari(BURADA, ["panel/index.html"]);
+  const duzlenmis = dosyalar.map((d) =>
+    d.startsWith("panel/") ? d.slice("panel/".length) : d,
+  );
+
+  const tekil = new Set(duzlenmis);
+  assert.equal(
+    tekil.size,
+    duzlenmis.length,
+    `önek kırpıldığında çakışan dosya adı var: ${duzlenmis.join(", ")}`,
+  );
+});
+
+/** `config.js` admin paketinde de üretilen olarak tanınıyor. */
+test("panel paketinde config.js üretilenler arasında", () => {
+  const { dosyalar, uretilen } = yayinDosyalari(BURADA, ["panel/index.html"]);
+  assert.ok(!dosyalar.includes("panel/config.js"), "config.js kopyalanacak listede olmamalı");
+  assert.ok(uretilen.includes("panel/config.js"), `config.js üretilenler arasında olmalı: ${uretilen}`);
+});
