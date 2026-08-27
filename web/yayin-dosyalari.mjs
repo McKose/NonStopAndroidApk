@@ -19,6 +19,15 @@
 // Kullanım:
 //   node web/yayin-dosyalari.mjs            → dosya adları, satır satır
 //   node web/yayin-dosyalari.mjs --kontrol  → yalnızca doğrula, çıktı verme
+//   node web/yayin-dosyalari.mjs --girisler=panel/index.html
+//                                           → yalnızca o yüzeyin dosyaları
+//
+// `--girisler` neden var: panel artık İKİ yere birden yayınlanıyor — GitHub
+// Pages'te `nonstopstudio.tr/panel/`, Turhost'ta `admin.nonstopstudio.tr`
+// kökü. İkincisine yalnızca panelin kendisi ve dokunduğu varlıklar gidiyor;
+// açılış sayfası ve üye alanı oraya ait değil. Liste yine TÜRETİLİYOR: elle
+// sayılsaydı bu dosyanın kapatmak için var olduğu hata sınıfı ikinci bir
+// yüzeyde yeniden açılırdı.
 
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join, normalize, posix } from "node:path";
@@ -160,7 +169,30 @@ export function yayinDosyalari(kok = BURADA, girisler = girisNoktalari(kok)) {
 // ─── Komut satırı ───────────────────────────────────────────────────────────
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const { dosyalar, uretilen, eksik } = yayinDosyalari();
+  // `--girisler=a,b` verilmezse bütün yüzeyler taranıyor (varsayılan davranış
+  // değişmedi). Verilen giriş noktası gerçekten var mı diye BURADA bakılıyor:
+  // olmayan bir yol verildiğinde `yayinDosyalari` onu "eksik" sayıp listeye
+  // hiç dosya koymaz ve hata "hiç dosya bulunamadı" diye çıkardı — sebebi
+  // yazmayan bir mesaj.
+  const girisArgumani = process.argv
+    .find((a) => a.startsWith("--girisler="))
+    ?.slice("--girisler=".length);
+
+  const secilenGirisler = girisArgumani
+    ? girisArgumani.split(",").map((g) => g.trim()).filter(Boolean)
+    : null;
+
+  if (secilenGirisler) {
+    const olmayan = secilenGirisler.filter((g) => !existsSync(join(BURADA, g)));
+    if (olmayan.length > 0) {
+      console.error(`HATA: giriş noktası bulunamadı: ${olmayan.join(", ")}`);
+      process.exit(1);
+    }
+  }
+
+  const { dosyalar, uretilen, eksik } = secilenGirisler
+    ? yayinDosyalari(BURADA, secilenGirisler)
+    : yayinDosyalari();
 
   if (eksik.length > 0) {
     console.error("HATA: referans verilen ama bulunamayan dosyalar:");

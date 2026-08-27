@@ -8,6 +8,12 @@ nonstopstudio.tr/panel/    personel paneli — üyeler, paketler, finans, market
 nonstopstudio.tr/uye/      üye alanı — paket durumu, ölçümler, sağlık beyanı
 ```
 
+Panel ayrıca **`admin.nonstopstudio.tr`** adresinden açılacak. Kurulum Turhost
+panelinde birkaç adım gerektiriyor ve tarifi ayrı bir belgede:
+[`docs/admin-alan-adi.md`](admin-alan-adi.md). Açılış sayfasından panele
+bağlantı **verilmiyor** — ziyaretçinin işine yaramıyor, personel kendi
+adresinden giriyor.
+
 Bu belge **neyi kimin, nasıl değiştirebileceğini** anlatıyor. Sonunda da neyin
 henüz hazır olmadığı ve hangi sırayla geleceği var.
 
@@ -210,6 +216,7 @@ Sitenin planlanan işleri bitti. Bundan sonrası isteğe bağlı ekler ve aşağ
 |---|---|
 | **`SUPABASE_TENANT_ID` gizli anahtarı** | Üye kayıt formunun açılması için. Değeri panelde Üye Hesapları sekmesinin altında yazıyor; Settings → Secrets → Actions'a ekle. |
 | **Supabase'de `0006` migrasyonu** | Kayıt isteği tablosu ve görsel kovası bu dosyada. Supabase panelinde SQL Editor'e `supabase/migrations/0006_member_signup_and_storage.sql` içeriğini yapıştırıp çalıştır. Yapılmazsa kayıt ve görsel yükleme çalışmaz (ekran sebebini söyler). |
+| **`admin.nonstopstudio.tr`** | Turhost'ta alt alan adı + SSL + FTP hesabı, sonra üç GitHub secret'ı. Yayın akışı hazır ve ayarlar gelene kadar sessizce atlıyor. Adımlar: [`docs/admin-alan-adi.md`](admin-alan-adi.md). |
 | **E-posta riski** | Aşağıdaki ayrı bölüme bakın — sitede yapılacak bir şey yok, iş Turhost panelinde. |
 | **Yayın anahtarı** | Android uygulamasının mağaza sürümü için. Adımlar `docs/yayin.md` içinde. Anahtarı **yedekle** — kaybı geri dönüşsüz. |
 | **Telefon, çalışma saatleri, açık adres** | Siteye eklenecek. |

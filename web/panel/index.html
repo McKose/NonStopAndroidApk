@@ -4,8 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NonStop Studio — Yönetim Paneli</title>
+
+  <!-- Arama motorlarına kapalı. Panel herkese açık bir adreste duruyor
+       (`nonstopstudio.tr/panel/` ve `admin.nonstopstudio.tr`) ve girişle
+       korunuyor — ama dizine girmesinin hiçbir faydası yok: aranan bir şey
+       değil, buna karşılık salonun yönetim adresini arama sonuçlarında
+       ilan ediyor. Üye alanında (`web/uye/`) bu satır zaten vardı, panelde
+       atlanmıştı. -->
+  <meta name="robots" content="noindex, nofollow">
+
   <!-- Simge olmadan tarayıcı her açılışta `/favicon.ico` istiyor ve 404
-       alıyordu; personelin sekmesinde de boş bir kare duruyordu. -->
+       alıyordu; personelin sekmesinde de boş bir kare duruyordu.
+
+       Yol `../varliklar/`: panel Pages'te `/panel/` altında, Turhost'ta ise
+       KÖKTE duruyor. Kökte `..` bir üste çıkamıyor — RFC 3986 onu atıyor ve
+       adres `/varliklar/...` oluyor — yani aynı yazım iki yerde de doğru
+       dosyaya gidiyor. Yayın paketi `varliklar/`i her iki hedefe de
+       kopyalıyor. -->
   <link rel="icon" href="../varliklar/nonstop-gym.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
 </head>
