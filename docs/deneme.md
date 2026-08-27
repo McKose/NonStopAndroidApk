@@ -22,7 +22,7 @@ Depodan çalıştırmak isterseniz iki yolu var. **Tek dosyalık kopya** üretip
 uygun, sunucu gerektirmiyor):
 
 ```bash
-node web/panel/onizleme.mjs > /tmp/panel.html
+node web/admin/onizleme.mjs > /tmp/panel.html
 ```
 
 Sonra `/tmp/panel.html` dosyasını tarayıcıda açın.
@@ -34,10 +34,10 @@ cd web
 python3 -m http.server 8000
 ```
 
-Sonra tarayıcıda: **`http://localhost:8000/panel/?demo`**
+Sonra tarayıcıda: **`http://localhost:8000/admin/?demo`**
 
 Adresin sonundaki `?demo` şart. Onsuz panel gerçek sunucuya bağlanmaya çalışır
-ve `web/panel/config.js` olmadığı için "Kurulum tamamlanmamış" der.
+ve `web/admin/config.js` olmadığı için "Kurulum tamamlanmamış" der.
 
 Giriş ekranında **herhangi bir e-posta ve şifre** yazıp "Giriş yap" deyin —
 demo modda kontrol yok. İçeride örnek bir salonun verisi var: aktif, süresi
@@ -288,7 +288,7 @@ panelde yalnızca üzerine yazabilirsiniz, değerini göremezsiniz. Üç yol var
    `supabase.com/dashboard` ile başlıyorsa sorun bu.
 
 3. **Panelle karşılaştırın.** Panel adresi **birebir aynı biçimde** kuruyor
-   (`web/panel/supabase.js`). Panel çalışıyor ama uygulama çalışmıyorsa iki yerdeki
+   (`web/admin/supabase.js`). Panel çalışıyor ama uygulama çalışmıyorsa iki yerdeki
    değer farklı demektir: panelin `web/config.js`'i ile depo gizli anahtarını
    eşitleyin.
 

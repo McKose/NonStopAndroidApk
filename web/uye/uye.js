@@ -7,7 +7,7 @@
 // açılmaya çalışır, "salonsuz" der ve kullanıcı sebebini anlamazdı.
 //
 // ### Neden panelin istemcisi kullanılmıyor
-// `panel/supabase.js` girişten sonra salonu `gym_users` üzerinden çözüyor —
+// `admin/supabase.js` girişten sonra salonu `gym_users` üzerinden çözüyor —
 // personel için doğru, üye için yanlış: üyenin `gym_users` satırı YOK ve
 // olmamalı (bkz. migrasyon 0005). Üyenin kimliği `member_accounts` üzerinden
 // çözülüyor.
@@ -15,7 +15,7 @@
 // Gösterim yardımcıları paylaşılıyor: tutar ve tarih biçimlendirmesinin iki
 // kopyası olsaydı aynı veri iki yüzeyde farklı görünürdü.
 
-import { tutarYaz, tarihYaz, uyelikDurumu, durumEtiketi } from "../panel/domain.js";
+import { tutarYaz, tarihYaz, uyelikDurumu, durumEtiketi } from "../admin/domain.js";
 
 const $ = (id) => document.getElementById(id);
 const ayar = window.NONSTOP_CONFIG;

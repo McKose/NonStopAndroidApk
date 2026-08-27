@@ -382,7 +382,7 @@ jobs:
       # Test dosyaları `find` ile bulunuyor, kabuk deseniyle değil.
       #
       # Önceki hâli `web/*.test.js` idi ve bu desen YALNIZCA `web/` kökündeki
-      # tek dosyayı yakalıyordu: panel `web/panel/` altına taşındığında oradaki
+      # tek dosyayı yakalıyordu: panel `web/admin/` altına taşındığında oradaki
       # sekiz test dosyası CI'da HİÇ koşmamaya başladı — üstelik iş yeşil
       # kalmaya devam etti, çünkü kalan tek dosya geçiyordu. Aynı sınıf hata
       # `supabase/tests/run.sh` içinde de yaşandı ve orada da dizinden okumaya
