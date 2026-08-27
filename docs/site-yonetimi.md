@@ -95,8 +95,13 @@ etiketlerinin arasında ve yanlışlıkla bir etiketi bozmak kolay — bozulduğ
 sayfanın o bölümü tamamen kaybolabiliyor. **Metin değişikliklerini Claude'a
 söylemen daha güvenli.**
 
-Eksik olan ve eklenebilecekler: telefon numarası, çalışma saatleri, açık adres
-(şu an yalnızca "Kartepe / Kocaeli" ve harita bağlantısı var).
+> **İletişim bilgisi iki yerde birden duruyor.** Telefon, adres ve çalışma
+> saatleri hem gözle okunan iletişim bölümünde hem de arama motorunun okuduğu
+> yapısal veri bloğunda yazılı. Biri değişirse ikisi birden değişmeli —
+> ayrıştıklarında hiçbir belirti vermezler: sayfa doğru görünür, arama sonucu
+> sessizce eski bilgiyi yayınlar. Bunu bir test koruyor
+> (`web/iletisim.test.js`), yani ayrışma CI'da yakalanıyor. Değişiklik
+> gerektiğinde bana söylemen yeterli.
 
 ---
 
@@ -223,7 +228,6 @@ Sitenin planlanan işleri bitti. Bundan sonrası isteğe bağlı ekler ve aşağ
 | **`admin.nonstopstudio.tr`** | Turhost'ta alt alan adı + SSL + FTP hesabı, sonra üç GitHub secret'ı. Yayın akışı hazır ve ayarlar gelene kadar sessizce atlıyor. Adımlar: [`docs/admin-alan-adi.md`](admin-alan-adi.md). |
 | **E-posta riski** | Aşağıdaki ayrı bölüme bakın — sitede yapılacak bir şey yok, iş Turhost panelinde. |
 | **Yayın anahtarı** | Android uygulamasının mağaza sürümü için. Adımlar `docs/yayin.md` içinde. Anahtarı **yedekle** — kaybı geri dönüşsüz. |
-| **Telefon, çalışma saatleri, açık adres** | Bana söylemen yeterli, ekleyeceğim. Artık yalnızca sayfa metni meselesi değil: sitede arama motoruna "bu bir spor salonu" diyen yapısal veri var ve bu üç alan orada **bilerek boş** — uydurulamaz. Üçü de girildiğinde "kartepe pilates" gibi aramalarda haritalı sonuç kutusuna girme şansı belirgin artıyor. |
 | **Yatay salon fotoğrafı** | Açılış ekranı için (isteğe bağlı). |
 
 ---
