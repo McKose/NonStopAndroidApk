@@ -8,6 +8,10 @@ nonstopstudio.tr/panel/    personel paneli — üyeler, paketler, finans, market
 nonstopstudio.tr/uye/      üye alanı — paket durumu, ölçümler, sağlık beyanı
 ```
 
+Yanlış bir adres yazıldığında (`nonstopstudio.tr/eski/kampanya`) GitHub'ın gri
+hata sayfası değil, sitenin kendi **404 sayfası** açılıyor: ziyaretçiyi ana
+sayfaya, branşlara ve iletişime yönlendiriyor.
+
 Panel ayrıca **`admin.nonstopstudio.tr`** adresinden açılacak. Kurulum Turhost
 panelinde birkaç adım gerektiriyor ve tarifi ayrı bir belgede:
 [`docs/admin-alan-adi.md`](admin-alan-adi.md). Açılış sayfasından panele
@@ -219,7 +223,7 @@ Sitenin planlanan işleri bitti. Bundan sonrası isteğe bağlı ekler ve aşağ
 | **`admin.nonstopstudio.tr`** | Turhost'ta alt alan adı + SSL + FTP hesabı, sonra üç GitHub secret'ı. Yayın akışı hazır ve ayarlar gelene kadar sessizce atlıyor. Adımlar: [`docs/admin-alan-adi.md`](admin-alan-adi.md). |
 | **E-posta riski** | Aşağıdaki ayrı bölüme bakın — sitede yapılacak bir şey yok, iş Turhost panelinde. |
 | **Yayın anahtarı** | Android uygulamasının mağaza sürümü için. Adımlar `docs/yayin.md` içinde. Anahtarı **yedekle** — kaybı geri dönüşsüz. |
-| **Telefon, çalışma saatleri, açık adres** | Siteye eklenecek. |
+| **Telefon, çalışma saatleri, açık adres** | Bana söylemen yeterli, ekleyeceğim. Artık yalnızca sayfa metni meselesi değil: sitede arama motoruna "bu bir spor salonu" diyen yapısal veri var ve bu üç alan orada **bilerek boş** — uydurulamaz. Üçü de girildiğinde "kartepe pilates" gibi aramalarda haritalı sonuç kutusuna girme şansı belirgin artıyor. |
 | **Yatay salon fotoğrafı** | Açılış ekranı için (isteğe bağlı). |
 
 ---

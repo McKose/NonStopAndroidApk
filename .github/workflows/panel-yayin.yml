@@ -102,21 +102,30 @@ jobs:
             mkdir -p "_site/$(dirname "$dosya")"
             cp "web/$dosya" "_site/$dosya"
           done < /tmp/yayin-listesi.txt
-          # `CNAME` özel alan adını taşıyan dosya. Türetmeye girmiyor çünkü
-          # hiçbir sayfa ona referans vermiyor — bir yayın yapılandırması,
-          # sayfa varlığı değil. Bu yüzden açıkça kopyalanıyor.
+          # Hiçbir sayfanın REFERANS VERMEDİĞİ kök dosyalar: `CNAME`,
+          # `robots.txt`, `sitemap.xml`. Tarayıcı bunları bir bağlantıdan
+          # değil, bilinen adresten istiyor; dolayısıyla türetme onları
+          # bulamıyor.
           #
-          # DİKKAT: bu dosya tek başına YETMİYOR. Actions ile yayınlanan bir
+          # Liste burada ELLE sayılmıyor, betikten geliyor. Eskiden yalnızca
+          # `CNAME` vardı ve bu satırlar elle yazılmıştı; ikinci dosya
+          # eklendiğinde aynı hata sınıfı geri gelirdi — dosya depoya girer,
+          # kopyalama satırı yazılmaz, yayın yeşil biter ve dosya sitede
+          # olmaz. Betik eksik olanı görürse yukarıdaki adımda çıkış kodu
+          # sıfırdan farklı dönüyor.
+          #
+          # DİKKAT — `CNAME` tek başına YETMİYOR: Actions ile yayınlanan bir
           # sitede alan adının yetkili kaynağı Settings → Pages; yapıtın
-          # içindeki CNAME onu kaydetmiyor. 18.08.2026'da bu yüzden yayın yeşil
-          # bitti ama site alan adında 404 verdi. Dosya yine de kopyalanıyor
-          # (dal tabanlı yayına düşülürse gerekiyor) ve aşağıdaki son adım,
-          # ayarın gerçekten etkin olup olmadığını yayın adresinden kontrol
-          # ediyor.
-          if [ -f web/CNAME ]; then
-            cp web/CNAME _site/CNAME
-            echo "Özel alan adı: $(cat _site/CNAME)"
-          fi
+          # içindeki CNAME onu kaydetmiyor. 18.08.2026'da bu yüzden yayın
+          # yeşil bitti ama site alan adında 404 verdi. Dosya yine de
+          # kopyalanıyor (dal tabanlı yayına düşülürse gerekiyor) ve
+          # aşağıdaki son adım ayarın gerçekten etkin olup olmadığını
+          # kontrol ediyor.
+          for ek in $(node web/yayin-dosyalari.mjs --yapilandirma); do
+            cp "web/$ek" "_site/$ek"
+            echo "Yapılandırma dosyası: $ek"
+          done
+          echo "Özel alan adı: $(cat _site/CNAME)"
 
           echo "Yayınlanacak dosyalar:"; (cd _site && find . -type f | sort)
 

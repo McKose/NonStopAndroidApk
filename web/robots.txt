@@ -1,0 +1,20 @@
+# Non Stop GYM — tarayıcı robotları için
+#
+# ## Panel ve üye alanı NEDEN burada engellenmiyor
+#
+# İkisi de arama sonuçlarında olmamalı ve bunu `noindex` meta etiketiyle
+# yapıyorlar (`web/panel/index.html`, `web/uye/index.html`).
+#
+# Buraya `Disallow: /panel/` yazmak bunu ÇÖZMEZ, BOZAR — sık yapılan hata bu:
+# `Disallow`, robotun sayfayı İNDİRMESİNİ engelliyor. İndirmeyen robot
+# içindeki `noindex` etiketini de göremiyor. Sonuç, adresi bilen birinin
+# verdiği bağlantı üzerinden URL'in yine de sonuçlarda çıkması — üstelik bu
+# sefer başlıksız ve açıklamasız, yani daha kötü görünerek.
+#
+# Doğru kurulum, istenmeyen sayfayı taranabilir bırakıp `noindex` demek.
+# Bu yüzden burada hiçbir şey engellenmiyor.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://nonstopstudio.tr/sitemap.xml

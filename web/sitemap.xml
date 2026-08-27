@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Site haritası.
+
+  Herkese açık tek sayfa açılış sayfası; panel ve üye alanı `noindex` ve
+  buraya girmiyorlar (site haritasına koyup ayrıca `noindex` demek robota
+  çelişkili iki şey söylemek olurdu).
+
+  `lastmod` BİLEREK yok. Elle yazılan bir tarih, içerik değiştiği anda yalan
+  söylemeye başlıyor ve yanlış `lastmod` doğrudan güveni düşürüyor — hiç
+  vermemek, yanlış vermekten iyi. Tek sayfalık bir sitede kazancı da yok.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://nonstopstudio.tr/</loc>
+  </url>
+</urlset>
