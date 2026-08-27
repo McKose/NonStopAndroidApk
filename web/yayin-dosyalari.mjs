@@ -23,15 +23,6 @@
 //   node web/yayin-dosyalari.mjs --yapilandirma
 //                                           → hiçbir sayfanın referans
 //                                             vermediği kök dosyalar
-//   node web/yayin-dosyalari.mjs --girisler=panel/index.html
-//                                           → yalnızca o yüzeyin dosyaları
-//
-// `--girisler` neden var: panel artık İKİ yere birden yayınlanıyor — GitHub
-// Pages'te `nonstopstudio.tr/panel/`, Turhost'ta `admin.nonstopstudio.tr`
-// kökü. İkincisine yalnızca panelin kendisi ve dokunduğu varlıklar gidiyor;
-// açılış sayfası ve üye alanı oraya ait değil. Liste yine TÜRETİLİYOR: elle
-// sayılsaydı bu dosyanın kapatmak için var olduğu hata sınıfı ikinci bir
-// yüzeyde yeniden açılırdı.
 
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join, normalize, posix } from "node:path";
@@ -83,9 +74,10 @@ const HTML_DESENI =
 /**
  * Giriş noktalarını bulur: kökteki ve bir alt dizindeki her `index.html`.
  *
- * Elle sayılmıyor. Site üç yüzeyden oluşuyor (`/`, `/panel/`, `/uye/`) ve
- * dördüncüsü eklendiğinde listeye yazılmayı beklemek, bu dosyanın kapatmak için
- * var olduğu hatanın aynısını geri getirirdi.
+ * Elle sayılmıyor. Site bugün dört yüzeyden oluşuyor — `/`, `/admin/`,
+ * `/uye/` ve panelin eski adresini yeni adrese yollayan `/panel/` — ve
+ * beşincisi eklendiğinde listeye yazılmayı beklemek, bu dosyanın kapatmak
+ * için var olduğu hatanın aynısını geri getirirdi.
  */
 export function girisNoktalari(kok = BURADA) {
   const girisler = [];
@@ -115,9 +107,9 @@ export function girisNoktalari(kok = BURADA) {
  * işleniyor. Döngüsel import (a → b → a) bu yüzden sonsuza gitmiyor.
  *
  * Yollar **referansı içeren dosyanın dizinine göre** çözülüyor. Baştaki `./`yi
- * kırpmak yetmez: `panel/index.html` içindeki `./app.js`, `app.js` değil
- * `panel/app.js` demek. Bu ayrım alt dizinler olmadan görünmüyordu ve site üç
- * yüzeye ayrılınca ortaya çıktı.
+ * kırpmak yetmez: `admin/index.html` içindeki `./app.js`, `app.js` değil
+ * `admin/app.js` demek. Bu ayrım alt dizinler olmadan görünmüyordu ve site
+ * birden çok yüzeye ayrılınca ortaya çıktı.
  */
 export function yayinDosyalari(kok = BURADA, girisler = girisNoktalari(kok)) {
   const bulunan = new Set();
@@ -130,7 +122,7 @@ export function yayinDosyalari(kok = BURADA, girisler = girisNoktalari(kok)) {
     if (bulunan.has(ad) || uretilen.has(ad)) continue;
 
     // Üretilen dosyalar dizinden bağımsız tanınıyor: `config.js` de
-    // `panel/config.js` de iş akışının yazdığı dosya.
+    // `admin/config.js` de iş akışının yazdığı dosya.
     if (URETILEN.has(posix.basename(ad))) {
       uretilen.add(ad);
       continue;
@@ -178,7 +170,7 @@ export function yayinDosyalari(kok = BURADA, girisler = girisNoktalari(kok)) {
       // (Nitekim 404 sayfası eklendiğinde tam bunu yaptı.)
       const hamYol = ham.split("#")[0];
 
-      // Dizine giden bağlantılar (`panel/`, `uye/`, `/`) YÜZEYLER ARASI
+      // Dizine giden bağlantılar (`admin/`, `uye/`, `/`) YÜZEYLER ARASI
       // GEZİNME, varlık değil. Her yüzey zaten kendi giriş noktası olarak
       // taranıyor; burada izlenirlerse betik bir dizini dosya sanıp okumaya
       // çalışıyor ve `EISDIR` ile çöküyor. Bu tam olarak yaşandı: açılış
@@ -208,30 +200,7 @@ export function yayinDosyalari(kok = BURADA, girisler = girisNoktalari(kok)) {
 // ─── Komut satırı ───────────────────────────────────────────────────────────
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  // `--girisler=a,b` verilmezse bütün yüzeyler taranıyor (varsayılan davranış
-  // değişmedi). Verilen giriş noktası gerçekten var mı diye BURADA bakılıyor:
-  // olmayan bir yol verildiğinde `yayinDosyalari` onu "eksik" sayıp listeye
-  // hiç dosya koymaz ve hata "hiç dosya bulunamadı" diye çıkardı — sebebi
-  // yazmayan bir mesaj.
-  const girisArgumani = process.argv
-    .find((a) => a.startsWith("--girisler="))
-    ?.slice("--girisler=".length);
-
-  const secilenGirisler = girisArgumani
-    ? girisArgumani.split(",").map((g) => g.trim()).filter(Boolean)
-    : null;
-
-  if (secilenGirisler) {
-    const olmayan = secilenGirisler.filter((g) => !existsSync(join(BURADA, g)));
-    if (olmayan.length > 0) {
-      console.error(`HATA: giriş noktası bulunamadı: ${olmayan.join(", ")}`);
-      process.exit(1);
-    }
-  }
-
-  const { dosyalar, uretilen, eksik } = secilenGirisler
-    ? yayinDosyalari(BURADA, secilenGirisler)
-    : yayinDosyalari();
+  const { dosyalar, uretilen, eksik } = yayinDosyalari();
 
   if (eksik.length > 0) {
     console.error("HATA: referans verilen ama bulunamayan dosyalar:");
@@ -239,10 +208,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   }
 
-  // Yapılandırma dosyaları yalnızca TAM yayında anlamlı. Alt küme (`--girisler`
-  // ile üretilen admin paketi) kendi `robots.txt`ini üretiyor ve `CNAME` ona
-  // ait değil — orada aramak yanlış olurdu.
-  if (!secilenGirisler) {
+  {
     const eksikYapilandirma = YAPILANDIRMA.filter(
       (d) => !existsSync(join(BURADA, d)),
     );
@@ -263,7 +229,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   // `--uretilen`: iş akışının YAZMASI gereken dosyalar (bugün yalnızca
   // `config.js`). Hangi dizinlere yazılacağı da türetiliyor; sabit bir yol
-  // panel `/panel/` altına taşındığında sessizce yanlış olurdu.
+  // panel `/admin/` altına taşındığında sessizce yanlış olurdu — nitekim
+  // panel iki kez taşındı ve türetme her ikisinde de kendiliğinden doğru
+  // hedefi buldu.
   if (process.argv.includes("--uretilen")) {
     for (const u of uretilen) console.log(u);
   } else if (process.argv.includes("--yapilandirma")) {

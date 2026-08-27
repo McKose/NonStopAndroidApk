@@ -3,99 +3,52 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NonStop Studio — Yönetim Paneli</title>
+  <title>Panel taşındı — Non Stop GYM</title>
+  <meta name="robots" content="noindex">
 
-  <!-- Arama motorlarına kapalı. Panel herkese açık bir adreste duruyor
-       (`nonstopstudio.tr/panel/` ve `admin.nonstopstudio.tr`) ve girişle
-       korunuyor — ama dizine girmesinin hiçbir faydası yok: aranan bir şey
-       değil, buna karşılık salonun yönetim adresini arama sonuçlarında
-       ilan ediyor. Üye alanında (`web/uye/`) bu satır zaten vardı, panelde
-       atlanmıştı. -->
-  <meta name="robots" content="noindex, nofollow">
+  <!--
+    Panel `/panel/` altından `/admin/` altına taşındı. Bu dosya yalnızca
+    yönlendirme yapıyor.
 
-  <!-- Simge olmadan tarayıcı her açılışta `/favicon.ico` istiyor ve 404
-       alıyordu; personelin sekmesinde de boş bir kare duruyordu.
+    ### Neden duruyor
+    Personel bu adresi biliyor ve tarayıcı yer imlerinde tutuyor. Klasör
+    silinip bırakılsaydı yer imine tıklayan kişi 404 görür ve panelin
+    kapandığını sanardı — oysa yalnızca adresi değişti.
 
-       Yol `../varliklar/`: panel Pages'te `/panel/` altında, Turhost'ta ise
-       KÖKTE duruyor. Kökte `..` bir üste çıkamıyor — RFC 3986 onu atıyor ve
-       adres `/varliklar/...` oluyor — yani aynı yazım iki yerde de doğru
-       dosyaya gidiyor. Yayın paketi `varliklar/`i her iki hedefe de
-       kopyalıyor. -->
-  <link rel="icon" href="../varliklar/nonstop-gym.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css">
+    ### Neden hem `meta refresh` hem bağlantı
+    GitHub Pages sunucu tarafında yönlendirme yapamıyor (301 yok), tek yol
+    HTML. `meta refresh` çalışmazsa (bazı kurumsal tarayıcı ayarları
+    engelliyor) ekranda tıklanabilir bir bağlantı kalıyor; sessiz bir boş
+    sayfa kalmıyor.
+
+    ### Yol kökten (`/admin/`)
+    Göreli yazılsaydı (`../admin/`) yayın yedeği adresinde de doğru çalışırdı
+    ama burada asıl adres önemli. Kökten yol, `nonstopstudio.tr/panel/`
+    isteğini doğrudan `nonstopstudio.tr/admin/` adresine götürüyor.
+  -->
+  <meta http-equiv="refresh" content="0; url=/admin/">
+  <link rel="canonical" href="/admin/">
+  <link rel="icon" href="/varliklar/nonstop-gym.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/site.css">
 </head>
 <body>
-  <!-- Ayarlar depoya işlenmiyor; config.js kurulum sırasında oluşturuluyor.
-       Dosya yoksa panel bunu fark edip ne yapılması gerektiğini söylüyor. -->
-  <script>window.NONSTOP_CONFIG = null;</script>
-  <script src="config.js" onerror="window.__configYok = true"></script>
 
-  <main id="uygulama">
-    <section id="giris" class="kart" hidden>
-      <h1>NonStop Studio</h1>
-      <p class="alt">Yönetim paneli</p>
+<main>
+  <section class="bolum">
+    <p class="ust-baslik">Panel</p>
+    <h1 class="bolum-baslik">Panelin adresi değişti</h1>
+    <p class="bolum-alt" style="max-width:52ch">
+      Yönetim paneli artık <strong>nonstopstudio.tr/admin</strong> adresinde.
+      Birkaç saniye içinde oraya yönlendirileceksiniz.
+    </p>
+    <div class="kahraman-dugmeler">
+      <a class="dugme dugme-birincil dugme-buyuk" href="/admin/">Panele git</a>
+    </div>
+    <p class="bolum-alt" style="max-width:52ch;margin-top:22px">
+      Yer imlerinizi güncellemeyi unutmayın.
+    </p>
+  </section>
+</main>
 
-      <form id="giris-formu">
-        <label>E-posta
-          <input type="email" name="eposta" autocomplete="username" required>
-        </label>
-        <label>Şifre
-          <input type="password" name="sifre" autocomplete="current-password" required>
-        </label>
-        <button type="submit" id="giris-dugmesi">Giriş yap</button>
-      </form>
-
-      <p id="giris-hata" class="hata" hidden></p>
-    </section>
-
-    <section id="panel" hidden>
-      <header class="baslik">
-        <div>
-          <h1 id="salon-adi">Salon</h1>
-          <p class="alt"><span id="kullanici"></span> · <span id="rol"></span></p>
-        </div>
-        <button id="cikis" class="ikincil">Çıkış</button>
-      </header>
-
-      <nav class="sekmeler" id="sekmeler">
-        <!-- Sekme görünürlüğü rolle değişiyor ve karar `roller.js`te; buradaki
-             sıra yalnızca gösterim. Düğmeler `hidden` ile gizleniyor. -->
-        <button data-sekme="ozet" class="secili">Özet</button>
-        <button data-sekme="uyeler">Üyeler</button>
-        <button data-sekme="paketler">Paketler</button>
-        <button data-sekme="randevular">Randevular</button>
-        <button data-sekme="market">Market</button>
-        <button data-sekme="satislar">Satışlar</button>
-        <button data-sekme="personel">Personel</button>
-        <button data-sekme="finans">Finans</button>
-        <button data-sekme="duyurular">Duyurular</button>
-        <button data-sekme="uye-hesaplari">Üye Hesapları</button>
-      </nav>
-
-      <p id="panel-hata" class="hata" hidden></p>
-      <p id="yukleniyor" class="alt" hidden>Yükleniyor…</p>
-
-      <div id="icerik"></div>
-    </section>
-
-    <section id="ayar-eksik" class="kart" hidden>
-      <h1>Kurulum tamamlanmamış</h1>
-      <p>
-        Panelin bağlanacağı proje bilgisi yok. Bu dosyaların yanına
-        <code>config.js</code> adında bir dosya ekleyin:
-      </p>
-      <pre>window.NONSTOP_CONFIG = {
-  url: "https://&lt;proje-ref&gt;.supabase.co",
-  anonKey: "&lt;anon public anahtarı&gt;",
-};</pre>
-      <p class="alt">
-        Örneği <code>config.example.js</code> dosyasında. Anahtar gizli değil:
-        tek başına hiçbir veriye erişemez, her sorgu giriş yapan kişiye göre
-        süzülür.
-      </p>
-    </section>
-  </main>
-
-  <script type="module" src="app.js"></script>
 </body>
 </html>

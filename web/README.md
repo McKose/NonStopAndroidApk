@@ -243,7 +243,7 @@ importu 404 alırsa onu içe alan dosya tamamen yüklenmiyor — eksik tek dosya
 paneli düşürüyor. CI ise yeşildi, çünkü testler depodaki dosyaları okuyor,
 yayınlananları değil.
 
-Başka bir yere koymak isterseniz panel statik: `web/panel` klasörünü herhangi bir
+Başka bir yere koymak isterseniz panel statik: `web/admin` klasörünü herhangi bir
 HTTP sunucusuna kopyalamak ve yanına `config.js` eklemek yeterli.
 
 ### Panelin herkese açık olması sorun mu

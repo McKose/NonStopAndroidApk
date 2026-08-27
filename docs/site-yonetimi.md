@@ -4,7 +4,7 @@
 
 ```
 nonstopstudio.tr/          açılış sayfası — etkinlikler, branşlar, iletişim
-nonstopstudio.tr/panel/    personel paneli — üyeler, paketler, finans, market
+nonstopstudio.tr/admin/    personel paneli — üyeler, paketler, finans, market
 nonstopstudio.tr/uye/      üye alanı — paket durumu, ölçümler, sağlık beyanı
 ```
 
@@ -12,11 +12,21 @@ Yanlış bir adres yazıldığında (`nonstopstudio.tr/eski/kampanya`) GitHub'ı
 hata sayfası değil, sitenin kendi **404 sayfası** açılıyor: ziyaretçiyi ana
 sayfaya, branşlara ve iletişime yönlendiriyor.
 
-Panel ayrıca **`admin.nonstopstudio.tr`** adresinden açılacak. Kurulum Turhost
-panelinde birkaç adım gerektiriyor ve tarifi ayrı bir belgede:
-[`docs/admin-alan-adi.md`](admin-alan-adi.md). Açılış sayfasından panele
-bağlantı **verilmiyor** — ziyaretçinin işine yaramıyor, personel kendi
-adresinden giriyor.
+Açılış sayfasından panele **bağlantı verilmiyor** — ziyaretçinin işine
+yaramıyor, personel adresi biliyor. Bağlantı vermemek bir güvenlik önlemi
+değil: koruma girişte ve Supabase erişim kurallarında, adresi bilen biri
+veriye ulaşamıyor.
+
+> **Panelin eski adresi (`/panel/`) çalışmaya devam ediyor** ama yalnızca
+> yönlendirme olarak: oraya giren `/admin/` adresine gönderiliyor. Yer imleri
+> bozulmasın diye duruyor; fırsat buldukça yer imini güncelleyin.
+
+> **Neden alt alan adı (`admin.nonstopstudio.tr`) değil:** GitHub Pages site
+> başına yalnızca **bir** özel alan adı kabul ediyor, o da `nonstopstudio.tr`.
+> Alt alan adına DNS kaydı açmak yetmiyor — Pages kanonik adrese 301 ile
+> yönlendiriyor, yani ziyaretçi panele değil açılış sayfasına düşerdi. Ayrı
+> bir alt alan adı için ya ücretli barındırma ya da paneli ikinci bir depoya
+> taşımak gerekiyordu; ikisi de bu kolaylık için fazla.
 
 Bu belge **neyi kimin, nasıl değiştirebileceğini** anlatıyor. Sonunda da neyin
 henüz hazır olmadığı ve hangi sırayla geleceği var.
@@ -197,8 +207,8 @@ sağlayan erişim kuralları. Gerçek PostgreSQL üzerinde sınandı: üye başk
 kasayı, personel maaşlarını göremiyor; anonim ziyaretçi yalnızca yayınlanmış
 duyuruları okuyabiliyor.
 
-**Faz 2 — site iskeleti.** Panel `/panel/` altına taşındı, üç yüzeyli yapı
-kuruldu, `nonstopstudio.tr` bağlandı.
+**Faz 2 — site iskeleti.** Panel kendi dizinine taşındı (bugün `/admin/`),
+üç yüzeyli yapı kuruldu, `nonstopstudio.tr` bağlandı.
 
 **Faz 3 — açılış sayfası.** Marka, branşlar, iletişim, etkinlik vitrini.
 Fotoğraflar ve logo yerleşti.
@@ -225,7 +235,6 @@ Sitenin planlanan işleri bitti. Bundan sonrası isteğe bağlı ekler ve aşağ
 |---|---|
 | **`SUPABASE_TENANT_ID` gizli anahtarı** | Üye kayıt formunun açılması için. Değeri panelde Üye Hesapları sekmesinin altında yazıyor; Settings → Secrets → Actions'a ekle. |
 | **Supabase'de `0006` migrasyonu** | Kayıt isteği tablosu ve görsel kovası bu dosyada. Supabase panelinde SQL Editor'e `supabase/migrations/0006_member_signup_and_storage.sql` içeriğini yapıştırıp çalıştır. Yapılmazsa kayıt ve görsel yükleme çalışmaz (ekran sebebini söyler). |
-| **`admin.nonstopstudio.tr`** | Turhost'ta alt alan adı + SSL + FTP hesabı, sonra üç GitHub secret'ı. Yayın akışı hazır ve ayarlar gelene kadar sessizce atlıyor. Adımlar: [`docs/admin-alan-adi.md`](admin-alan-adi.md). |
 | **E-posta riski** | Aşağıdaki ayrı bölüme bakın — sitede yapılacak bir şey yok, iş Turhost panelinde. |
 | **Yayın anahtarı** | Android uygulamasının mağaza sürümü için. Adımlar `docs/yayin.md` içinde. Anahtarı **yedekle** — kaybı geri dönüşsüz. |
 | **Yatay salon fotoğrafı** | Açılış ekranı için (isteğe bağlı). |
@@ -294,7 +303,7 @@ başarılı görünür.
 
 **Bu arada site erişilebilir:** `https://mckose.github.io/NonStopAndroidApk/`
 adresi her zaman çalışır. Panel ve üye alanı da oradan açılır
-(`.../NonStopAndroidApk/panel/` ve `.../NonStopAndroidApk/uye/`). Alan adı
+(`.../NonStopAndroidApk/admin/` ve `.../NonStopAndroidApk/uye/`). Alan adı
 düzelene kadar denemelerini orada yapabilirsin.
 
 ---

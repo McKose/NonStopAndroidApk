@@ -150,10 +150,14 @@ jobs:
               echo "Değeri panelde 'Üye Hesapları' sekmesinin altında yazıyor."
             fi
             # Hedef, `config.js`i ARAYAN dizinlerden türetiliyor; sabit
-            # `_site/config.js` değil. Panel `/panel/` altına taşınınca eski
-            # sabit yol sessizce yanlış oldu: dosya kökte kalır, panel onu
-            # `panel/config.js` diye arar ve "Kurulum tamamlanmamış" der. Üstelik
-            # yayın yeşil görünür.
+            # `_site/config.js` değil.
+            #
+            # Panel iki kez taşındı: önce köke yakın bir yerden `/panel/`
+            # altına, sonra `/admin/` altına. Sabit bir yol her ikisinde de
+            # sessizce yanlış olurdu — dosya kökte kalır, panel onu kendi
+            # dizininde arar, "Kurulum tamamlanmamış" der ve yayın yeşil
+            # görünür. Türetme her iki taşımada da doğru hedefi kendiliğinden
+            # buldu.
             hedefler=$(node web/yayin-dosyalari.mjs --uretilen)
             if [ -z "$hedefler" ]; then
               echo "::error::config.js'i arayan hiçbir yüzey yok — beklenmedik."

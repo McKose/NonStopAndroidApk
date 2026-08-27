@@ -21,7 +21,7 @@ const BURADA = dirname(fileURLToPath(import.meta.url));
 
 test("her yüzeyin giriş noktası bulunuyor", () => {
   const girisler = girisNoktalari();
-  assert.ok(girisler.includes("panel/index.html"), `panel girişi bulunamadı: ${girisler}`);
+  assert.ok(girisler.includes("admin/index.html"), `panel (admin/) girişi bulunamadı: ${girisler}`);
   assert.ok(girisler.length > 0, "hiç giriş noktası yok");
 });
 
@@ -29,8 +29,8 @@ test("panelin çekirdek dosyaları listede", () => {
   const { dosyalar } = yayinDosyalari();
 
   for (const gerekli of [
-    "panel/index.html", "panel/styles.css", "panel/app.js",
-    "panel/supabase.js", "panel/domain.js",
+    "admin/index.html", "admin/styles.css", "admin/app.js",
+    "admin/supabase.js", "admin/domain.js",
   ]) {
     assert.ok(dosyalar.includes(gerekli), `${gerekli} yayın listesinde yok`);
   }
@@ -44,7 +44,7 @@ test("panelin çekirdek dosyaları listede", () => {
  * bir modül eklenirse bu test onu da kapsıyor.
  */
 test("app.js'in bütün importları yayın listesinde", () => {
-  const kaynak = readFileSync(join(BURADA, "panel", "app.js"), "utf8");
+  const kaynak = readFileSync(join(BURADA, "admin", "app.js"), "utf8");
   const importlar = [...kaynak.matchAll(/from\s+["']\.\/([^"']+)["']/g)].map((m) => m[1]);
 
   assert.ok(importlar.length >= 5, `app.js'te beklenenden az import bulundu: ${importlar.length}`);
@@ -52,7 +52,7 @@ test("app.js'in bütün importları yayın listesinde", () => {
   const { dosyalar } = yayinDosyalari();
   for (const modul of importlar) {
     assert.ok(
-      dosyalar.includes(`panel/${modul}`),
+      dosyalar.includes(`admin/${modul}`),
       `app.js "${modul}" modülünü içe alıyor ama yayın listesinde yok — ` +
         `yayınlanan panel bu modül yüzünden hiç açılmaz`,
     );
@@ -83,9 +83,9 @@ test("test ve kurulum dosyaları yayına girmiyor", () => {
   }
 
   for (const girmemeli of [
-    "panel/config.example.js",  // örnek ayar; gerçek config.js iş akışında üretiliyor
-    "panel/onizleme.mjs",       // önizleme üreticisi, panelin parçası değil
-    "panel/sema.js",            // yalnızca testler için (kendi başlığında yazılı)
+    "admin/config.example.js",  // örnek ayar; gerçek config.js iş akışında üretiliyor
+    "admin/onizleme.mjs",       // önizleme üreticisi, panelin parçası değil
+    "admin/sema.js",            // yalnızca testler için (kendi başlığında yazılı)
     "package.json",
     "README.md",
     "yayin-dosyalari.mjs",      // yayın aracının kendisi
@@ -104,8 +104,8 @@ test("test ve kurulum dosyaları yayına girmiyor", () => {
 test("config.js üretilen dosya olarak ayrı tutuluyor", () => {
   const { dosyalar, uretilen, eksik } = yayinDosyalari();
 
-  assert.ok(!dosyalar.includes("panel/config.js"), "config.js kopyalanacak listede olmamalı");
-  assert.ok(uretilen.includes("panel/config.js"), `config.js üretilenler arasında olmalı: ${uretilen}`);
+  assert.ok(!dosyalar.includes("admin/config.js"), "config.js kopyalanacak listede olmamalı");
+  assert.ok(uretilen.includes("admin/config.js"), `config.js üretilenler arasında olmalı: ${uretilen}`);
   assert.ok(
     !eksik.some((e) => e.includes("config.js")),
     "config.js eksik sayılmamalı — yoksa her yayın düşer",
@@ -163,75 +163,6 @@ test("boş data-kaynak yayın listesine girmiyor", () => {
     !dosyalar.some((d) => d.trim() === ""),
     "yalnızca boşluktan oluşan yol yayın listesine girmiş",
   );
-});
-
-// ─── Admin paketi (Turhost) ─────────────────────────────────────────────────
-//
-// Panel iki yere birden yayınlanıyor: GitHub Pages'te `nonstopstudio.tr/panel/`
-// altında, Turhost'ta `admin.nonstopstudio.tr` KÖKÜNDE. İkinci pakette
-// `panel/` öneki kırpılıyor. Aşağıdaki testler o paketin doğru kurulduğunu
-// sabitliyor — yanlış kurulmasının belirtisi, panelin açılmaması olurdu ve
-// bunu ancak yayından sonra tarayıcıda görebilirdik.
-
-test("panel yüzeyi tek başına türetilebiliyor", () => {
-  const { dosyalar, eksik } = yayinDosyalari(BURADA, ["panel/index.html"]);
-
-  assert.deepEqual(eksik, [], `panel paketinde eksik dosya: ${eksik.join(", ")}`);
-  assert.ok(dosyalar.includes("panel/index.html"), "giriş noktası pakette yok");
-  assert.ok(dosyalar.includes("panel/app.js"), `app.js pakette yok: ${dosyalar}`);
-  assert.ok(dosyalar.includes("panel/styles.css"), `styles.css pakette yok: ${dosyalar}`);
-
-  // Panelin dışındaki yüzeyler bu pakete AİT DEĞİL. Girseydi admin adresine
-  // açılış sayfası ve üye alanı da kopyalanır, salonun yönetim adresi
-  // gereksizce ikinci bir tam site yayınlardı.
-  assert.ok(!dosyalar.includes("index.html"), "açılış sayfası admin paketine girmiş");
-  assert.ok(!dosyalar.includes("uye/index.html"), "üye alanı admin paketine girmiş");
-});
-
-/**
- * Panelin `../varliklar/...` yazımı iki hedefte de çalışıyor.
- *
- * Pages'te panel `/panel/` altında ve `..` bir üste çıkıp `/varliklar/`e
- * gidiyor. Admin adresinde panel kökte; kökteki `..` atılıyor (RFC 3986) ve
- * yol yine `/varliklar/` oluyor. Yani tek yazım iki yerde de doğru — AMA
- * yalnızca dosya her iki pakete de kopyalanırsa. Bu test onu sabitliyor:
- * varlık pakete girmezse panelin simgesi 404 alır.
- */
-test("panel paketinde varlıklar da var", () => {
-  const { dosyalar } = yayinDosyalari(BURADA, ["panel/index.html"]);
-  assert.ok(
-    dosyalar.includes("varliklar/nonstop-gym.svg"),
-    `panelin kullandığı varlık pakete girmemiş: ${dosyalar}`,
-  );
-});
-
-/**
- * `panel/` öneki kırpılınca iki dosya aynı ada düşmemeli.
- *
- * Admin paketi `panel/app.js`i `app.js` yapıyor. Bir gün panelin dışında
- * `app.js` adında bir dosyaya referans verilirse ikisi aynı hedefe yazılır ve
- * biri diğerini sessizce ezer — panel çalışmaya devam ettiği için de fark
- * edilmez. Bugün böyle bir çakışma yok; bu test öyle kalmasını sağlıyor.
- */
-test("admin paketinde önek kırpma çakışma üretmiyor", () => {
-  const { dosyalar } = yayinDosyalari(BURADA, ["panel/index.html"]);
-  const duzlenmis = dosyalar.map((d) =>
-    d.startsWith("panel/") ? d.slice("panel/".length) : d,
-  );
-
-  const tekil = new Set(duzlenmis);
-  assert.equal(
-    tekil.size,
-    duzlenmis.length,
-    `önek kırpıldığında çakışan dosya adı var: ${duzlenmis.join(", ")}`,
-  );
-});
-
-/** `config.js` admin paketinde de üretilen olarak tanınıyor. */
-test("panel paketinde config.js üretilenler arasında", () => {
-  const { dosyalar, uretilen } = yayinDosyalari(BURADA, ["panel/index.html"]);
-  assert.ok(!dosyalar.includes("panel/config.js"), "config.js kopyalanacak listede olmamalı");
-  assert.ok(uretilen.includes("panel/config.js"), `config.js üretilenler arasında olmalı: ${uretilen}`);
 });
 
 // ─── Hata sayfası ve yayın yapılandırması ───────────────────────────────────
@@ -325,7 +256,7 @@ test("robots.txt noindex'li yüzeyleri engellemiyor", () => {
     .join("\n");
 
   assert.ok(
-    !/^\s*Disallow:\s*\/(panel|uye)/im.test(kurallar),
+    !/^\s*Disallow:\s*\/(admin|panel|uye)/im.test(kurallar),
     "robots.txt panel/üye alanını engelliyor — noindex'i görünmez kılar",
   );
 });
@@ -352,4 +283,55 @@ test("og etiketleri mutlak adres kullanıyor", () => {
       `${etiket} göreli yazılmış ("${deger}") — önizleme robotları çözemez`,
     );
   }
+});
+
+// ─── Panelin eski adresi ────────────────────────────────────────────────────
+//
+// Panel `/panel/` altından `/admin/` altına taşındı. Eski klasör yalnızca
+// yönlendirme yapan bir sayfa olarak duruyor: personel eski adresi biliyor ve
+// yer imlerinde tutuyor. Klasör tamamen silinseydi yer imine tıklayan kişi 404
+// görür ve panelin kapandığını sanardı — oysa yalnızca adresi değişti.
+
+test("eski panel adresi yeni adrese yönlendiriyor", () => {
+  const { dosyalar } = yayinDosyalari();
+  assert.ok(
+    dosyalar.includes("panel/index.html"),
+    "eski panel adresi yayın listesinde yok — yer imleri 404 alır",
+  );
+
+  const kaynak = readFileSync(join(BURADA, "panel", "index.html"), "utf8");
+
+  const yenileme = kaynak.match(
+    /<meta\s+http-equiv="refresh"\s+content="[^"]*url=([^"]+)"/i,
+  );
+  assert.ok(yenileme, "yönlendirme sayfasında meta refresh yok");
+  assert.equal(yenileme[1].trim(), "/admin/", "yönlendirme hedefi yanlış");
+
+  // GitHub Pages sunucu tarafında 301 veremiyor; tek yol HTML. `meta refresh`
+  // bazı kurumsal tarayıcı ayarlarında engelleniyor, o yüzden ekranda
+  // tıklanabilir bir bağlantı da olmalı — yoksa sessiz bir boş sayfa kalır.
+  assert.ok(
+    /href="\/admin\/"/.test(kaynak.replace(/<!--[\s\S]*?-->/g, "")),
+    "yönlendirme sayfasında elle tıklanacak bağlantı yok",
+  );
+
+  assert.ok(
+    /name="robots"[^>]*noindex/.test(kaynak),
+    "yönlendirme sayfası arama motorlarına kapalı değil",
+  );
+});
+
+/**
+ * Yönlendirme sayfası `config.js` İSTEMİYOR.
+ *
+ * İsteseydi yayın akışı ona da bir `config.js` yazardı: panelin çalışmadığı
+ * bir adrese sunucu ayarı koymak boşuna, üstelik `--uretilen` listesini
+ * gereksiz yere büyütürdü.
+ */
+test("yönlendirme sayfası sunucu ayarı yüklemiyor", () => {
+  const { uretilen } = yayinDosyalari();
+  assert.ok(
+    !uretilen.includes("panel/config.js"),
+    `yönlendirme sayfası config.js istiyor: ${uretilen.join(", ")}`,
+  );
 });

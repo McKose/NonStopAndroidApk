@@ -118,10 +118,15 @@
     <a href="#iletisim">İletişim</a>
   </nav>
 
-  <!-- Panel bağlantısı BİLEREK yok. Panel duruyor (`web/panel/`), yalnızca
-       herkese açık sayfada tanıtılmıyor: ziyaretçinin işine yaramıyor ve
-       personel oraya kendi adresinden giriyor. Aynı sebeple alt bilgideki
-       "Personel paneli" bağlantısı da kaldırıldı. -->
+  <!-- Panel bağlantısı BİLEREK yok. Panel `nonstopstudio.tr/admin/`
+       adresinde duruyor (`web/admin/`), yalnızca herkese açık sayfada
+       tanıtılmıyor: ziyaretçinin işine yaramıyor ve personel adresi
+       biliyor. Aynı sebeple alt bilgideki "Personel paneli" bağlantısı da
+       kaldırıldı.
+
+       Bağlantı vermemek bir GÜVENLİK önlemi değil — koruma girişte ve
+       Supabase erişim kurallarında. Yalnızca ziyaretçiye ait olmayan bir
+       şeyi ziyaretçiye göstermemek. -->
   <div class="ust-girisler">
     <a class="dugme dugme-birincil" href="uye/">Üye Girişi</a>
   </div>
