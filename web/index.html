@@ -51,14 +51,19 @@
     Yerel bir işletme için en çok işe yarayan tek ek bu: "kartepe pilates"
     gibi bir aramada haritalı sonuç kutusuna girme şansını belirleyen şey.
 
-    ### Bilerek EKSİK olanlar
-    `telephone`, `openingHoursSpecification` ve `streetAddress` yok, çünkü
-    bu bilgiler sitede de yok. Uydurmak seçenek değil: yanlış telefon,
-    hiç telefon olmamasından kötü. Üçü de eklendiğinde haritalı sonuç
-    kutusu belirgin şekilde doluyor — bu yüzden `docs/site-yonetimi.md`de
-    bekleyen iş olarak duruyor.
+    ### Sayfayla AYNI bilgi olmak zorunda
+    Buradaki telefon, adres ve saatler sayfadaki iletişim bölümüyle birebir
+    aynı. Ayrışırlarsa arama motoru ikisini karşılaştırıp yapısal veriye
+    güvenmeyi bırakıyor — ve hangisinin doğru olduğunu ziyaretçi de bilemiyor.
+    Biri değişirse ikisi birden değişmeli.
 
-    `priceRange` da yok; paket fiyatları sitede yayınlanmıyor.
+    ### `opens`/`closes` ikisi de "00:00" ne demek
+    Hafta sonu KAPALI demek; schema.org'un kapalı günü ifade etme biçimi bu.
+    Cumartesi–pazarı hiç yazmamak "bilinmiyor" demek olurdu ve arama sonucu
+    "açık olabilir" izlenimi verirdi — kapalı bir salona gelen ziyaretçi,
+    hiç bilgi bulamayandan daha kötü bir deneyim yaşar.
+
+    `priceRange` yok; paket fiyatları sitede yayınlanmıyor.
   -->
   <script type="application/ld+json">
   {
@@ -72,12 +77,29 @@
     "logo": "https://nonstopstudio.tr/varliklar/nonstop-gym.svg",
     "hasMap": "https://maps.app.goo.gl/WT8vUfRpxPUbvBpo8",
     "sameAs": ["https://www.instagram.com/nonstopkartepe"],
+    "telephone": "+90 541 971 50 95",
     "address": {
       "@type": "PostalAddress",
+      "streetAddress": "Fatih Sultan Mehmet Mah., Hızır Sk. No: 12D",
       "addressLocality": "Kartepe",
       "addressRegion": "Kocaeli",
+      "postalCode": "41250",
       "addressCountry": "TR"
     },
+    "openingHoursSpecification": [
+      {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        "opens": "10:00",
+        "closes": "22:00"
+      },
+      {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Saturday", "Sunday"],
+        "opens": "00:00",
+        "closes": "00:00"
+      }
+    ],
     "areaServed": { "@type": "City", "name": "Kartepe" }
   }
   </script>
@@ -236,12 +258,30 @@
     <h2 class="bolum-baslik">İletişim</h2>
 
     <div class="iletisim-kutular">
+      <!-- Telefon `tel:` ile: mobilde tıklayınca arama başlıyor. Düz metin
+           olsaydı ziyaretçinin numarayı seçip kopyalaması gerekirdi ve
+           ziyaretçilerin çoğu telefondan geliyor. -->
+      <a class="iletisim-kutu" href="tel:+905419715095">
+        <span class="iletisim-etiket">Telefon</span>
+        <span class="iletisim-deger">0541 971 50 95</span>
+        <span class="iletisim-not">Emre Geçici · Arayın →</span>
+      </a>
+
       <a class="iletisim-kutu" href="https://maps.app.goo.gl/WT8vUfRpxPUbvBpo8"
          target="_blank" rel="noopener noreferrer">
         <span class="iletisim-etiket">Adres</span>
-        <span class="iletisim-deger">Kartepe / Kocaeli</span>
-        <span class="iletisim-not">Haritada aç →</span>
+        <span class="iletisim-deger">Fatih Sultan Mehmet Mah., Hızır Sk. No: 12D</span>
+        <span class="iletisim-not">41250 Kartepe / Kocaeli — haritada aç →</span>
       </a>
+
+      <!-- Bağlantı değil, bilgi: bu kutu bir yere gitmiyor, o yüzden `<div>`.
+           `<a>` olsaydı klavyeyle gezinen biri hiçbir şey yapmayan bir
+           durakla karşılaşırdı. -->
+      <div class="iletisim-kutu">
+        <span class="iletisim-etiket">Çalışma saatleri</span>
+        <span class="iletisim-deger">Hafta içi 10.00 – 22.00</span>
+        <span class="iletisim-not">Hafta sonu kapalı</span>
+      </div>
 
       <a class="iletisim-kutu" href="https://www.instagram.com/nonstopkartepe"
          target="_blank" rel="noopener noreferrer">
