@@ -19,6 +19,10 @@
 // Kullanım:
 //   node web/yayin-dosyalari.mjs            → dosya adları, satır satır
 //   node web/yayin-dosyalari.mjs --kontrol  → yalnızca doğrula, çıktı verme
+//   node web/yayin-dosyalari.mjs --uretilen → iş akışının YAZMASI gerekenler
+//   node web/yayin-dosyalari.mjs --yapilandirma
+//                                           → hiçbir sayfanın referans
+//                                             vermediği kök dosyalar
 //   node web/yayin-dosyalari.mjs --girisler=panel/index.html
 //                                           → yalnızca o yüzeyin dosyaları
 //
@@ -44,6 +48,20 @@ const BURADA = dirname(fileURLToPath(import.meta.url));
  * değil — ama listeye de girmemeli, çünkü kopyalanacak bir kaynağı yok.
  */
 const URETILEN = new Set(["config.js"]);
+
+/**
+ * Hiçbir sayfanın REFERANS VERMEDİĞİ ama yayına giren kök dosyalar.
+ *
+ * Bunlar sayfa varlığı değil, **yayın yapılandırması**: tarayıcı bir sayfadan
+ * bağlantıyla değil, doğrudan bilinen adresten istiyor. Türetme onları
+ * bulamaz — tanım gereği kimse onlara bağlantı vermiyor.
+ *
+ * Eskiden yalnızca `CNAME` vardı ve iş akışına ELLE kopyalanıyordu. Liste
+ * ikiye çıkınca aynı hata sınıfı geri geliyordu: `robots.txt` eklenir,
+ * kopyalama satırı yazılmaz, yayın yeşil biter ve dosya sitede olmaz. Artık
+ * tek yerde duruyorlar ve eksik olan biri yayını düşürüyor.
+ */
+export const YAPILANDIRMA = ["CNAME", "robots.txt", "sitemap.xml"];
 
 /** `import ... from "./x.js"` ve `import "./x.js"` biçimlerini yakalar. */
 const IMPORT_DESENI = /(?:from|import)\s+["'](\.\/[^"']+)["']/g;
@@ -72,6 +90,13 @@ const HTML_DESENI =
 export function girisNoktalari(kok = BURADA) {
   const girisler = [];
   if (existsSync(join(kok, "index.html"))) girisler.push("index.html");
+
+  // Hata sayfası da bir giriş noktası: ona kimse bağlantı vermiyor (sunucu
+  // servis ediyor) ama kendi varlıklarını — stil, logo — referans veriyor.
+  // Yapılandırma dosyaları gibi düz kopyalansaydı o varlıklar izlenmez,
+  // yalnızca başka sayfalar da onları kullandığı için tesadüfen yayına
+  // girerlerdi. Tesadüfe bağlı çalışan bir kurulum, ilk düzenlemede bozulur.
+  if (existsSync(join(kok, "404.html"))) girisler.push("404.html");
 
   for (const ad of readdirSync(kok, { withFileTypes: true })) {
     if (!ad.isDirectory()) continue;
@@ -144,17 +169,31 @@ export function yayinDosyalari(kok = BURADA, girisler = girisNoktalari(kok)) {
     for (const m of icerik.matchAll(desen)) {
       const ham = m[1];
 
-      // Dizine giden bağlantılar (`panel/`, `uye/`) YÜZEYLER ARASI GEZİNME,
-      // varlık değil. Her yüzey zaten kendi giriş noktası olarak taranıyor;
-      // burada izlenirlerse betik bir dizini dosya sanıp okumaya çalışıyor ve
-      // `EISDIR` ile çöküyor. Bu tam olarak yaşandı: açılış sayfasına "Admin
-      // Paneli" düğmesi eklendiği anda.
-      if (ham.endsWith("/")) continue;
-
-      // Sayfa içi çapa, e-posta ve telefon bağlantıları da dosya değil.
+      // Sayfa içi çapa, e-posta ve telefon bağlantıları dosya değil.
       if (ham.startsWith("#") || ham.startsWith("mailto:") || ham.startsWith("tel:")) continue;
 
-      const hedef = posix.normalize(posix.join(dizin === "." ? "" : dizin, ham));
+      // `#bolum` PARÇASI dosya adına ait değil, ondan sonra geliyor. 404
+      // sayfası ana sayfanın bölümlerine `/#branslar` diye bağlanıyor; parça
+      // ayrılmasaydı `#branslar` adında bir dosya aranır ve yayın düşerdi.
+      // (Nitekim 404 sayfası eklendiğinde tam bunu yaptı.)
+      const hamYol = ham.split("#")[0];
+
+      // Dizine giden bağlantılar (`panel/`, `uye/`, `/`) YÜZEYLER ARASI
+      // GEZİNME, varlık değil. Her yüzey zaten kendi giriş noktası olarak
+      // taranıyor; burada izlenirlerse betik bir dizini dosya sanıp okumaya
+      // çalışıyor ve `EISDIR` ile çöküyor. Bu tam olarak yaşandı: açılış
+      // sayfasına "Admin Paneli" düğmesi eklendiği anda.
+      if (hamYol === "" || hamYol.endsWith("/")) continue;
+
+      // Kökten yazılmış yollar (`/site.css`) referansın bulunduğu dizine
+      // GÖRE ÇÖZÜLMÜYOR — kökten çözülüyor. 404 sayfası bunu gerektiriyor:
+      // herhangi bir adreste servis edildiği için yollarını kökten vermek
+      // zorunda (bkz. 404.html). Bu ayrım yapılmasaydı yol hem `site.css`
+      // hem `/site.css` diye iki kez listeye girer, dosya iki kez kopyalanır
+      // ve `_site//site.css` gibi tuhaf bir hedef oluşurdu.
+      const hedef = hamYol.startsWith("/")
+        ? posix.normalize(hamYol.slice(1))
+        : posix.normalize(posix.join(dizin === "." ? "" : dizin, hamYol));
       if (hedef.startsWith("..")) {
         eksik.push(`${hedef} (${ad} içinden — kök dizinin dışı)`);
         continue;
@@ -200,6 +239,23 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   }
 
+  // Yapılandırma dosyaları yalnızca TAM yayında anlamlı. Alt küme (`--girisler`
+  // ile üretilen admin paketi) kendi `robots.txt`ini üretiyor ve `CNAME` ona
+  // ait değil — orada aramak yanlış olurdu.
+  if (!secilenGirisler) {
+    const eksikYapilandirma = YAPILANDIRMA.filter(
+      (d) => !existsSync(join(BURADA, d)),
+    );
+    if (eksikYapilandirma.length > 0) {
+      console.error(
+        `HATA: yayın yapılandırma dosyası eksik: ${eksikYapilandirma.join(", ")}`,
+      );
+      console.error("Bunlara hiçbir sayfa referans vermiyor; silinirlerse");
+      console.error("yayın sessizce eksik çıkardı — bu yüzden burada aranıyor.");
+      process.exit(1);
+    }
+  }
+
   if (dosyalar.length === 0) {
     console.error("HATA: hiç dosya bulunamadı — giriş noktası yanlış olabilir.");
     process.exit(1);
@@ -210,6 +266,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // panel `/panel/` altına taşındığında sessizce yanlış olurdu.
   if (process.argv.includes("--uretilen")) {
     for (const u of uretilen) console.log(u);
+  } else if (process.argv.includes("--yapilandirma")) {
+    // Hiçbir sayfanın referans vermediği kök dosyalar. Yukarıda varlıkları
+    // zaten doğrulandı, burada yalnızca listeleniyor.
+    for (const y of YAPILANDIRMA) console.log(y);
   } else if (!process.argv.includes("--kontrol")) {
     for (const d of dosyalar) console.log(d);
   }

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sayfa bulunamadı — Non Stop GYM</title>
+
+  <!-- Hata sayfası arama sonuçlarına girmemeli. -->
+  <meta name="robots" content="noindex">
+
+  <!--
+    YOLLAR KÖKTEN (`/site.css`), göreli değil — ve bu, bu dosyaya özgü bir
+    kural.
+
+    404 sayfası HERHANGİ bir adreste servis ediliyor: ziyaretçi
+    `nonstopstudio.tr/eski/kampanya/` yazarsa bu dosya orada açılıyor. Yol
+    göreli olsaydı tarayıcı `eski/kampanya/site.css` arar, onu da bulamaz ve
+    hata sayfası STİLSİZ çıkardı. Yani sitenin en kötü göründüğü an, tam da
+    bir şeyin ters gittiği an olurdu.
+
+    Bedeli: yayın yedeği adresinde (`mckose.github.io/NonStopAndroidApk/`)
+    kökten yollar alan adının köküne gider ve stil yüklenmez. Kabul edildi —
+    o adres yalnızca alan adı bozulduğunda kullanılan bir yedek, 404 sayfası
+    ise asıl adreste her gün karşımıza çıkabilir.
+  -->
+  <link rel="icon" href="/varliklar/nonstop-gym.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+
+<header class="ust">
+  <a class="marka" href="/" aria-label="Non Stop GYM ana sayfa">
+    <img src="/varliklar/nonstop-gym-beyaz.svg" alt="Non Stop GYM" width="44" height="54">
+    <span class="marka-ad">Non Stop <strong>GYM</strong></span>
+  </a>
+
+  <div class="ust-girisler" style="margin-inline-start:auto">
+    <a class="dugme dugme-birincil" href="/uye/">Üye Girişi</a>
+  </div>
+</header>
+
+<main>
+  <section class="bolum">
+    <p class="ust-baslik">404</p>
+    <h1 class="bolum-baslik">Aradığınız sayfa burada değil</h1>
+    <p class="bolum-alt" style="max-width:52ch">
+      Bağlantı eskimiş ya da adres yanlış yazılmış olabilir. Aşağıdan devam
+      edebilirsiniz.
+    </p>
+
+    <div class="kahraman-dugmeler">
+      <a class="dugme dugme-birincil dugme-buyuk" href="/">Ana sayfa</a>
+      <a class="dugme dugme-ikincil dugme-buyuk" href="/#branslar">Branşlar</a>
+      <a class="dugme dugme-ikincil dugme-buyuk" href="/#iletisim">İletişim</a>
+    </div>
+  </section>
+</main>
+
+<footer class="alt-bilgi">
+  <p>© Non Stop Studio — Kartepe</p>
+  <p class="alt-bilgi-baglantilar">
+    <a href="/uye/">Üye girişi</a>
+  </p>
+</footer>
+
+</body>
+</html>

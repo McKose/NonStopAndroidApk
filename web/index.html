@@ -7,12 +7,33 @@
   <meta name="description" content="Kartepe'de Reformer Pilates, fitness ve fonksiyonel antrenman. Non Stop GYM'de altın ve siyahın estetiğiyle tasarlanmış modern alanda üst düzey antrenman deneyimi.">
 
   <!-- Sosyal medyada paylaşıldığında görünen kart. Olmadığında bağlantı çıplak
-       bir adres olarak görünüyor ve tıklanma oranı belirgin düşüyor. -->
+       bir adres olarak görünüyor ve tıklanma oranı belirgin düşüyor.
+
+       ADRESLER MUTLAK OLMAK ZORUNDA. Önceden `og:image` göreli yazılıydı
+       (`varliklar/salon-ic.jpg`) ve bu sessizce bozuktu: tarayıcıda sayfa
+       kusursuz görünüyor, çünkü göreli yolu çözen tarayıcı. Önizlemeyi
+       üreten WhatsApp / Instagram / Facebook robotları ise göreli yolu
+       çözmüyor, görseli atlıyor. Yani salonun asıl paylaşım kanalı olan
+       Instagram'da bağlantı görselsiz çıkıyordu ve bunu ancak paylaşınca
+       görebilirdiniz. -->
   <meta property="og:title" content="Non Stop GYM — Kartepe">
   <meta property="og:description" content="Denge, güç ve akışın buluştuğu nokta. Reformer Pilates, fitness ve fonksiyonel antrenman.">
-  <meta property="og:image" content="varliklar/salon-ic.jpg">
+  <meta property="og:image" content="https://nonstopstudio.tr/varliklar/salon-ic.jpg">
+  <meta property="og:image:alt" content="Non Stop GYM salon içi">
+  <meta property="og:url" content="https://nonstopstudio.tr/">
+  <meta property="og:site_name" content="Non Stop GYM">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="tr_TR">
+
+  <!-- X/Twitter kendi etiketlerine bakıyor; `og:` olanları yalnızca kısmen
+       kullanıyor. `summary_large_image` olmadan görsel küçük bir kare olarak
+       çıkıyor. -->
+  <meta name="twitter:card" content="summary_large_image">
+
+  <!-- Site iki adresten birden açılabiliyor (`nonstopstudio.tr` ve yayın
+       yedeği `mckose.github.io/NonStopAndroidApk/`). Kanonik adres verilmezse
+       arama motoru ikisini ayrı sayfa sanıp aralarında bölünüyor. -->
+  <link rel="canonical" href="https://nonstopstudio.tr/">
 
   <link rel="icon" href="varliklar/nonstop-gym.svg" type="image/svg+xml">
   <link rel="stylesheet" href="site.css">
@@ -22,6 +43,44 @@
        çalışıyor, çünkü tanıtım içeriği sabit. -->
   <script>window.NONSTOP_CONFIG = null;</script>
   <script src="config.js" onerror="window.__configYok = true"></script>
+
+  <!--
+    Yapısal veri (schema.org). Arama motoru sayfayı okuyup "bu bir spor
+    salonu" diye TAHMİN etmek zorunda kalmıyor; burada yazıyor.
+
+    Yerel bir işletme için en çok işe yarayan tek ek bu: "kartepe pilates"
+    gibi bir aramada haritalı sonuç kutusuna girme şansını belirleyen şey.
+
+    ### Bilerek EKSİK olanlar
+    `telephone`, `openingHoursSpecification` ve `streetAddress` yok, çünkü
+    bu bilgiler sitede de yok. Uydurmak seçenek değil: yanlış telefon,
+    hiç telefon olmamasından kötü. Üçü de eklendiğinde haritalı sonuç
+    kutusu belirgin şekilde doluyor — bu yüzden `docs/site-yonetimi.md`de
+    bekleyen iş olarak duruyor.
+
+    `priceRange` da yok; paket fiyatları sitede yayınlanmıyor.
+  -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "HealthClub",
+    "name": "Non Stop GYM",
+    "alternateName": "Non Stop Studio",
+    "description": "Kartepe'de Reformer Pilates, fitness ve fonksiyonel antrenman.",
+    "url": "https://nonstopstudio.tr/",
+    "image": "https://nonstopstudio.tr/varliklar/salon-ic.jpg",
+    "logo": "https://nonstopstudio.tr/varliklar/nonstop-gym.svg",
+    "hasMap": "https://maps.app.goo.gl/WT8vUfRpxPUbvBpo8",
+    "sameAs": ["https://www.instagram.com/nonstopkartepe"],
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Kartepe",
+      "addressRegion": "Kocaeli",
+      "addressCountry": "TR"
+    },
+    "areaServed": { "@type": "City", "name": "Kartepe" }
+  }
+  </script>
 </head>
 <body>
 

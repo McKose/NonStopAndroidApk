@@ -15,7 +15,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { yayinDosyalari, girisNoktalari } from "./yayin-dosyalari.mjs";
+import { yayinDosyalari, girisNoktalari, YAPILANDIRMA } from "./yayin-dosyalari.mjs";
 
 const BURADA = dirname(fileURLToPath(import.meta.url));
 
@@ -232,4 +232,124 @@ test("panel paketinde config.js üretilenler arasında", () => {
   const { dosyalar, uretilen } = yayinDosyalari(BURADA, ["panel/index.html"]);
   assert.ok(!dosyalar.includes("panel/config.js"), "config.js kopyalanacak listede olmamalı");
   assert.ok(uretilen.includes("panel/config.js"), `config.js üretilenler arasında olmalı: ${uretilen}`);
+});
+
+// ─── Hata sayfası ve yayın yapılandırması ───────────────────────────────────
+
+test("404 sayfası yayın listesinde ve varlıkları da geliyor", () => {
+  const { dosyalar, eksik } = yayinDosyalari();
+
+  assert.deepEqual(eksik, [], `eksik dosya: ${eksik.join(", ")}`);
+  assert.ok(dosyalar.includes("404.html"), `404.html listede yok: ${dosyalar}`);
+  assert.ok(dosyalar.includes("site.css"), "404'ün stili listede yok");
+  assert.ok(
+    dosyalar.includes("varliklar/nonstop-gym-beyaz.svg"),
+    "404'ün logosu listede yok",
+  );
+});
+
+/**
+ * 404 sayfasının yolları KÖKTEN olmalı.
+ *
+ * Bu dosya herhangi bir adreste servis ediliyor: `nonstopstudio.tr/eski/yol/`
+ * isteği de bunu açıyor. Yol göreli olsaydı tarayıcı `eski/yol/site.css`
+ * arar, bulamaz ve hata sayfası STİLSİZ çıkardı — sitenin en kötü göründüğü
+ * an, tam da bir şeyin ters gittiği an olurdu.
+ *
+ * Göz ile fark edilmesi de zor: kökten açıldığında (`/404.html`) her iki
+ * yazım da doğru çalışıyor. Ancak alt bir yolda denenirse ayrılıyorlar.
+ */
+test("404 sayfasının bütün yolları kökten", () => {
+  const kaynak = readFileSync(join(BURADA, "404.html"), "utf8")
+    .replace(/<!--[\s\S]*?-->/g, "");
+
+  const desen = /(?:src|href)\s*=\s*["']([^"']+)["']/g;
+  const goreli = [];
+
+  for (const m of kaynak.matchAll(desen)) {
+    const yol = m[1];
+    if (/^(https?:|\/\/|#|mailto:|tel:)/.test(yol)) continue;
+    if (!yol.startsWith("/")) goreli.push(yol);
+  }
+
+  assert.deepEqual(
+    goreli, [],
+    `404.html'de göreli yol var — alt bir adreste açıldığında bozulur: ${goreli.join(", ")}`,
+  );
+});
+
+/**
+ * Kökten yollar listeye BİR kez giriyor.
+ *
+ * `/site.css` ile `site.css` aynı dosya. Ayırt edilmeseydi ikisi de listeye
+ * girer, dosya iki kez kopyalanır ve hedefte `_site//site.css` gibi tuhaf bir
+ * yol oluşurdu.
+ */
+test("kökten yollar ikinci kez listeye girmiyor", () => {
+  const { dosyalar } = yayinDosyalari();
+  const bolulu = dosyalar.filter((d) => d.startsWith("/"));
+  assert.deepEqual(bolulu, [], `kökten yol ham hâliyle listeye girmiş: ${bolulu}`);
+});
+
+/**
+ * Yayın yapılandırma dosyaları duruyor.
+ *
+ * Bunlara hiçbir sayfa referans vermiyor, dolayısıyla türetme onları
+ * korumuyor. Biri silinse yayın yine yeşil biter ve eksik çıkardı: `CNAME`
+ * gidince alan adı, `robots.txt` gidince site haritası bildirimi, `sitemap.xml`
+ * gidince `robots.txt`in işaret ettiği hedef kaybolurdu.
+ */
+test("yayın yapılandırma dosyaları duruyor", () => {
+  for (const ad of YAPILANDIRMA) {
+    assert.ok(
+      existsSync(join(BURADA, ad)),
+      `yayın yapılandırma dosyası eksik: ${ad}`,
+    );
+  }
+});
+
+/**
+ * `robots.txt` panel ve üye alanını ENGELLEMEMELİ.
+ *
+ * İkisi de `noindex` ile korunuyor. `Disallow` eklenirse robot sayfayı
+ * indirmez, indirmediği için `noindex` etiketini de göremez ve URL yine
+ * sonuçlarda çıkabilir — üstelik başlıksız. Yani engellemek korumayı
+ * güçlendirmiyor, bozuyor. Bu test o "iyileştirmenin" sessizce yapılmasını
+ * engelliyor.
+ */
+test("robots.txt noindex'li yüzeyleri engellemiyor", () => {
+  const kaynak = readFileSync(join(BURADA, "robots.txt"), "utf8");
+  const kurallar = kaynak
+    .split("\n")
+    .filter((s) => !s.trim().startsWith("#"))
+    .join("\n");
+
+  assert.ok(
+    !/^\s*Disallow:\s*\/(panel|uye)/im.test(kurallar),
+    "robots.txt panel/üye alanını engelliyor — noindex'i görünmez kılar",
+  );
+});
+
+/**
+ * Sosyal paylaşım adresleri MUTLAK olmalı.
+ *
+ * Göreli bir `og:image` tarayıcıda sorunsuz görünüyor ama önizlemeyi üreten
+ * robotlar (WhatsApp, Instagram, Facebook) göreli yolu çözmüyor ve görseli
+ * atlıyor. Yaşanmış hâli buydu; belirtisi yalnızca bağlantıyı paylaşınca
+ * görülüyordu, sitede hiçbir iz yoktu.
+ */
+test("og etiketleri mutlak adres kullanıyor", () => {
+  const kaynak = readFileSync(join(BURADA, "index.html"), "utf8");
+  const desen =
+    /<meta\s+(?:property|name)=["'](og:image|og:url|twitter:image)["']\s+content=["']([^"']+)["']/g;
+
+  const bulunanlar = [...kaynak.matchAll(desen)];
+  assert.ok(bulunanlar.length > 0, "og:image / og:url etiketi bulunamadı");
+
+  for (const [, etiket, deger] of bulunanlar) {
+    assert.ok(
+      deger.startsWith("https://"),
+      `${etiket} göreli yazılmış ("${deger}") — önizleme robotları çözemez`,
+    );
+  }
 });
