@@ -28,13 +28,16 @@ yazılabileceğini söyler. İkincisi olmasaydı bir istemci başka salonun
 1. **Proje aç.** [supabase.com](https://supabase.com) üzerinden yeni bir proje
    oluşturun.
 
-2. **Şemayı uygulayın.** SQL Editor'de sırasıyla çalıştırın:
-   - `migrations/0001_tenancy.sql`
-   - `migrations/0002_data_tables.sql`
-   - `migrations/0003_staff_auth_link.sql`
-   - `migrations/0004_role_based_access.sql`
+2. **Şemayı uygulayın.** `migrations/` altındaki dosyaları **numara
+   sırasıyla** SQL Editor'de çalıştırın — bugün `0001`'den `0007`'ye kadar.
 
-   Hepsi tekrar çalıştırılabilir: emin değilseniz yeniden koşturun, zarar vermez.
+   Sıra önemli: sonrakiler öncekilerin tablolarına dayanıyor. Dosyalar burada
+   tek tek sayılmıyor, çünkü sayılan bir liste yeni migrasyon eklendiğinde
+   sessizce eskiyor (nitekim eskimişti: `0005`–`0007` listede yoktu ve
+   kuruluma yeni başlayan biri eksik şema kurardı).
+
+   Hepsi tekrar çalıştırılabilir: emin değilseniz yeniden koşturun, zarar
+   vermez. CI her koşuda hepsini **iki kez** uygulayarak bunu sınıyor.
 
    `tests/` altındaki dosyalar **yüklenmez**; onlar yalnızca CI içindir.
 
@@ -211,20 +214,27 @@ Satırlar eksikse derleme düşmez — uygulama açılır ve giriş ekranında
 `service_role` anahtarı buraya da **konmaz**; o anahtar tüm erişim kurallarını
 baypas eder.
 
-## Personeli hesabına bağlama
+## Personele uygulama erişimi verme
 
-Bir personelin uygulamada "bugün benim derslerim" listesini görebilmesi için
-personel kaydının Supabase hesabına bağlanması gerekiyor.
+Bir personelin uygulamaya girebilmesi için ÜÇ şey gerekiyor ve üçü birden
+olmadan sonuç sessiz bir arıza oluyor:
 
-1. Panel → Authentication → Users → ilgili kullanıcının **UID** değerini kopyalayın.
-2. Uygulamada Ayarlar → Personel → kişiyi açın → **Supabase kullanıcı kimliği**
-   alanına yapıştırın → Güncelle.
+| Ne | Nerede | Olmazsa ne olur |
+|---|---|---|
+| Auth hesabı | `auth.users` | Giriş yapamaz |
+| Salon yetkisi | `gym_users` | Giriş yapar, **hiçbir veri gelmez** |
+| Personel bağı | `staff.auth_user_id` | Girer, veriyi görür, "benim derslerim"/"hakedişim" boş kalır |
 
-Elle yapılıyor çünkü uygulama `auth.users` tablosunu okuyamıyor; erişim kuralları
-buna izin vermiyor ve vermesi de istenmez.
+İkincisi en sinsisi: uygulama açılıyor, hata yok, ekranlar boş. Sebebi hiçbir
+yerde yazmıyor.
 
-Bağlantı kurulmadan da giriş yapılabilir — yalnızca randevu eşleşmesi kurulamaz.
-Ders vermeyen bir kullanıcı (ör. salon sahibi) için bu zaten doğru sonuç.
+Bu üçünü tek adımda yapan bir Edge Function var: **`personel-davet`**. Kurulumu
+ve kullanımı için [`functions/personel-davet/BENIOKU.md`](functions/personel-davet/BENIOKU.md).
+
+Fonksiyon kurulmadıysa üçü elle de yapılabilir (Authentication → Users'tan
+hesap açıp UID'yi `gym_users` ve `staff` satırlarına yazarak), ama elle
+yapıldığında adımlardan biri atlanabiliyor — bu fonksiyon tam olarak o yüzden
+var.
 
 ## Kim neyi yazabilir
 
@@ -313,6 +323,15 @@ görünmeye devam ederdi.
 
 ## Henüz yapılmadı
 
+- **Şifre değiştirme ekranı yok.** `personel-davet` geçici bir şifre üretip
+  yöneticiye bir kez gösteriyor; personel o şifreyle giriyor. Kendi şifresini
+  belirleyebileceği bir ekran henüz yok, dolayısıyla geçici şifre kalıcı hâle
+  geliyor. Ekran teknik olarak küçük (giriş yapmış kullanıcı için tek bir
+  `updateUser` çağrısı, e-posta göndermeye gerek yok) ama henüz yazılmadı.
+- **Erişimi geri alma akışı yok.** İşten ayrılan birinin `gym_users` satırı
+  elle silinmeli. Fonksiyona `delete` yetkisi bilerek verilmedi: yanlışlıkla
+  silinen bir satır o kişinin bütün geçmişini görünmez kılar ve bu ayrı
+  düşünülmesi gereken bir karar.
 - **iOS tarafında oturum saklama yok.** Android'de oturum Keystore ile
   şifrelenip saklanıyor ve uygulama kapansa da korunuyor; iOS uygulaması
   yazıldığında Keychain karşılığı `SessionStore` arayüzünün arkasına eklenecek.
