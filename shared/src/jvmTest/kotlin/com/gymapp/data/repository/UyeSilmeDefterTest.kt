@@ -61,12 +61,23 @@ class UyeSilmeDefterTest {
         db.close()
     }
 
+    /**
+     * Her üyeye ayrı telefon.
+     *
+     * `(tenantId, phone)` **benzersiz** ve örnek satırın telefonu sabit; iki
+     * üye eklemek isteyen test, sınadığı şeye hiç gelemeden kısıt hatasıyla
+     * düşerdi. JUnit her test için sınıfı yeniden kurduğu için sayaç da
+     * testler arasında sıfırlanıyor.
+     */
+    private var sonrakiTelefon = 0
+
     /** Bir tahakkuk ve bir tahsilatı olan üye. */
     private suspend fun kayitliUye(id: String = "uye-1"): String {
         db.memberDao().insertMember(
             SampleRows.member.copy(
                 id = id,
                 tenantId = TEST_TENANT,
+                phone = "+9050000000${++sonrakiTelefon}",
                 paymentStatus = PaymentState.PENDING,
                 paymentType = PaymentMethod.CASH,
                 deletedAtMs = null,
