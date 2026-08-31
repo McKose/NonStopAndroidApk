@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymapp.data.access.AppDestination
 import com.gymapp.data.auth.CurrentUser
+import com.gymapp.data.local.entity.iptalEdilenKimlikler
 import com.gymapp.data.repository.FinanceRepository
 import com.gymapp.domain.LedgerCategory
 import com.gymapp.domain.Money
@@ -40,6 +41,16 @@ data class FinanceUiState(
 
 sealed interface FinanceEvent {
     data object Saved : FinanceEvent
+
+    /**
+     * İptal edilen kayıt sayısı ayrı bir olay.
+     *
+     * `Saved` ile aynı mesajı göstermek yanıltıcı olurdu: kullanıcı 5 kayıt
+     * seçip 3'ünün iptal edildiğini görmeli. Aradaki fark gerçek bir bilgi —
+     * ikisi başka bir cihazdan zaten iptal edilmiş demektir.
+     */
+    data class Iptal(val sayi: Int) : FinanceEvent
+
     data class Failed(val message: String) : FinanceEvent
 }
 
@@ -91,7 +102,7 @@ class FinanceViewModel(
     private val allEntries: Flow<List<FinansKaydi>> =
         repository.observeLedgerBetween(startMs = 0L, endMs = Long.MAX_VALUE)
             .map { ledger ->
-                val reversedIds = ledger.mapNotNull { it.reversesId }.toSet()
+                val reversedIds = ledger.iptalEdilenKimlikler()
                 ledger.map { it.finansKaydinaCevir(reversedIds) }
                     .sortedByDescending { entry -> entry.occurredAtMs }
             }
@@ -208,13 +219,31 @@ class FinanceViewModel(
         }
     }
 
-    /** Hatalı kaydı ters kayıtla iptal eder; kayıt silinmez, denetim izi korunur. */
-    fun voidEntry(entry: FinansKaydi, reason: String = "Kullanıcı düzeltmesi") {
+    /**
+     * Seçilen hatalı kayıtları ters kayıtla iptal eder.
+     *
+     * Kayıtlar **silinmiyor**: aynı tutarda ters kayıt yazılıyor, ikisi de
+     * listede duruyor ve toplamlarda birbirini götürüyor. Defterden satır
+     * silmek denetim izini yok ederdi — "bu para nereye gitti" sorusunun
+     * cevabı kalmazdı.
+     *
+     * Tek kayıt da toplu iptal de aynı yoldan geçiyor: tek kaydı ayrı bir
+     * çağrıyla iptal etmek ikinci bir davranış tanımlar ve ikisi zamanla
+     * ayrışırdı.
+     */
+    fun voidEntries(entryIds: List<String>, reason: String = VARSAYILAN_IPTAL_SEBEBI) {
+        if (entryIds.isEmpty()) return
+
+        val sebep = reason.trim().ifBlank { VARSAYILAN_IPTAL_SEBEBI }
         viewModelScope.launch {
-            repository.voidEntry(entry.id, reason).fold(
-                onSuccess = { _events.send(FinanceEvent.Saved) },
+            repository.voidEntries(entryIds, sebep).fold(
+                onSuccess = { _events.send(FinanceEvent.Iptal(it)) },
                 onFailure = { _events.send(FinanceEvent.Failed(it.message ?: "İptal edilemedi.")) },
             )
         }
+    }
+
+    private companion object {
+        const val VARSAYILAN_IPTAL_SEBEBI = "Kullanıcı düzeltmesi"
     }
 }

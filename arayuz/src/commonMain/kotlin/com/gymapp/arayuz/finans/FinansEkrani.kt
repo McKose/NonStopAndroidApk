@@ -31,6 +31,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -89,6 +90,17 @@ object FinansSuzgeci {
  * `FinanceUiState` `app`'te kalıyor: varsayılan değerleri `LocalDate.now()`
  * kullanıyor ve o çağrı JVM'e özgü. Sınıfı taşımak, ortak modülde
  * derlenmeyen bir varsayılanı da beraberinde getirirdi.
+ *
+ * ### Düzeltme kipi
+ * Hatalı kayıtlar buradan iptal ediliyor: [secimModu] açıkken her kaydın
+ * yanında bir kutu beliriyor, seçilenler tek işlemde ters kayıtla iptal
+ * ediliyor. Tek kayıt da toplu iptal de **aynı** yoldan geçiyor — tek kayıt
+ * için ayrı bir düğme, aynı işin ikinci bir davranışı olurdu.
+ *
+ * Silme yok ve olmayacak: defter append-only. İptal edilen kayıt listede
+ * kalıyor, "İPTAL EDİLDİ" rozetiyle işaretleniyor ve toplamlara girmiyor.
+ *
+ * @param secilenKayitlar iptal için işaretlenmiş kayıt kimlikleri
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,6 +119,8 @@ fun FinansEkrani(
     yontemSuzgeci: String,
     kayitlar: List<FinansKaydi>,
     eklemeAcik: Boolean,
+    secimModu: Boolean,
+    secilenKayitlar: Set<String>,
     onGeri: () -> Unit,
     onDonemDegisti: (ay: Int, yil: Int) -> Unit,
     onTurSuzgeci: (String) -> Unit,
@@ -114,12 +128,28 @@ fun FinansEkrani(
     onEklemeAc: () -> Unit,
     onEklemeKapat: () -> Unit,
     onKayitEkle: (tutar: String, kategori: String, aciklama: String, yontem: String, gelirMi: Boolean) -> Unit,
+    onSecimModu: (Boolean) -> Unit,
+    onSecimDegis: (Set<String>) -> Unit,
+    onIptalEt: (secilenler: List<String>, sebep: String) -> Unit,
     snackbarDurumu: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     if (!gorebilir) {
         YetkiYokEkrani(onGeri)
         return
     }
+
+    // Onay diyaloğu tamamen bu ekranın kendi durumu: açılıp kapanması hiçbir
+    // veriyi değiştirmiyor ve ekran yeniden kurulduğunda kapalı olması doğru.
+    var onayAcik by remember { mutableStateOf(false) }
+
+    // İptal edilmiş kayıt tekrar iptal edilemez; kutusu hiç çıkmıyor.
+    val secilebilir = kayitlar.filterNot { it.isVoided }
+
+    // Yalnızca EKRANDA GÖRÜNEN seçim geçerli. Seçim yapıldıktan sonra dönem
+    // ya da süzgeç değişirse işaretli kayıtlar listeden düşüyor; kümede
+    // kalmaya devam etselerdi kullanıcı göremediği kayıtları iptal eder ve
+    // şeritteki sayı ekrandaki kutu sayısıyla tutmazdı.
+    val gecerliSecim = secilebilir.map { it.id }.filter { it in secilenKayitlar }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarDurumu) },
@@ -131,14 +161,41 @@ fun FinansEkrani(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
                 },
+                actions = {
+                    TextButton(
+                        onClick = {
+                            // Kipten çıkarken seçim de temizleniyor: kapalı kipte
+                            // görünmeyen bir seçim, kip tekrar açıldığında
+                            // kullanıcının hiç yapmadığı bir işaretlemeye dönerdi.
+                            if (secimModu) onSecimDegis(emptySet())
+                            onSecimModu(!secimModu)
+                        },
+                    ) { Text(if (secimModu) "Vazgeç" else "Düzelt") }
+                },
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onEklemeAc,
-                containerColor = MaterialTheme.colorScheme.primary,
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "İşlem Ekle", tint = Color.White)
+            // Düzeltme kipinde gizli: aynı ekranda hem kayıt eklemek hem
+            // iptal etmek iki ayrı iş ve ikisi karışırsa yanlışı düzeltmeye
+            // gelen kullanıcı yeni bir kayıt açabilir.
+            if (!secimModu) {
+                FloatingActionButton(
+                    onClick = onEklemeAc,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "İşlem Ekle", tint = Color.White)
+                }
+            }
+        },
+        bottomBar = {
+            if (secimModu) {
+                SecimSeridi(
+                    secilenSayisi = gecerliSecim.size,
+                    secilebilirSayisi = secilebilir.size,
+                    onTumunuSec = { onSecimDegis(secilebilir.map { it.id }.toSet()) },
+                    onTemizle = { onSecimDegis(emptySet()) },
+                    onIptalEt = { onayAcik = true },
+                )
             }
         },
     ) { bosluk ->
@@ -227,7 +284,19 @@ fun FinansEkrani(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(kayitlar) { kayit -> KayitSatiri(kayit) }
+                    items(kayitlar) { kayit ->
+                        KayitSatiri(
+                            kayit = kayit,
+                            secimModu = secimModu,
+                            secili = kayit.id in secilenKayitlar,
+                            onSecimDegis = {
+                                onSecimDegis(
+                                    if (kayit.id in secilenKayitlar) secilenKayitlar - kayit.id
+                                    else secilenKayitlar + kayit.id
+                                )
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -237,6 +306,17 @@ fun FinansEkrani(
         KayitEklemeDiyalogu(
             onKapat = onEklemeKapat,
             onKaydet = onKayitEkle,
+        )
+    }
+
+    if (onayAcik) {
+        IptalOnayDiyalogu(
+            secilenSayisi = gecerliSecim.size,
+            onKapat = { onayAcik = false },
+            onOnayla = { sebep ->
+                onayAcik = false
+                onIptalEt(gecerliSecim, sebep)
+            },
         )
     }
 }
@@ -361,10 +441,104 @@ private fun CiroKarti(etiket: String, tutar: Money) {
     }
 }
 
+/**
+ * Düzeltme kipinin alt şeridi.
+ *
+ * Sayıyı yazması önemli: "İptal et"e basan kullanıcı kaç kaydı geri
+ * alınamaz biçimde iptal ettiğini onay diyaloğundan ÖNCE görmeli.
+ */
 @Composable
-private fun KayitSatiri(kayit: FinansKaydi) {
+private fun SecimSeridi(
+    secilenSayisi: Int,
+    secilebilirSayisi: Int,
+    onTumunuSec: () -> Unit,
+    onTemizle: () -> Unit,
+    onIptalEt: () -> Unit,
+) {
+    val hepsiSecili = secilebilirSayisi > 0 && secilenSayisi == secilebilirSayisi
+
+    Surface(tonalElevation = 3.dp) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = if (secilenSayisi == 0) {
+                    "İptal edilecek kayıtları seçin"
+                } else {
+                    "$secilenSayisi kayıt seçildi"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+
+            TextButton(
+                enabled = secilebilirSayisi > 0,
+                onClick = { if (hepsiSecili) onTemizle() else onTumunuSec() },
+            ) { Text(if (hepsiSecili) "Seçimi bırak" else "Tümünü seç") }
+
+            Button(
+                enabled = secilenSayisi > 0,
+                onClick = onIptalEt,
+            ) { Text("İptal et") }
+        }
+    }
+}
+
+/**
+ * Toplu iptalin onayı ve sebebi.
+ *
+ * Sebep serbest metin ve deftere `"İPTAL — <sebep>"` olarak yazılıyor.
+ * Boş bırakılabilir; o zaman varsayılan sebep kullanılıyor. Zorunlu
+ * kılmak, aceleyle "x" yazılmasından başka bir şey üretmezdi.
+ */
+@Composable
+private fun IptalOnayDiyalogu(
+    secilenSayisi: Int,
+    onKapat: () -> Unit,
+    onOnayla: (sebep: String) -> Unit,
+) {
+    var sebep by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onKapat,
+        title = { Text("$secilenSayisi kayıt iptal edilsin mi?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Kayıtlar silinmiyor: aynı tutarda ters kayıt yazılıyor, " +
+                        "ikisi de listede kalıyor ve toplamlarda birbirini götürüyor. " +
+                        "Bu işlem geri alınamaz.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedTextField(
+                    value = sebep,
+                    onValueChange = { sebep = it },
+                    label = { Text("Sebep (isteğe bağlı)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onOnayla(sebep) }) { Text("İptal et") }
+        },
+        dismissButton = {
+            TextButton(onClick = onKapat) { Text("Vazgeç") }
+        },
+    )
+}
+
+@Composable
+private fun KayitSatiri(
+    kayit: FinansKaydi,
+    secimModu: Boolean,
+    secili: Boolean,
+    onSecimDegis: () -> Unit,
+) {
     val gelirMi = kayit.isIncome
-    
+
     val containerColor = if (kayit.isPending) {
         Color(0xFFFF9800).copy(alpha = 0.05f)
     } else {
@@ -380,6 +554,16 @@ private fun KayitSatiri(kayit: FinansKaydi) {
             modifier = Modifier.padding(16.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (secimModu) {
+                // İptal edilmiş kayıtta kutu YOK, boşluğu da yok: yer tutucu
+                // bir kutu "seçilebilir ama seçilmemiş" gibi okunurdu.
+                if (!kayit.isVoided) {
+                    Checkbox(checked = secili, onCheckedChange = { onSecimDegis() })
+                } else {
+                    Spacer(Modifier.width(48.dp))
+                }
+            }
+
             Surface(
                 color = if (gelirMi) Color(0xFF4CAF50).copy(alpha = 0.1f) else Color(0xFFF44336).copy(alpha = 0.1f),
                 shape = RoundedCornerShape(8.dp),
@@ -408,6 +592,24 @@ private fun KayitSatiri(kayit: FinansKaydi) {
                         ) {
                             Text(
                                 "BEKLEYEN",
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
+                            )
+                        }
+                    }
+                    // İptal edilmiş kayıt ile ters kaydı listede yan yana
+                    // duruyor ve hiçbir işaret taşımıyorlardı: kullanıcı aynı
+                    // tutarı iki kez görüp tahsilatın iki kez yazıldığını
+                    // sanabiliyordu. `isVoided` hesaplanıyordu ama çizilmiyordu.
+                    if (kayit.isVoided) {
+                        Surface(
+                            color = Color.Gray,
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.padding(start = 8.dp)
+                        ) {
+                            Text(
+                                "İPTAL EDİLDİ",
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.White
@@ -450,7 +652,14 @@ private fun KayitSatiri(kayit: FinansKaydi) {
                 "${if (gelirMi) "+" else "-"}${ParaBicimi.tl(kayit.amount)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = if (gelirMi) Color(0xFF4CAF50) else Color(0xFFF44336)
+                // İptal edilen tutar solgun: rozet tek başına yeterli değil,
+                // gözün ilk gittiği yer tutarın kendisi ve orada canlı yeşil
+                // bir sayı "bu para kasaya girdi" diyor.
+                color = when {
+                    kayit.isVoided -> Color.Gray
+                    gelirMi -> Color(0xFF4CAF50)
+                    else -> Color(0xFFF44336)
+                },
             )
         }
     }

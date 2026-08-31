@@ -666,12 +666,22 @@ private fun FinansBagla(navController: NavHostController) {
     val gorebilir by model.gorebilir.collectAsState()
     val snackbarDurumu = remember { SnackbarHostState() }
     var eklemeAcik by remember { mutableStateOf(false) }
+    var secimModu by remember { mutableStateOf(false) }
+    var secilenKayitlar by remember { mutableStateOf(emptySet<String>()) }
 
     // Kayıt sonucu her durumda kullanıcıya bildiriliyor.
     LaunchedEffect(Unit) {
         model.events.collect { olay ->
             when (olay) {
                 is FinanceEvent.Saved -> snackbarDurumu.showSnackbar("Kayıt eklendi.")
+                is FinanceEvent.Iptal -> {
+                    // Kip ve seçim ancak işlem BİTİNCE kapanıyor: erken
+                    // kapansaydı hata durumunda kullanıcı seçimini baştan
+                    // yapmak zorunda kalırdı.
+                    secimModu = false
+                    secilenKayitlar = emptySet()
+                    snackbarDurumu.showSnackbar("${olay.sayi} kayıt iptal edildi.")
+                }
                 is FinanceEvent.Failed -> snackbarDurumu.showSnackbar(olay.message)
             }
         }
@@ -692,6 +702,8 @@ private fun FinansBagla(navController: NavHostController) {
         yontemSuzgeci = durum.selectedPaymentMethod,
         kayitlar = durum.entries,
         eklemeAcik = eklemeAcik,
+        secimModu = secimModu,
+        secilenKayitlar = secilenKayitlar,
         onGeri = { navController.popBackStack() },
         onDonemDegisti = { ay, yil -> model.setPeriod(ay, yil) },
         onTurSuzgeci = { model.setFilter(it) },
@@ -709,6 +721,9 @@ private fun FinansBagla(navController: NavHostController) {
             )
             eklemeAcik = false
         },
+        onSecimModu = { secimModu = it },
+        onSecimDegis = { secilenKayitlar = it },
+        onIptalEt = { secilenler, sebep -> model.voidEntries(secilenler, sebep) },
         snackbarDurumu = snackbarDurumu,
     )
 }
@@ -837,10 +852,10 @@ private fun UyeDetayBagla(
         onGeri = { navController.popBackStack() },
         onSekmeSec = { secilenSekme = it },
         onSilIste = { silmeOnayiAcik = true },
-        onSilOnayla = {
+        onSilOnayla = { iptalEdilecekKayitlar ->
             siliniyor = true
             silmeOnayiAcik = false
-            model.deleteMember(uyeId)
+            model.deleteMember(uyeId, iptalEdilecekKayitlar)
         },
         onSilVazgec = { silmeOnayiAcik = false },
         onTahsilat = { tutar -> model.markAsPaid(uyeId, tutar) },

@@ -63,3 +63,30 @@ data class LedgerEntryEntity(
 
     val createdAtMs: Long,
 )
+
+/**
+ * Bu listede iptal edilmiş kayıtların kimlikleri.
+ *
+ * Ters kayıt neyi iptal ettiğini [reversesId] ile söylüyor; iptal edilmiş
+ * kaydın kendisinde bunu gösteren hiçbir alan yok. Dolayısıyla "iptal edildi
+ * mi" sorusu tek bir satıra bakarak yanıtlanamıyor, listenin tamamı gerekiyor.
+ */
+fun List<LedgerEntryEntity>.iptalEdilenKimlikler(): Set<String> =
+    mapNotNullTo(HashSet()) { it.reversesId }
+
+/**
+ * Listedeki **yaşayan** kayıtlar: ne ters kayıt, ne de iptal edilmiş.
+ *
+ * Aynı kural veritabanında da var (bkz. `LedgerDao.activePaymentsForMember`)
+ * ama oradaki sorgu tek bir üyenin tahsilatlarını süzüyor; elinde hazır liste
+ * olan ekranlar onu tekrar sorgulayamaz ve süzgeci kendileri yazarsa iki kural
+ * zamanla ayrışır.
+ *
+ * Süzgeç iki yönlü olmak zorunda: ters kaydın kendisi de listede duruyor.
+ * Yalnızca `reversesId == null` bakılsaydı iptal edilmiş asıl kayıt hâlâ
+ * "yaşıyor" görünür ve kullanıcıya ikinci kez iptal için sunulurdu.
+ */
+fun List<LedgerEntryEntity>.aktifKayitlar(): List<LedgerEntryEntity> {
+    val iptalEdilenler = iptalEdilenKimlikler()
+    return filter { it.reversesId == null && it.id !in iptalEdilenler }
+}
