@@ -76,10 +76,21 @@ class FinanceRepository(
         }
     }
 
-    /** Hatalı kaydı ters kayıtla iptal eder (kayıt silinmez). */
-    suspend fun voidEntry(entryId: String, reason: String): Result<String?> = runCatching {
-        database.inTransaction {
-            ledgerRepository.reverse(entryId, reason).getOrThrow()
+    /**
+     * Seçilen hatalı kayıtları **tek işlemde** ters kayıtla iptal eder.
+     *
+     * Kayıt silinmiyor; ters kayıt yazılıyor (bkz. [LedgerRepository.reverseMany]).
+     *
+     * Tek tek çağırmakla aynı şey değil: hepsi ya yazılıyor ya hiçbiri.
+     * Yarısı uygulanmış bir toplu düzeltmede kullanıcı hangi kayıtların
+     * düzeldiğini listeye tek tek bakmadan bilemezdi.
+     *
+     * @return yazılan ters kayıt sayısı; zaten iptal edilmiş kayıtlar sayılmaz
+     */
+    suspend fun voidEntries(entryIds: Collection<String>, reason: String): Result<Int> =
+        runCatching {
+            database.inTransaction {
+                ledgerRepository.reverseMany(entryIds, reason).getOrThrow()
+            }
         }
-    }
 }

@@ -378,9 +378,16 @@ class MemberViewModel(
         }
     }
 
-    fun deleteMember(memberId: String) {
+    /**
+     * Üyeyi siler; ekranda seçilen defter kayıtlarını da ters kayıtla iptal eder.
+     *
+     * @param iptalEdilecekKayitlar boşsa defter olduğu gibi kalır — silme
+     *   kararı ile finans düzeltmesi kararı ayrı ayrı veriliyor
+     *   (bkz. [com.gymapp.data.repository.MemberRepository.deleteMember]).
+     */
+    fun deleteMember(memberId: String, iptalEdilecekKayitlar: List<String> = emptyList()) {
         viewModelScope.launch {
-            repository.deleteMember(memberId).fold(
+            repository.deleteMember(memberId, iptalEdilecekKayitlar).fold(
                 onSuccess = { _events.send(MemberEvent.Deleted) },
                 onFailure = { _events.send(MemberEvent.Failed(it.message ?: "Üye silinemedi.")) },
             )

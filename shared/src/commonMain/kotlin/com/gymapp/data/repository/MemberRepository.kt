@@ -396,10 +396,44 @@ class MemberRepository(
      * Önceden fırlatıyordu ve çağıran çıplak bir `viewModelScope.launch` içindeydi;
      * projede hiç `CoroutineExceptionHandler` olmadığı için uygulama kapanıyordu.
      * Kaydetme yolları bu deseni zaten kullanıyordu, silme yolları atlanmıştı.
+     *
+     * ### Defter kayıtları neden ayrı bir seçim
+     * Üye silmek defterine dokunmuyordu ve dokunmaması **görünmez bir hata**
+     * üretiyordu: yanlışlıkla kaydedilen üye siliniyor, ondan doğan tahsilatlar
+     * finansta duruyor, salon o parayı almış görünüyordu. Kayıtları koşulsuz
+     * iptal etmek ise ters yönde aynı ağırlıkta olurdu — gerçekten ödeme almış
+     * bir üyenin kaydı silindiğinde ciro sessizce düşerdi.
+     *
+     * Karar bu yüzden çağırana bırakılıyor: ekran hangi kayıtların iptal
+     * edileceğini soruyor, buraya yalnızca seçilenler geliyor. Boş liste
+     * "defter olduğu gibi kalsın" demek ve eski davranışın aynısı.
+     *
+     * İptal, kayıtları **silmiyor**: ters kayıt yazılıyor, denetim izi duruyor
+     * ve toplamlar sıfırlanıyor. İkisi tek transaction'da: yarısı uygulanmış
+     * bir düzeltme (üye gitti, kayıtlar kaldı) düzeltilmemiş olandan zor
+     * fark edilir.
+     *
+     * @param iptalEdilecekKayitlar ters kayıtla iptal edilecek defter kayıtlarının
+     *   kimlikleri; boşsa deftere dokunulmaz
      */
-    suspend fun deleteMember(id: String): Result<Unit> = runCatching {
+    suspend fun deleteMember(
+        id: String,
+        iptalEdilecekKayitlar: Collection<String> = emptyList(),
+    ): Result<Unit> = runCatching {
         val nowMs = Now.epochMillis()
         database.inTransaction {
+            if (iptalEdilecekKayitlar.isNotEmpty()) {
+                // Ad ters kaydın açıklamasına gömülüyor. Üye listelerden
+                // kalktıktan sonra o satır finansta tek başına duracak ve
+                // `memberId` bir kimlikten ibaret — "İPTAL — üye kaydı silindi"
+                // satırının kime ait olduğunu söyleyecek başka bir kaynak yok.
+                val ad = memberDao.getMemberById(id)?.fullName ?: "Üye"
+                ledgerRepository.reverseMany(
+                    entryIds = iptalEdilecekKayitlar,
+                    reason = "$ad - üye kaydı silindi",
+                    occurredAtMs = nowMs,
+                ).getOrThrow()
+            }
             memberDao.softDeleteMember(id, nowMs)
             syncQueue.enqueue(SyncTable.MEMBERS, id, tenantId, nowMs)
         }

@@ -78,6 +78,7 @@ class UyeDetayGoruntuTesti {
         uye: MemberEntity? = this.uye,
         kalanBorc: Money? = Money(250_000),
         silmeOnayiAcik: Boolean = false,
+        hareketler: List<LedgerEntryEntity> = this.hareketler,
     ): @Composable () -> Unit = {
         UyeDetayEkrani(
             uye = uye,
@@ -126,6 +127,37 @@ class UyeDetayGoruntuTesti {
     fun `silme onayi ciziliyor`() {
         cizildiginiDogrula(ekraniCiz("uye-detay-silme", icerik = ekran(silmeOnayiAcik = true)))
     }
+
+    /**
+     * Silme onayı üyenin finans kayıtlarını listeliyor mu.
+     *
+     * Bu diyalog düzeltilen hatanın tam kalbi: silme defterine hiç
+     * dokunmuyordu, yanlışlıkla kaydedilen üye siliniyor ve ondan doğan
+     * tahsilatlar finansta kalıyordu — salon o parayı almış görünüyordu.
+     * Liste çizilmezse kullanıcıya hiçbir şey sorulmamış olur ve akış
+     * sessizce eski hâline döner.
+     */
+    @Test
+    fun `silme onayi finans kayitlarini listeliyor`() {
+        val kayitli = ekraniCiz(
+            "uye-detay-silme",
+            icerik = ekran(silmeOnayiAcik = true),
+        ).readBytes()
+        val kayitsiz = ekraniCiz(
+            "uye-detay-silme-kayitsiz",
+            icerik = ekran(silmeOnayiAcik = true, hareketler = emptyList()),
+        ).readBytes()
+
+        assertTrue(
+            !kayitli.contentEquals(kayitsiz),
+            "Finans kayıtları diyaloğa çizilmedi — kullanıcıya hangi kaydın " +
+                "iptal edileceği sorulmuyor",
+        )
+    }
+
+    // Listenin İÇERİĞİ (iptal edilmiş kayıtların ayıklanması) burada değil,
+    // `AktifKayitlarTesti` içinde sınanıyor: saf bir fonksiyon ve piksel
+    // karşılaştırmasıyla değil doğrudan doğrulanabiliyor.
 
     /**
      * Sekme seçimi gerçekten içeriği değiştiriyor mu.

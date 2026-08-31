@@ -98,37 +98,41 @@ class LedgerRepository(
         paymentMethod = method,
     )
 
+    // KALDIRILDI: `reverse` (tek kayıt). Tek kaydı iptal etmek artık tek
+    // elemanlı bir listeyle [reverseMany]'den geçiyor. İki yol tutmak, aynı
+    // kuralın (ters kaydın kendisi iptal edilemez, iptal idempotenttir) iki
+    // ayrı yerde yaşaması demekti ve biri değişince diğeri sessizce
+    // ayrışırdı — üstelik tek kayıtlı yolun hiç çağıranı yoktu.
+
     /**
-     * Bir kaydı ters kayıtla iptal eder.
+     * Seçilen kayıtları tek işlemde ters kayıtla iptal eder.
      *
-     * Kayıt **silinmez**; aynı tutarda, [LedgerEntryEntity.reversesId] alanı dolu
-     * yeni bir kayıt eklenir. Böylece denetim izi korunur ve toplamlar sıfırlanır.
+     * Kayıtlar **silinmiyor**; her biri için aynı tutarda, [LedgerEntryEntity.reversesId]
+     * alanı dolu yeni bir satır yazılıyor. Böylece denetim izi korunuyor ve
+     * toplamlar sıfırlanıyor.
      *
-     * İşlem idempotenttir: zaten iptal edilmiş bir kayıt tekrar iptal edilmez.
+     * Hatalı kaydın düzeltilmesi için: kullanıcı hangi kayıtların iptal
+     * edileceğini **seçiyor**, tek tek ya da toplu. Seçim dışında kalanlar
+     * olduğu gibi duruyor.
+     *
+     * Bilinmeyen bir kimlik **hata**: kısmen uygulanmış bir düzeltme, hiç
+     * uygulanmamış olandan kötüdür — kullanıcı "N kayıt iptal edildi" görür
+     * ama hangilerinin atlandığını bilmez. Zaten iptal edilmiş kayıtlar ise
+     * sessizce atlanıyor (işlem idempotent); iki cihazdan aynı düzeltme
+     * yapıldığında ikincisi tutarı bir kez daha düşürmemeli.
+     *
+     * @return gerçekten yazılan ters kayıt sayısı
      */
-    suspend fun reverse(
-        entryId: String,
+    suspend fun reverseMany(
+        entryIds: Collection<String>,
         reason: String,
         occurredAtMs: Long = Now.epochMillis(),
-    ): Result<String?> = runCatching {
-        val original = ledgerDao.getById(entryId)
-            ?: throw IllegalArgumentException("Finans kaydı bulunamadı.")
-
-        require(original.reversesId == null) { "Ters kayıt tekrar iptal edilemez." }
-        if (ledgerDao.isReversed(entryId)) return@runCatching null // zaten iptal edilmiş
-
-        val reversal = original.copy(
-            id = Ids.new(),
-            description = "İPTAL — $reason",
-            occurredAtMs = occurredAtMs,
-            reversesId = original.id,
-            createdAtMs = Now.epochMillis(),
-        )
-        ledgerDao.insert(reversal)
-        syncQueue.enqueue(
-            SyncTable.LEDGER_ENTRIES, reversal.id, reversal.tenantId, reversal.createdAtMs,
-        )
-        reversal.id
+    ): Result<Int> = runCatching {
+        // `distinct`: aynı kimlik iki kez geçerse ikincisi bir öncekinin
+        // yazdığı ters kaydı görmeden ikinci bir ters kayıt üretebilirdi ve
+        // kayıt toplamlardan iki kez düşerdi.
+        val hedefler = entryIds.distinct().mapNotNull { iptalEdilebilir(it) }
+        tersKayitlariYaz(hedefler, reason, occurredAtMs)
     }
 
     /**
@@ -145,26 +149,9 @@ class LedgerRepository(
         occurredAtMs: Long = Now.epochMillis(),
         tenantId: String = tenants.requireTenantId(),
     ): Result<Int> = runCatching {
-        val active = ledgerDao.activePaymentsForMember(tenantId, memberId)
-        val reversals = active.map { original ->
-            original.copy(
-                id = Ids.new(),
-                description = "İPTAL — $reason",
-                occurredAtMs = occurredAtMs,
-                reversesId = original.id,
-                createdAtMs = Now.epochMillis(),
-            )
-        }
-        if (reversals.isNotEmpty()) {
-            ledgerDao.insertAll(reversals)
-            // Her kayıt kendi tenant'ıyla kuyruğa alınıyor. Hepsine ilk kaydın
-            // tenant'ını vermek bugün doğru sonucu üretirdi (tek kiracı var) ama
-            // çok kiracılıya geçişte kayıtları yanlış hesaba yazardı.
-            reversals.forEach {
-                syncQueue.enqueue(SyncTable.LEDGER_ENTRIES, it.id, it.tenantId, it.createdAtMs)
-            }
-        }
-        reversals.size
+        tersKayitlariYaz(
+            ledgerDao.activePaymentsForMember(tenantId, memberId), reason, occurredAtMs,
+        )
     }
 
     /** Bir randevunun doğurduğu tüm aktif kayıtları iptal eder (randevu geri alınınca). */
@@ -173,8 +160,50 @@ class LedgerRepository(
         reason: String,
         occurredAtMs: Long = Now.epochMillis(),
     ): Result<Int> = runCatching {
-        val active = ledgerDao.activeEntriesForAppointment(appointmentId)
-        val reversals = active.map { original ->
+        tersKayitlariYaz(
+            ledgerDao.activeEntriesForAppointment(appointmentId), reason, occurredAtMs,
+        )
+    }
+
+    // ─── Ters kaydın ortak yolu ─────────────────────────────────────────────
+
+    /**
+     * Kaydı iptal edilebiliyorsa döndürür, zaten iptal edilmişse `null`.
+     *
+     * Ters kaydın kendisini iptal etmek **hata**: iki ters kayıt birbirini
+     * götürür ve tutar toplamlara geri döner — yani "iptali iptal etmek"
+     * sessizce çalışır gibi görünürdü. Düzeltmenin düzeltmesi yeni bir kayıt
+     * girmek olmalı, defter geriye doğru oyulmamalı.
+     */
+    private suspend fun iptalEdilebilir(entryId: String): LedgerEntryEntity? {
+        val original = ledgerDao.getById(entryId)
+            ?: throw IllegalArgumentException("Finans kaydı bulunamadı.")
+        require(original.reversesId == null) { "Ters kayıt tekrar iptal edilemez." }
+        return original.takeUnless { ledgerDao.isReversed(entryId) }
+    }
+
+    /**
+     * Verilen kayıtların ters kayıtlarını yazar ve kuyruğa alır.
+     *
+     * Ters kayıt orijinalin kopyası: aynı tutar, aynı yön, aynı kategori —
+     * yalnızca kimliği yeni ve [LedgerEntryEntity.reversesId] kaynağa bağlı.
+     * Tutarı eksiyle yazmak da toplamları sıfırlardı ama "tutar daima
+     * pozitif, yön `type` ile ifade edilir" kuralını bozardı (bkz. [record]).
+     *
+     * Çağıranların hepsi [occurredAtMs] için **şimdi**yi geçiyor: muhasebe ters
+     * kaydı cari döneme işler. Orijinalin dönemine yazılsaydı kapanmış bir ayın
+     * toplamı geriye dönük değişirdi.
+     *
+     * @return yazılan ters kayıt sayısı
+     */
+    private suspend fun tersKayitlariYaz(
+        kayitlar: List<LedgerEntryEntity>,
+        reason: String,
+        occurredAtMs: Long,
+    ): Int {
+        if (kayitlar.isEmpty()) return 0
+
+        val reversals = kayitlar.map { original ->
             original.copy(
                 id = Ids.new(),
                 description = "İPTAL — $reason",
@@ -183,16 +212,14 @@ class LedgerRepository(
                 createdAtMs = Now.epochMillis(),
             )
         }
-        if (reversals.isNotEmpty()) {
-            ledgerDao.insertAll(reversals)
-            // Her kayıt kendi tenant'ıyla kuyruğa alınıyor. Hepsine ilk kaydın
-            // tenant'ını vermek bugün doğru sonucu üretirdi (tek kiracı var) ama
-            // çok kiracılıya geçişte kayıtları yanlış hesaba yazardı.
-            reversals.forEach {
-                syncQueue.enqueue(SyncTable.LEDGER_ENTRIES, it.id, it.tenantId, it.createdAtMs)
-            }
+        ledgerDao.insertAll(reversals)
+        // Her kayıt kendi tenant'ıyla kuyruğa alınıyor. Hepsine ilk kaydın
+        // tenant'ını vermek bugün doğru sonucu üretirdi (tek kiracı var) ama
+        // çok kiracılıya geçişte kayıtları yanlış hesaba yazardı.
+        reversals.forEach {
+            syncQueue.enqueue(SyncTable.LEDGER_ENTRIES, it.id, it.tenantId, it.createdAtMs)
         }
-        reversals.size
+        return reversals.size
     }
 
     // ─── Okuma ──────────────────────────────────────────────────────────────

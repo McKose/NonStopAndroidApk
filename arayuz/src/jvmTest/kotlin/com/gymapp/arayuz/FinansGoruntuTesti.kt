@@ -33,6 +33,8 @@ class FinansGoruntuTesti {
         gorebilir: Boolean = true,
         kayitlar: List<FinansKaydi> = this.kayitlar,
         eklemeAcik: Boolean = false,
+        secimModu: Boolean = false,
+        secilenKayitlar: Set<String> = emptySet(),
     ): @Composable () -> Unit = {
         FinansEkrani(
             gorebilir = gorebilir,
@@ -49,10 +51,13 @@ class FinansGoruntuTesti {
             yontemSuzgeci = "ALL",
             kayitlar = kayitlar,
             eklemeAcik = eklemeAcik,
+            secimModu = secimModu,
+            secilenKayitlar = secilenKayitlar,
             onGeri = {}, onDonemDegisti = { _, _ -> },
             onTurSuzgeci = {}, onYontemSuzgeci = {},
             onEklemeAc = {}, onEklemeKapat = {},
             onKayitEkle = { _, _, _, _, _ -> },
+            onSecimModu = {}, onSecimDegis = {}, onIptalEt = { _, _ -> },
         )
     }
 
@@ -108,6 +113,84 @@ class FinansGoruntuTesti {
         )
     }
 
+    // ─── Düzeltme kipi ──────────────────────────────────────────────────────
+
+    @Test
+    fun `duzeltme kipi ciziliyor`() {
+        cizildiginiDogrula(
+            ekraniCiz(
+                "finans-duzeltme",
+                icerik = ekran(secimModu = true, secilenKayitlar = setOf("k1")),
+            )
+        )
+    }
+
+    /**
+     * Düzeltme kipi görünümü gerçekten değiştiriyor mu.
+     *
+     * `secimModu` çizime bağlanmamış olsaydı kutular hiç belirmez, alt şerit
+     * çıkmaz ve kullanıcı hatalı kaydı iptal edecek hiçbir yol bulamazdı —
+     * özellik kodda var, ekranda yok olurdu.
+     */
+    @Test
+    fun `duzeltme kipi goruntuyu degistiriyor`() {
+        val normal = ekraniCiz("finans", icerik = ekran()).readBytes()
+        val duzeltme = ekraniCiz("finans-duzeltme", icerik = ekran(secimModu = true)).readBytes()
+
+        assertTrue(
+            !normal.contentEquals(duzeltme),
+            "Düzeltme kipi görüntüyü değiştirmedi — seçim kutuları çizilmiyor olabilir",
+        )
+    }
+
+    /**
+     * Seçim işaretlenmiş görünüyor mu.
+     *
+     * Kutu çizilip `secili` bağlanmasaydı kullanıcı hiçbir işaret göremeden
+     * "3 kayıt seçildi" yazısını okurdu ve hangilerini iptal ettiğini ancak
+     * işlemden sonra öğrenirdi.
+     */
+    @Test
+    fun `secili kayit isaretli goruniyor`() {
+        val secimsiz = ekraniCiz("finans-duzeltme-bos", icerik = ekran(secimModu = true))
+            .readBytes()
+        val secili = ekraniCiz(
+            "finans-duzeltme",
+            icerik = ekran(secimModu = true, secilenKayitlar = setOf("k1")),
+        ).readBytes()
+
+        assertTrue(!secimsiz.contentEquals(secili), "Seçim çizime yansımadı")
+    }
+
+    /**
+     * İptal edilmiş kayıt işaretleniyor mu.
+     *
+     * `isVoided` hesaplanıyordu ama hiç çizilmiyordu: iptal edilen kayıt ile
+     * onu iptal eden ters kayıt listede yan yana, aynı tutarla ve hiçbir
+     * ayrım olmadan duruyordu. Kullanıcı tahsilatın iki kez yazıldığını
+     * sanabiliyordu.
+     */
+    @Test
+    fun `iptal edilmis kayit isaretleniyor`() {
+        val normal = ekraniCiz(
+            "finans-tek",
+            icerik = ekran(kayitlar = listOf(kayit("k1", true, 450_000, "MEMBERSHIP", "Ayşe"))),
+        ).readBytes()
+        val iptalli = ekraniCiz(
+            "finans-tek-iptal",
+            icerik = ekran(
+                kayitlar = listOf(
+                    kayit("k1", true, 450_000, "MEMBERSHIP", "Ayşe", iptalEdilmis = true),
+                ),
+            ),
+        ).readBytes()
+
+        assertTrue(
+            !normal.contentEquals(iptalli),
+            "İptal edilmiş kayıt normal kayıtla aynı çiziliyor",
+        )
+    }
+
     private fun kayit(
         id: String,
         gelirMi: Boolean,
@@ -115,6 +198,7 @@ class FinansGoruntuTesti {
         kategori: String,
         aciklama: String,
         bekleyen: Boolean = false,
+        iptalEdilmis: Boolean = false,
     ) = FinansKaydi(
         id = id,
         isIncome = gelirMi,
@@ -124,7 +208,7 @@ class FinansGoruntuTesti {
         paymentMethod = if (gelirMi) PaymentMethod.CARD else PaymentMethod.CASH,
         occurredAtMs = anMs,
         isPending = bekleyen,
-        isVoided = false,
+        isVoided = iptalEdilmis,
         note = null,
     )
 }

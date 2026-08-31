@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -62,6 +64,7 @@ import com.gymapp.data.local.entity.LedgerEntryEntity
 import com.gymapp.data.local.entity.MeasurementEntity
 import com.gymapp.data.local.entity.MemberEntity
 import com.gymapp.data.local.entity.PackageEntity
+import com.gymapp.data.local.entity.aktifKayitlar
 import com.gymapp.domain.Decimals
 import com.gymapp.domain.LedgerType
 import com.gymapp.domain.Membership
@@ -111,7 +114,7 @@ fun UyeDetayEkrani(
     onGeri: () -> Unit,
     onSekmeSec: (Int) -> Unit,
     onSilIste: () -> Unit,
-    onSilOnayla: () -> Unit,
+    onSilOnayla: (iptalEdilecekKayitlar: List<String>) -> Unit,
     onSilVazgec: () -> Unit,
     onTahsilat: (Money) -> Unit,
     onSaglikKaydet: (MemberEntity) -> Unit,
@@ -123,20 +126,12 @@ fun UyeDetayEkrani(
     snackbarDurumu: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     if (silmeOnayiAcik) {
-        AlertDialog(
-            onDismissRequest = onSilVazgec,
-            title = { Text("Üyeyi sil") },
-            text = { Text("${uye?.fullName ?: "Bu üye"} listeden kaldırılacak. Devam edilsin mi?") },
-            confirmButton = {
-                TextButton(
-                    // Çift dokunma iki silme denemesi başlatmasın.
-                    enabled = !siliniyor,
-                    onClick = onSilOnayla,
-                ) { Text("Sil", color = Color.Red) }
-            },
-            dismissButton = {
-                TextButton(onClick = onSilVazgec) { Text("Vazgeç") }
-            },
+        UyeSilmeDiyalogu(
+            ad = uye?.fullName ?: "Bu üye",
+            silinebilirKayitlar = hareketler.aktifKayitlar(),
+            siliniyor = siliniyor,
+            onOnayla = onSilOnayla,
+            onVazgec = onSilVazgec,
         )
     }
 
@@ -613,9 +608,160 @@ private fun PaketSekmesi(
                 color = Color.Gray,
             )
         } else {
-            hareketler.forEach { hareket -> DefterSatiri(hareket) }
+            hareketler.forEach { hareket ->
+                DefterSatiri(hareket, modifier = Modifier.fillMaxWidth())
+            }
         }
     }
+}
+
+/**
+ * Üye silme onayı — finans kayıtlarının ne olacağı da burada soruluyor.
+ *
+ * ### Neden bir soru
+ * Silme defterine hiç dokunmuyordu ve bu **görünmez** bir hataydı: yanlışlıkla
+ * kaydedilen üye siliniyor, ondan doğan tahsilatlar finansta duruyor, salon o
+ * parayı almış görünüyordu. Kayıtları koşulsuz iptal etmek ise ters yönde aynı
+ * ağırlıkta olurdu — gerçekten ödeme yapmış bir üyenin kaydı silindiğinde ciro
+ * sessizce düşerdi. İki durum da doğru, ayırt edebilecek tek şey kullanıcı.
+ *
+ * ### Neden hepsi baştan işaretli
+ * Bu diyaloğun asıl geldiği yer hatalı kayıt: kullanıcı üyeyi zaten "bu kayıt
+ * yanlıştı" diye siliyor ve kayıtların da gitmesini bekliyor. Boş bir liste
+ * sunmak, düzeltmeyi yapmayı unutmayı kolaylaştırırdı ve unutulan hâli —
+ * hayalet gelir — tam olarak düzeltilen hata. Ters yöndeki risk daha ucuz:
+ * fazladan iptal edilen kayıt finansta rozetiyle **görünüyor** ve yeniden
+ * girilebiliyor, oysa hiç iptal edilmeyen kayıt hiçbir yerde uyarı üretmiyor.
+ *
+ * Yine de tek dokunuşla değil: liste tutarlarıyla birlikte önde ve onay
+ * düğmesi kaç kaydın iptal edileceğini yazıyor.
+ *
+ * @param silinebilirKayitlar yalnızca yaşayan kayıtlar; iptal edilmiş olanlar
+ *   tekrar iptal edilemez ve listede hiç görünmüyor
+ */
+@Composable
+private fun UyeSilmeDiyalogu(
+    ad: String,
+    silinebilirKayitlar: List<LedgerEntryEntity>,
+    siliniyor: Boolean,
+    onOnayla: (iptalEdilecekKayitlar: List<String>) -> Unit,
+    onVazgec: () -> Unit,
+) {
+    // Anahtarsız `remember`: diyalog açıkken senkronizasyon liste değiştirirse
+    // kullanıcının işaretlemesi korunuyor. İki uç durum da güvenli tarafa
+    // düşüyor — aradan çıkan kimlik onaylarken güncel listeye göre süzülüyor,
+    // sonradan gelen kayıt ise işaretsiz geliyor (yani kimsenin seçmediği bir
+    // kayıt kendiliğinden iptal edilmiyor).
+    var secilenler by remember { mutableStateOf(silinebilirKayitlar.map { it.id }.toSet()) }
+
+    val hepsiSecili = silinebilirKayitlar.isNotEmpty() &&
+        silinebilirKayitlar.all { it.id in secilenler }
+    val secilenSayisi = silinebilirKayitlar.count { it.id in secilenler }
+
+    AlertDialog(
+        onDismissRequest = onVazgec,
+        title = { Text("Üyeyi sil") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("$ad listeden kaldırılacak.")
+
+                if (silinebilirKayitlar.isEmpty()) {
+                    Text(
+                        "Bu üyenin finans kaydı yok.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                    )
+                } else {
+                    HorizontalDivider()
+                    Text(
+                        "Finans kayıtları duruyor. İptal edilecekleri seçin:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = hepsiSecili,
+                            onCheckedChange = {
+                                secilenler = if (hepsiSecili) {
+                                    emptySet()
+                                } else {
+                                    silinebilirKayitlar.map { k -> k.id }.toSet()
+                                }
+                            },
+                        )
+                        Text(
+                            if (hepsiSecili) "Hiçbirini iptal etme" else "Tümünü seç",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+
+                    // Sınırlı yükseklik + kendi kaydırması: onlarca kaydı olan
+                    // üyede liste diyaloğu taşırır ve düğmeler erişilemez
+                    // hâle gelirdi.
+                    //
+                    // `LazyColumn` DEĞİL: diyaloğun metin bölmesi kendi
+                    // yüksekliğini içeriğinden alıyor ve tembel liste orada
+                    // sınırsız yükseklikle ölçülüp çalışma zamanında düşerdi.
+                    // Bir üyenin defter satırı zaten az; tembelliğin kazancı yok.
+                    Column(
+                        modifier = Modifier
+                            .heightIn(max = 240.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        silinebilirKayitlar.forEach { kayit ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(
+                                    checked = kayit.id in secilenler,
+                                    onCheckedChange = {
+                                        secilenler = if (kayit.id in secilenler) {
+                                            secilenler - kayit.id
+                                        } else {
+                                            secilenler + kayit.id
+                                        }
+                                    },
+                                )
+                                DefterSatiri(kayit, modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+
+                    Text(
+                        "İptal edilen kayıt silinmez: aynı tutarda ters kayıt yazılır, " +
+                            "ikisi de finansta kalır ve toplamlarda birbirini götürür. " +
+                            "Seçilmeyenler olduğu gibi durur.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                // Çift dokunma iki silme denemesi başlatmasın.
+                enabled = !siliniyor,
+                onClick = {
+                    // Güncel listeye göre süzülüyor: ekranda artık olmayan bir
+                    // kimlik gönderilmiyor.
+                    onOnayla(silinebilirKayitlar.map { it.id }.filter { it in secilenler })
+                },
+            ) {
+                Text(
+                    if (secilenSayisi == 0) "Sil" else "Sil ve $secilenSayisi kaydı iptal et",
+                    color = Color.Red,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onVazgec) { Text("Vazgeç") }
+        },
+    )
 }
 
 /**
@@ -625,10 +771,10 @@ private fun PaketSekmesi(
  * borçla tahsilatı ayırt edilemez hâle getirirdi.
  */
 @Composable
-private fun DefterSatiri(kayit: LedgerEntryEntity) {
+private fun DefterSatiri(kayit: LedgerEntryEntity, modifier: Modifier = Modifier) {
     val tahsilat = kayit.type == LedgerType.PAYMENT
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        modifier = modifier.padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {

@@ -579,3 +579,43 @@ tamamen ortadan kaldırıyor.
 ekranında görünür. Görünmez bir senkronizasyon, çalışmadığında da çalışıyormuş
 gibi görünür; bekleyen sayının düşmemesi kullanıcının fark edebileceği tek
 belirti.
+
+## Hatalı kaydın düzeltilmesi: silme değil ters kayıt, seçim kullanıcıda
+
+**Karar:** Finans defterinden satır **silinmiyor**. Hatalı kayıt, aynı tutarda
+ve `reversesId` alanı dolu ikinci bir satırla iptal ediliyor; ikisi de listede
+kalıyor, toplamlarda birbirini götürüyor ve iptal edilmiş kayıt "İPTAL EDİLDİ"
+rozetiyle işaretleniyor.
+
+**Üye silinirken defterine ne olacağı KULLANICIYA soruluyor.** Silme onayı
+üyenin yaşayan defter kayıtlarını kutularıyla listeliyor; iptal edilecekler tek
+tek ya da "tümünü seç" ile işaretleniyor ve yalnızca işaretlenenler iptal
+ediliyor. Aynı seçim finans ekranında da var ("Düzelt" kipi), çünkü **önceden
+silinmiş** üyelerin kayıtlarına başka bir yerden ulaşılamıyor.
+
+**Neden soruluyor:** Silme daha önce deftere hiç dokunmuyordu ve bu görünmez bir
+hataydı — yanlışlıkla kaydedilen üye siliniyor, ondan doğan tahsilatlar finansta
+kalıyor, salon o parayı almış görünüyordu. Koşulsuz iptal etmek ise ters yönde
+aynı ağırlıkta olurdu: gerçekten ödeme almış bir üyenin kaydı silindiğinde ciro
+sessizce düşerdi. İki durum da meşru ve ayırt edebilecek tek şey kullanıcı.
+
+**Neden hepsi baştan işaretli geliyor:** Diyaloğun geldiği yer neredeyse her
+zaman hatalı kayıt. İki hatanın maliyeti simetrik değil: fazladan iptal edilen
+kayıt finansta rozetiyle **görünüyor** ve elle yeniden girilebiliyor, oysa hiç
+iptal edilmeyen kayıt hiçbir yerde uyarı üretmiyor — düzeltilen hatanın ta
+kendisi.
+
+**Ters kayıt cari döneme yazılıyor**, orijinalin dönemine değil. Muhasebe
+düzeltmeyi cari döneme işler; orijinalin dönemine yazılsaydı kapanmış bir ayın
+toplamı geriye dönük değişirdi.
+
+**Ters kaydın kendisi iptal edilemiyor.** İptalin iptali tutarı toplamlara geri
+getirirdi ve defter geriye doğru oyulmuş olurdu; düzeltmenin düzeltmesi yeni bir
+kayıt girmektir.
+
+**İşlem idempotent.** Zaten iptal edilmiş bir kayıt ikinci kez iptal edilmiyor:
+iki cihazdan aynı düzeltme yapıldığında tutar bir kez daha düşmemeli.
+
+**Toplu iptal ya hep ya hiç.** Yarısı uygulanmış bir düzeltmede kullanıcı
+"N kayıt iptal edildi" görür ama hangilerinin atlandığını bilmez; bilinmeyen bir
+kimlik işlemin tamamını düşürüyor.
