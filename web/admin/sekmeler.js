@@ -82,6 +82,15 @@ export const SEKME_VERISI = {
   // ortak Kotlin modülünde tanımlı hiçbir iş kuralı yok.
   duyurular: { ozel: true, okunanTablolar: ["announcements"] },
   "uye-hesaplari": { ozel: true, okunanTablolar: ["member_accounts", "gym_members"] },
+
+  // Personel erişimi. Okuduğu iki tablo: kimlere hesap açılabileceği (`staff`)
+  // ve kimin hâlihazırda yetkisi olduğu (`gym_users`).
+  //
+  // YAZMAYI bu bölüm yapmıyor — diğer ikisinden farkı bu. Yazma sunucudaki
+  // `personel-davet` Edge Function'ında, çünkü `gym_users` bütün erişim
+  // kurallarının dayanağı ve ona istemciden yazma açılamaz. Panel yalnızca
+  // formu topluyor ve sonucu gösteriyor.
+  "personel-erisim": { ozel: true, okunanTablolar: ["staff", "gym_users"] },
 };
 
 /** `order` değerinin kolon kısmı: `"full_name.asc"` → `"full_name"`. */

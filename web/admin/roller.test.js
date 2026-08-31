@@ -143,7 +143,7 @@ test("panele özgü bölümler sınırlı ve gerekçeli", () => {
 
   assert.deepEqual(
     ozel,
-    ["duyurular", "uye-hesaplari"],
+    ["duyurular", "personel-erisim", "uye-hesaplari"],
     "Panele özgü bölümlerin listesi değişmiş. Yeni bir bölüm gerçekten " +
       "uygulamada karşılığı olmayan bir bölüm mü, yoksa eşleşme mi unutuldu?",
   );

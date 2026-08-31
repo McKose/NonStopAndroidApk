@@ -43,6 +43,15 @@ export const SEKME_ROLLERI = {
   // bir kapı açsaydı kullanıcı "kaydet" deyip sessizce reddedilirdi.
   duyurular: ["ADMIN", "MANAGER"],
   "uye-hesaplari": ["ADMIN", "MANAGER"],
+
+  // YALNIZCA ADMIN — duyurular/üye-hesapları gibi MANAGER'a da açılmadı.
+  //
+  // Bu bölüm kimin uygulamaya girebileceğine ve hangi yetkiyle gireceğine
+  // karar veriyor; yetki verebilen kişi kendi yetkisini de yükseltebilir.
+  // Sunucudaki Edge Function da tam olarak `ADMIN` istiyor (`personel-davet`).
+  // Panel daha geniş bir kapı açsaydı müdür formu doldurur, "Davet et" der ve
+  // sunucudan 403 alırdı — yapabileceği bir şey olmadan.
+  "personel-erisim": ["ADMIN"],
 };
 
 /**
@@ -63,6 +72,10 @@ export const PANEL_OZEL_GEREKCE = {
   "uye-hesaplari":
     "Üye kaydını bir Supabase hesabına bağlama. Uygulamada üye girişi diye bir " +
     "şey yok; bağ yalnızca web'deki üye alanı için anlamlı.",
+  "personel-erisim":
+    "Personele Auth hesabı açıp salon yetkisi verme. Uygulamada karşılığı yok " +
+    "ve olmamalı: iş sunucudaki `service_role` anahtarıyla yapılıyor ve o " +
+    "anahtar hiçbir istemciye — telefona da — konulamaz.",
 };
 
 /**
@@ -91,6 +104,7 @@ export const SEKME_HEDEFI = {
   // Uygulamada karşılığı yok; gerekçeleri PANEL_OZEL_GEREKCE içinde.
   duyurular: PANEL_OZEL,
   "uye-hesaplari": PANEL_OZEL,
+  "personel-erisim": PANEL_OZEL,
 };
 
 /** Bu rol bu sekmeyi görebilir mi? */

@@ -183,12 +183,17 @@ const SIPARISLER = [
   deleted_at_ms: null,
 }));
 
+// Son alan: Auth hesabı kimliği (`null` = hesabı yok).
+//
+// İkisi bağlı, ikisi değil — bilerek KARIŞIK. Hepsi bağlı olsaydı önizlemede
+// "davet et" akışı hiç görünmezdi; hiçbiri bağlı olmasaydı "zaten erişimi var"
+// hâli görünmezdi. Bölümün asıl işi bu iki durumu ayırt ettirmek.
 const PERSONEL = [
-  ["Cağatay Köse", "Salon sahibi", "ADMIN", "Merkez", 0, 0, "cagatay"],
-  ["Deniz Yıldız", "Müdür", "MANAGER", "Merkez", 500, 3500000, "deniz"],
-  ["Emre Tan", "Eğitmen", "TRAINER", "Merkez", 4000, 0, "emre"],
-  ["Naz Kılıç", "Reformer eğitmeni", "TRAINER", "Merkez", 3500, 1200000, "naz"],
-].map(([ad, unvan, rol, sube, hakedis, maas, takma], i) => ({
+  ["Cağatay Köse", "Salon sahibi", "ADMIN", "Merkez", 0, 0, "cagatay", "auth-demo-0"],
+  ["Deniz Yıldız", "Müdür", "MANAGER", "Merkez", 500, 3500000, "deniz", "auth-demo-1"],
+  ["Emre Tan", "Eğitmen", "TRAINER", "Merkez", 4000, 0, "emre", null],
+  ["Naz Kılıç", "Reformer eğitmeni", "TRAINER", "Merkez", 3500, 1200000, "naz", null],
+].map(([ad, unvan, rol, sube, hakedis, maas, takma, hesap], i) => ({
   id: kimlik("personel", i),
   tenant_id: "demo",
   full_name: ad,
@@ -199,11 +204,29 @@ const PERSONEL = [
   monthly_salary_minor: maas,
   phone: `+90532999${String(i).padStart(4, "0")}`,
   nickname: takma,
+  auth_user_id: hesap,
   is_active: true,
   created_at_ms: simdi - 300 * GUN,
   updated_at_ms: simdi - 20 * GUN,
   deleted_at_ms: null,
 }));
+
+/**
+ * Salon yetkileri — kimin uygulamaya girebildiği.
+ *
+ * `staff.auth_user_id` ile `gym_users` AYRI şeyler ve bu bölüm tam da farkı
+ * göstermek için var: birincisi "bu personel hangi hesaba ait", ikincisi "o
+ * hesap salona girebilir mi ve hangi yetkiyle". Demo verisinde ikisi tutarlı
+ * tutuluyor, çünkü tutarsız hâli (hesabı bağlı ama yetkisi yok) gerçek bir
+ * arıza ve önizlemede normalmiş gibi görünmemeli.
+ *
+ * `role` alanı `staff.role`u DEĞİL kendi değerini taşıyor; gerçek yetkiyi
+ * belirleyen bu tablo.
+ */
+const YETKILER = [
+  { user_id: "auth-demo-0", gym_id: "demo", role: "ADMIN" },
+  { user_id: "auth-demo-1", gym_id: "demo", role: "MANAGER" },
+];
 
 const DUYURULAR = [
   ["Açık Ders: Reformer Tanışma", "Reformer pilatesi hiç denemediyseniz bu seans sizin için. Kontenjan sınırlı.", "EVENT", 3, 10, true],
@@ -271,6 +294,7 @@ const TABLOLAR = {
   stock_movements: STOK_HAREKETLERI,
   orders: SIPARISLER,
   staff: PERSONEL,
+  gym_users: YETKILER,
   announcements: DUYURULAR,
   member_accounts: UYE_HESAPLARI,
   member_link_requests: KAYIT_ISTEKLERI,
@@ -345,6 +369,39 @@ export function demoIstemcisi() {
      * ediyor: demo ekranını değerlendiren kişi görselin yüklenmediğini görsün,
      * yüklendiğini sanmasın.
      */
+    /**
+     * Demo modda davet **kabul ediliyor ama kalıcı değil**.
+     *
+     * Gerçek istemciyle aynı yüzeyi taşıması şart: app.js hangisiyle
+     * çalıştığını bilmiyor ve eksik bir yöntem demoyu çökertirdi.
+     *
+     * Sahte bir geçici şifre dönüyor — ekranın en kritik parçası o kutu
+     * (bir kez görünüyor, bir daha alınamıyor) ve önizlemeyi değerlendiren
+     * kişinin onu görmesi gerekiyor. Şifre sabit değil, `crypto` ile
+     * üretiliyor: sabit olsaydı ekran görüntüsü alan biri onu gerçek bir
+     * şifre sanabilirdi.
+     */
+    async personelDavetEt({ personelId, yetki }) {
+      if (!oturum) return { tur: "oturumsuz" };
+
+      const kisi = PERSONEL.find((p) => p.id === personelId);
+      const harfler = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+      const rastgele = Array.from(
+        crypto.getRandomValues(new Uint8Array(14)),
+        (b) => harfler[b % harfler.length],
+      ).join("");
+
+      return {
+        tur: "tamam",
+        yanit: {
+          durum: "hesap_acildi",
+          personel: kisi?.full_name ?? "Personel",
+          yetki,
+          gecici_sifre: rastgele,
+        },
+      };
+    },
+
     async dosyaYukle(dosya) {
       if (!oturum) return { tur: "oturumsuz" };
       const hata = gorselKontrol(dosya);
