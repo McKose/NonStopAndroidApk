@@ -290,6 +290,55 @@ export class SupabaseClient {
    * @param {File} dosya `<input type=file>` üzerinden seçilen dosya
    * @param {string} salonId nesne yolunun ilk parçası
    */
+  /**
+   * Personele uygulama erişimi verir.
+   *
+   * İşi PANEL YAPMIYOR: istek sunucudaki `personel-davet` Edge Function'ına
+   * gidiyor. Sebep `gym_users` tablosu — bütün erişim kurallarının dayanağı ve
+   * ona istemciden yazma açılsaydı, yazabilen kişi kendi yetkisini de
+   * yükseltebilirdi. Fonksiyon `service_role` anahtarıyla koşuyor ve o anahtar
+   * hiçbir zaman tarayıcıya inmiyor.
+   *
+   * `gym_id` OTURUMDAN alınıyor, formdan değil. Formdan gelseydi paneli
+   * değiştiren biri başka salonun kimliğini yazmayı deneyebilirdi — sunucu
+   * yine reddederdi (yetkiyi kendi doğruluyor), ama reddedilecek bir isteği
+   * hiç göndermemek daha iyi.
+   *
+   * Hata durumunda ham durum kodu ve gövde dönüyor; okunur mesaja çeviren yer
+   * `davet.js` (orada sınanabiliyor). Ağ hatası `kod: 0` ile ayrı tutuluyor:
+   * yapılacak şey farklı — tekrar denemek güvenli, davet tekrar edilebilir
+   * olacak şekilde yazıldı.
+   */
+  async personelDavetEt({ personelId, eposta, yetki }) {
+    const oturum = this.oturumOku();
+    if (!oturum) return { tur: "oturumsuz" };
+    if (Date.now() >= oturum.expires_at_ms) {
+      this.oturumSil();
+      return { tur: "oturumsuz" };
+    }
+
+    const yanit = await fetch(`${this.url}/functions/v1/personel-davet`, {
+      method: "POST",
+      headers: {
+        apikey: this.anonKey,
+        Authorization: `Bearer ${oturum.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        gym_id: oturum.gym_id,
+        staff_id: personelId,
+        email: eposta,
+        role: yetki,
+      }),
+    }).catch(() => null);
+
+    if (!yanit) return { tur: "hata", kod: 0, govde: null };
+
+    const govde = await yanit.json().catch(() => null);
+    if (!yanit.ok) return { tur: "hata", kod: yanit.status, govde };
+    return { tur: "tamam", yanit: govde };
+  }
+
   async dosyaYukle(dosya, salonId) {
     const oturum = this.oturumOku();
     if (!oturum) return { tur: "oturumsuz" };

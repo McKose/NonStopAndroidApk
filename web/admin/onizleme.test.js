@@ -95,3 +95,91 @@ test("dizindeki her modül ya birleştirmede ya bilinçli dışında", () => {
     );
   }
 });
+
+/**
+ * Birleştirilmiş betik AYRIŞTIRILABİLİYOR olmalı.
+ *
+ * Önizleme modülleri TEK KAPSAMDA birleştiriyor: `import`/`export` satırları
+ * siliniyor ve dosyalar uç uca ekleniyor. Bunun iki sonucu var ve ikisi de
+ * gerçek hataya yol açtı:
+ *
+ *   1. İki modül aynı adı dışa açarsa birleşimde "Identifier has already been
+ *      declared" oluşur ve PANELİN TAMAMI yüklenmez.
+ *   2. `import { x as y }` biçimindeki takma adlar birleşimde YOK OLUR;
+ *      `y` diye bir şey kalmaz ve o adı kullanan kod `y is not defined` ile
+ *      düşer — üstelik yalnızca o kod yolu çalıştığında (bir düğmeye
+ *      basıldığında), yani açılışta hiçbir belirti vermeden.
+ *
+ * Üçü de `davet.js` eklenirken yaşandı ve hiçbirini birim testleri, `node
+ * --check` ya da tip denetimi yakalamadı — yalnızca tarayıcıda görüldü.
+ *
+ * `vm.Script` betiği ÇALIŞTIRMADAN ayrıştırıyor: `document` yok, ağ yok,
+ * tarayıcı yok. Yinelenen tanım bir sözdizimi hatası olduğu için burada
+ * yakalanıyor.
+ */
+test("birleştirilmiş betik ayrıştırılabiliyor (ad çakışması yok)", async () => {
+  const { execFileSync } = await import("node:child_process");
+  const { writeFileSync, mkdtempSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+
+  const kaynak = BIRLESTIRILEN.map((ad) =>
+    readFileSync(join(burada, ad), "utf8")
+      .replace(/^import[\s\S]*?;\s*$/gm, "")
+      .replace(/^export\s+/gm, ""),
+  ).join("\n");
+
+  // MODÜL olarak ayrıştırılıyor, düz betik olarak değil — ve bu ayrım testin
+  // işe yarayıp yaramamasını belirliyor.
+  //
+  // Önizleme betiği `<script type="module">` içinde koşuyor. Düz betikte aynı
+  // adlı İKİ FONKSİYON tanımı yasal; modülde hata. İlk yazımda `vm.Script`
+  // kullanılmıştı (düz betik) ve gerçek çakışmayı KAÇIRDI: mutasyon testinde
+  // hatayı geri koydum, test yeşil kaldı. Uzantısı `.mjs` olan bir dosyaya
+  // yazıp `node --check` çalıştırmak modül kipini garanti ediyor.
+  const dizin = mkdtempSync(join(tmpdir(), "onizleme-"));
+  const dosya = join(dizin, "birlesim.mjs");
+  writeFileSync(dosya, kaynak, "utf8");
+
+  try {
+    execFileSync(process.execPath, ["--check", dosya], { stdio: "pipe" });
+  } catch (e) {
+    assert.fail(
+      "Birleştirilmiş betik ayrıştırılamıyor. En olası sebep iki modülün aynı " +
+        "adı dışa açması — önizlemede tek kapsam olduğu için çakışıyorlar. " +
+        "Adlardan birini benzersiz yapın; `import ... as` çözüm değil, " +
+        "birleştirmede takma ad kalmıyor.\n\n" +
+        String(e.stderr ?? e.message),
+    );
+  }
+});
+
+/**
+ * Birleştirilen modüller arasında takma adlı içe alma OLMAMALI.
+ *
+ * `import { hataMesaji as davetHatasi }` gerçek ES modüllerinde çalışıyor ama
+ * birleşimde `davetHatasi` diye bir şey kalmıyor. Sözdizimi hatası da vermiyor
+ * — kod o satıra gelene kadar sessiz. Yukarıdaki ayrıştırma testi bunu
+ * yakalayamaz, bu yüzden ayrı bir kontrol.
+ */
+test("birleştirilen modüller arasında takma adlı import yok", () => {
+  const sorunlar = [];
+
+  for (const ad of BIRLESTIRILEN) {
+    const kaynak = readFileSync(join(burada, ad), "utf8");
+    for (const m of kaynak.matchAll(/import\s*\{([^}]*)\}\s*from\s+"\.\/([^"]+)"/g)) {
+      if (!BIRLESTIRILEN.includes(m[2])) continue;   // dışarıdan gelen: sorun değil
+      for (const parca of m[1].split(",")) {
+        if (/\bas\b/.test(parca)) {
+          sorunlar.push(`${ad}: ${parca.trim()} (${m[2]})`);
+        }
+      }
+    }
+  }
+
+  assert.deepEqual(
+    sorunlar, [],
+    "Birleştirilen modüller arasında takma adlı import var. Önizlemede takma " +
+      "ad kaybolur ve kod çalışma anında `is not defined` ile düşer. " +
+      "Kaynaktaki adı benzersiz yapın:\n  " + sorunlar.join("\n  "),
+  );
+});

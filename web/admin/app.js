@@ -13,6 +13,20 @@ import { demoIstemcisi, demoMu } from "./demo.js";
 import { suz } from "./suzme.js";
 import { stokHaritasi, stokYaz, stokUyarilari, stokDurumu } from "./stok.js";
 import { sekmeGorunur } from "./roller.js";
+// Adların `domain.js` ile ÇAKIŞMAMASI gerekiyor; `import ... as` yetmiyor.
+// Önizleme üreticisi modülleri tek kapsamda birleştiriyor ve orada takma ad
+// diye bir şey kalmıyor — çakışan iki tanım panelin tamamını düşürüyor.
+// Bu yüzden `davet.js` kendi adlarını benzersiz seçiyor (`erisimEtiketi`).
+import {
+  DAVET_YETKILERI,
+  YETKI_ACIKLAMA,
+  YETKI_YOK_ACIKLAMA,
+  erisimDurumu,
+  erisimEtiketi,
+  davetiDogrula,
+  davetHataMesaji,
+  davetBasariMesaji,
+} from "./davet.js";
 import { SEKME_VERISI } from "./sekmeler.js";
 
 const $ = (id) => document.getElementById(id);
@@ -178,6 +192,7 @@ const CIZIMLER = {
   finans: { ciz: finansiCiz },
   duyurular: { ozel: duyurulariYukle },
   "uye-hesaplari": { ozel: uyeHesaplariYukle },
+  "personel-erisim": { ozel: personelErisimYukle },
 };
 
 const SEKMELER = Object.fromEntries(
@@ -864,6 +879,252 @@ function turEtiketi(tur) {
     case "NOTICE": return "Duyuru";
     default: return tur ?? "—";
   }
+}
+
+// ─── Personel erişimi ───────────────────────────────────────────────────────
+
+/**
+ * Personele uygulama erişimi verir.
+ *
+ * ### Neden ayrı bir bölüm, `personel` sekmesinin içi değil
+ * `personel` sekmesi üç role de açık; erişim vermek yalnızca ADMIN'in işi
+ * (sunucudaki `personel-davet` fonksiyonu da öyle davranıyor). Panelin rol
+ * kapısı sekme düzeyinde çalışıyor, sekme içi eleman gizleme deseni yok —
+ * yani formu oraya koymak ya müdüre de göstermek ya da yeni bir gizleme
+ * mekanizması icat etmek olurdu.
+ *
+ * ### Üç durum gösteriliyor, iki değil
+ * "Hesabı var ama yetkisi yok" hâli ayrı duruyor ve bunun sebebi bu bölümün
+ * var oluş sebebiyle aynı: o kişi giriş yapabiliyor, uygulama açılıyor, hiçbir
+ * hata çıkmıyor ve HİÇBİR VERİ gelmiyor. İki hâlli bir liste onu "erişimi var"
+ * tarafına yazar ve yönetici sorunu hiç göremezdi.
+ */
+async function personelErisimYukle(ad) {
+  const [personelSonuc, yetkiSonuc] = await Promise.all([
+    istemci.oku("staff", { order: "full_name.asc" }),
+    istemci.oku("gym_users"),
+  ]);
+
+  for (const sonuc of [personelSonuc, yetkiSonuc]) {
+    if (sonuc.tur === "oturumsuz") {
+      hataYaz("giris-hata", "Oturumunuzun süresi doldu, tekrar giriş yapın.");
+      return goster("giris");
+    }
+    if (sonuc.tur !== "tamam") return hataYaz("panel-hata", sonuc.mesaj);
+  }
+  if (ad !== aktifSekme) return;
+
+  const personeller = silinmemisler(personelSonuc.satirlar);
+  const yetkiler = yetkiSonuc.satirlar;
+  const durumlar = personeller.map((p) => ({ p, ...erisimDurumu(p, yetkiler) }));
+
+  const say = (d) => durumlar.filter((x) => x.durum === d).length;
+
+  const kap = document.createElement("div");
+  kap.appendChild(kutular([
+    ["Personel", String(personeller.length)],
+    ["Erişimi var", String(say("erisim_var"))],
+    ["Yetkisi eksik", String(say("yetki_yok"))],
+    ["Hesabı yok", String(say("hesap_yok"))],
+  ]));
+
+  // Yetkisi eksik biri varsa bu bir ARIZA ve görünür olmalı: o kişi her gün
+  // giriş yapıp boş ekran görüyor olabilir.
+  if (say("yetki_yok") > 0) {
+    const uyari = document.createElement("p");
+    uyari.className = "hata";
+    uyari.textContent = YETKI_YOK_ACIKLAMA;
+    kap.appendChild(uyari);
+  }
+
+  kap.appendChild(davetFormu(durumlar));
+
+  const baslik = document.createElement("h2");
+  baslik.textContent = "Personel";
+  kap.appendChild(baslik);
+
+  kap.appendChild(tabloYap(
+    ["Ad Soyad", "Unvan", "Durum", "Uygulama yetkisi"],
+    durumlar.map(({ p, durum, yetki }) => [
+      p.full_name,
+      p.title,
+      durum === "erisim_var"
+        ? { rozet: "aktif", metin: erisimEtiketi(durum) }
+        : { rozet: "donduruldu", metin: erisimEtiketi(durum) },
+      // `gym_users.role` — `staff.role` DEĞİL. İkisi ayrışabiliyor ve gerçek
+      // yetkiyi belirleyen bu. `staff.role` gösterilseydi yönetici birine
+      // ADMIN verdiğini sanırken kişi eğitmen yetkisiyle gezebilirdi.
+      yetki ?? "—",
+    ]),
+  ));
+
+  $("icerik").appendChild(kap);
+}
+
+/** Davet formu: personel seç, e-posta ve yetki gir, gönder. */
+function davetFormu(durumlar) {
+  const form = document.createElement("form");
+  form.className = "kart";
+
+  const baslik = document.createElement("h2");
+  baslik.textContent = "Erişim ver";
+  form.appendChild(baslik);
+
+  const aciklama = document.createElement("p");
+  aciklama.className = "alt";
+  aciklama.textContent =
+    "Hesap açılır, salon yetkisi yazılır ve personel kaydına bağlanır. " +
+    "Geçici şifre bir kez gösterilir — kaydetmezseniz bir daha alınamaz.";
+  form.appendChild(aciklama);
+
+  // Erişimi zaten olanlar da listede: yetkisini değiştirmek (ör. eğitmenden
+  // müdüre) aynı akışla yapılıyor. Listeden çıkarsalardı yetki yükseltmek
+  // yine Supabase paneli gerektirirdi.
+  const kisi = document.createElement("select");
+  kisi.required = true;
+  for (const { p, durum } of durumlar) {
+    const secenek = document.createElement("option");
+    secenek.value = p.id;
+    secenek.textContent = `${p.full_name} — ${erisimEtiketi(durum)}`;
+    kisi.appendChild(secenek);
+  }
+  form.appendChild(etiketli("Personel", kisi));
+
+  const eposta = document.createElement("input");
+  eposta.type = "email";
+  eposta.required = true;
+  eposta.placeholder = "personel@ornek.com";
+  form.appendChild(etiketli("E-posta", eposta));
+
+  const yetki = document.createElement("select");
+  for (const y of DAVET_YETKILERI) {
+    const secenek = document.createElement("option");
+    secenek.value = y;
+    secenek.textContent = YETKI_ACIKLAMA[y];
+    yetki.appendChild(secenek);
+  }
+  form.appendChild(etiketli("Yetki", yetki));
+
+  const dugme = document.createElement("button");
+  dugme.type = "submit";
+  dugme.textContent = "Erişim ver";
+  form.appendChild(dugme);
+
+  const sonucAlani = document.createElement("div");
+  form.appendChild(sonucAlani);
+
+  form.addEventListener("submit", async (olay) => {
+    olay.preventDefault();
+    sonucAlani.replaceChildren();
+
+    const kontrol = davetiDogrula({
+      personelId: kisi.value,
+      eposta: eposta.value,
+      yetki: yetki.value,
+    });
+    if (!kontrol.gecerli) {
+      sonucAlani.appendChild(mesajSatiri("hata", kontrol.mesaj));
+      return;
+    }
+
+    // Düğme kilitleniyor: davet tekrar edilebilir olsa da iki kez göndermek
+    // yöneticiye iki farklı geçici şifre gösterir ve hangisinin geçerli
+    // olduğu belirsizleşir.
+    dugme.disabled = true;
+    dugme.textContent = "Gönderiliyor…";
+
+    const sonuc = await istemci.personelDavetEt(kontrol.deger);
+
+    dugme.disabled = false;
+    dugme.textContent = "Erişim ver";
+
+    if (sonuc.tur === "oturumsuz") {
+      hataYaz("giris-hata", "Oturumunuzun süresi doldu, tekrar giriş yapın.");
+      return goster("giris");
+    }
+    if (sonuc.tur !== "tamam") {
+      sonucAlani.appendChild(
+        mesajSatiri("hata", davetHataMesaji(sonuc.kod, sonuc.govde)),
+      );
+      return;
+    }
+
+    sonucAlani.appendChild(mesajSatiri("alt", davetBasariMesaji(sonuc.yanit)));
+
+    if (sonuc.yanit?.gecici_sifre) {
+      sonucAlani.appendChild(sifreKutusu(sonuc.yanit.gecici_sifre));
+      // LİSTE TAZELENMİYOR ve bu bilinçli.
+      //
+      // İlk yazımda tazeleniyordu ve ekranın en kritik parçasını siliyordu:
+      // `sekmeYukle` bölümü baştan çiziyor, geçici şifre kutusu da onun
+      // içinde. Sonuç, hesabın açılması ama şifreyi KİMSENİN görememesiydi —
+      // ve şifre bir daha alınamıyor. Tarayıcıda akış sürülene kadar
+      // görünmedi; birim testleri, sözdizimi ve tip denetimi hepsi temizdi.
+      //
+      // Durum sütunu bu satır yüzünden eski kalıyor. Kabul edildi: bir kez
+      // görülebilen şifreyi korumak, güncel bir tablodan önemli. Yönetici
+      // sekmeye tekrar bastığında liste zaten tazeleniyor.
+      const not = document.createElement("p");
+      not.className = "alt";
+      not.textContent =
+        "Şifreyi kaydettikten sonra listeyi görmek için sekmeye tekrar basın.";
+      sonucAlani.appendChild(not);
+      return;
+    }
+
+    // Şifre yoksa (mevcut hesap bağlandı) korunacak bir şey de yok; liste
+    // tazeleniyor ki durum sütunu doğru olsun.
+    sekmeYukle(aktifSekme);
+  });
+
+  return form;
+}
+
+/**
+ * Geçici şifreyi gösteren kutu.
+ *
+ * Şifre `<input readonly>` içinde, düz metin değil: yönetici tek dokunuşla
+ * seçip kopyalayabilsin. Uzun ve belirsiz karakterler içermeyen bir şifreyi
+ * ekrandan okuyup elle yazmak hata kaynağı.
+ */
+function sifreKutusu(sifre) {
+  const kap = document.createElement("div");
+  kap.className = "kart";
+  kap.style.marginTop = "12px";
+
+  const baslik = document.createElement("p");
+  baslik.className = "alt";
+  baslik.textContent = "Geçici şifre — bu kutu bir daha gösterilmeyecek:";
+
+  const alan = document.createElement("input");
+  alan.readOnly = true;
+  alan.value = sifre;
+  alan.style.fontFamily = "monospace";
+  alan.addEventListener("focus", () => alan.select());
+
+  const not = document.createElement("p");
+  not.className = "alt";
+  not.textContent =
+    "Şifreyi personele siz iletin. Kendi şifresini değiştirebileceği ekran " +
+    "henüz yok, yani bu şifre kalıcı — güvenli bir yerde saklayın.";
+
+  kap.append(baslik, alan, not);
+  return kap;
+}
+
+function etiketli(metin, alan) {
+  const etiket = document.createElement("label");
+  const yazi = document.createElement("span");
+  yazi.textContent = metin;
+  etiket.append(yazi, alan);
+  return etiket;
+}
+
+function mesajSatiri(sinif, metin) {
+  const p = document.createElement("p");
+  p.className = sinif;
+  p.textContent = metin;
+  return p;
 }
 
 // ─── Üye hesapları ──────────────────────────────────────────────────────────
