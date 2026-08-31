@@ -479,7 +479,12 @@ jobs:
             exit 0
           fi
           echo "Denetlenen dosyalar:"; printf '  %s\n' "${dosyalar[@]}"
-          npx --yes typescript@5.9.2 tsc --noEmit \
+          # `--package=` ŞART. `npx typescript@5.9.2 tsc` çalışmıyor:
+          # `typescript` paketi iki binary sunuyor (`tsc`, `tsserver`) ve ikisi
+          # de paket adıyla eşleşmediği için npx hangisini çalıştıracağını
+          # seçemeyip "could not determine executable to run" diyor. Paketi ve
+          # komutu ayırmak bunu çözüyor.
+          npx --yes --package=typescript@5.9.2 tsc --noEmit \
             --target es2022 --lib es2022,dom \
             --module esnext --moduleResolution bundler \
             --strict --skipLibCheck \
