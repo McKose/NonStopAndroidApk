@@ -452,6 +452,39 @@ jobs:
           PGURL: postgres://postgres:postgres@localhost:5432/postgres
         run: ./supabase/tests/run.sh
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Edge Function'lar başka HİÇBİR yerde denetlenmiyor.
+      #
+      # Deno ile koşuyorlar, depoda Deno yok ve yayınlama elle yapılıyor —
+      # yani bir yazım hatası, eksik `await` ya da yanlış alan adı ancak
+      # CANLIDA, bir yönetici personel davet etmeye çalışırken ortaya çıkardı.
+      # `tsc` bunları derlemeden yakalıyor.
+      #
+      # `Deno` global'i her fonksiyonun yanındaki `deno.d.ts` ile geliyor; o
+      # dosya aynı zamanda fonksiyonun çalışma zamanından ne beklediğinin
+      # yazılı hâli.
+      #
+      # Dosyalar dizinden okunuyor, elle sayılmıyor: yeni bir fonksiyon
+      # eklenip listeye yazılmayı beklemek, bu adımın kapatmak için var olduğu
+      # boşluğu geri açardı.
+      - name: Edge Function'ları denetle (tsc)
+        run: |
+          shopt -s nullglob
+          dosyalar=(supabase/functions/*/*.ts)
+          if [ ${#dosyalar[@]} -eq 0 ]; then
+            echo "supabase/functions/ altında .ts yok — denetlenecek bir şey yok."
+            exit 0
+          fi
+          echo "Denetlenen dosyalar:"; printf '  %s\n' "${dosyalar[@]}"
+          npx --yes typescript@5.9.2 tsc --noEmit \
+            --target es2022 --lib es2022,dom \
+            --module esnext --moduleResolution bundler \
+            --strict --skipLibCheck \
+            "${dosyalar[@]}"
+
   # Değişikliğin Kotlin/Native derlemesini etkileyip etkilemediğini belirler.
   #
   # Yalnızca SQL, belge ya da CI dosyası değişen bir PR'da macOS işini koşturmak
