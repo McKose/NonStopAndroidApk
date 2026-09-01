@@ -7,8 +7,24 @@
 // er geç birbirinden sapardı.
 
 import { SupabaseClient } from "./supabase.js";
-import { tutarYaz, tarihYaz, uyelikDurumu, durumEtiketi, silinmemisler } from "./domain.js";
+import {
+  tutarYaz,
+  tarihYaz,
+  uyelikDurumu,
+  durumEtiketi,
+  silinmemisler,
+  iptalEdilenKimlikler,
+} from "./domain.js";
 import { ayBasi, uyeDagilimi, yaklasanBitisler, defterToplami } from "./ozet.js";
+import {
+  FINANS_YONTEM_ETIKETLERI,
+  defterOzeti,
+  kategoriKirilimi,
+  yontemKirilimi,
+  aylikSeyir,
+  kayitIptalDurumu,
+  kategoriEtiketi,
+} from "./finans.js";
 import { demoIstemcisi, demoMu } from "./demo.js";
 import { suz } from "./suzme.js";
 import { stokHaritasi, stokYaz, stokUyarilari, stokDurumu } from "./stok.js";
@@ -1410,16 +1426,25 @@ function istekEylemleri(istek, secici) {
   return kap;
 }
 
+/**
+ * Özet kutuları.
+ *
+ * Üçüncü eleman isteğe bağlı bir renk sınıfı (`deger-iyi`, `deger-hata`, …).
+ * Renk tek başına bilgi TAŞIMIYOR — negatif tutar zaten eksi işaretiyle
+ * yazılıyor — yalnızca gözü doğru kutuya götürüyor; renk körlüğünde de sayı
+ * okunabilir kalıyor.
+ */
 function kutular(ciftler) {
   const kap = document.createElement("div");
   kap.className = "kutular";
-  for (const [baslik, deger] of ciftler) {
+  for (const [baslik, deger, sinif] of ciftler) {
     const kutu = document.createElement("div");
     kutu.className = "kutu";
     const b = document.createElement("p");
     b.className = "alt";
     b.textContent = baslik;
     const d = document.createElement("strong");
+    if (sinif) d.className = sinif;
     d.textContent = deger;
     kutu.append(b, d);
     kap.appendChild(kutu);
@@ -1505,14 +1530,187 @@ function randevulariCiz(satirlar) {
   );
 }
 
+/**
+ * Finans panosu: özet kutuları, aylık seyir, kırılımlar ve kayıt listesi.
+ *
+ * ### Neden düz bir tablo yetmiyordu
+ * Bölüm yalnızca ham satırları listeliyordu: ne "bu dönemde ne kadar tahsilat",
+ * ne "nereye gitti", ne de "geçen aya göre ne oldu" görülebiliyordu. Bu sayılar
+ * defterde zaten duruyordu ama okumak için satırları elle toplamak gerekiyordu
+ * — yani rapor vardı, raporun kendisi yoktu.
+ *
+ * ### Bütün sayılar SÜZGECE bağlı
+ * Buraya gelen `satirlar` üstteki arama ve tarih aralığından geçmiş hâli.
+ * Bu bilinçli: tarih aralığını daraltmak bütün kutuları, kırılımları ve
+ * seyri birlikte değiştiriyor. Bazı sayıları süzgeçten muaf tutmak, aynı
+ * ekranda iki farklı "dönem" tanımı yaratırdı ve hangi sayının neye ait
+ * olduğu anlaşılmazdı. Kullanıcıya da yazıyor.
+ *
+ * ### İptal edilmiş kayıtlar
+ * Listede duruyorlar (denetim izi) ama hiçbir toplama girmiyorlar ve
+ * rozetle işaretleniyorlar. Uygulamadaki finans ekranı da aynısını yapıyor;
+ * ikisi ayrışsaydı aynı defter iki yerde iki farklı ciro gösterirdi.
+ */
 function finansiCiz(satirlar) {
+  const kap = document.createElement("div");
+  const ozet = defterOzeti(satirlar);
+  const iptaller = iptalEdilenKimlikler(satirlar);
+
+  kap.appendChild(kutular([
+    ["Tahsilat", tutarYaz(ozet.tahsilat), "deger-iyi"],
+    ["Gider", tutarYaz(ozet.gider), "deger-hata"],
+    ["Net", tutarYaz(ozet.net), ozet.net < 0 ? "deger-hata" : "deger-iyi"],
+    // Tahakkuk ayrı kutuda: gelire eklenseydi ciro, kasaya hiç girmemiş
+    // borçla şişerdi.
+    ["Bekleyen tahsilat", tutarYaz(ozet.tahakkuk), "deger-uyari"],
+    ["Kayıt", `${ozet.kayitSayisi}`],
+    ["İptal edilen", `${ozet.iptalSayisi}`],
+  ]));
+
+  const not = document.createElement("p");
+  not.className = "alt";
+  not.textContent =
+    "Bütün sayılar üstteki arama ve tarih süzgecine göre. " +
+    "İptal edilen kayıtlar listede kalır ama hiçbir toplama girmez.";
+  kap.appendChild(not);
+
+  kap.appendChild(bolumBasligi("Aylık seyir (son 6 ay)"));
+  kap.appendChild(seyirTablosu(aylikSeyir(satirlar, Date.now(), 6)));
+
+  kap.appendChild(bolumBasligi("Kategoriye göre"));
+  const kategoriler = kategoriKirilimi(satirlar);
+  kap.appendChild(kategoriler.length === 0 ? bosSatir() : tabloYap(
+    ["Kategori", "Tahsilat", "Gider", "Bekleyen"],
+    kategoriler.map((s) => [
+      s.etiket, tutarYaz(s.tahsilat), tutarYaz(s.gider), tutarYaz(s.tahakkuk),
+    ]),
+  ));
+
+  kap.appendChild(bolumBasligi("Tahsilat yöntemi"));
+  const yontemler = yontemKirilimi(satirlar);
+  kap.appendChild(yontemler.length === 0 ? bosSatir() : tabloYap(
+    ["Yöntem", "Tahsilat", "Pay"],
+    yontemler.map((s) => [
+      s.etiket, tutarYaz(s.tahsilat), `%${Math.round(s.oran * 100)}`,
+    ]),
+  ));
+
+  kap.appendChild(bolumBasligi("Kayıtlar"));
+  kap.appendChild(tabloYap(
+    ["Tarih", "Tür", "Kategori", "Tutar", "Yöntem", "Durum", "Açıklama"],
+    satirlar.map((k) => {
+      const durum = kayitIptalDurumu(k, iptaller);
+      return [
+        tarihYaz(k.occurred_at_ms),
+        defterTuruEtiketi(k.type),
+        kategoriEtiketi(k.category),
+        // İptal edilmiş satırın tutarı solgun: rozet tek başına yeterli değil,
+        // gözün ilk gittiği yer tutarın kendisi.
+        durum === "normal" ? tutarYaz(k.amount_minor)
+          : soluk(tutarYaz(k.amount_minor)),
+        FINANS_YONTEM_ETIKETLERI[k.payment_method] ?? k.payment_method,
+        finansDurumRozeti(durum),
+        k.description,
+      ];
+    }),
+  ));
+
+  return kap;
+}
+
+/** Defter türünün Türkçe karşılığı; ham `PAYMENT` kullanıcıya bir şey anlatmıyor. */
+function defterTuruEtiketi(tur) {
+  switch (tur) {
+    case "PAYMENT": return "Tahsilat";
+    case "EXPENSE": return "Gider";
+    case "CHARGE": return "Tahakkuk";
+    default: return tur ?? "—";
+  }
+}
+
+/** İptal durumunun tablo hücresi; yaşayan kayıtta rozet yok, tire var. */
+function finansDurumRozeti(durum) {
+  if (durum === "iptal") return { rozet: "finans-iptal", metin: "İptal edildi" };
+  if (durum === "ters") return { rozet: "finans-ters", metin: "İptal kaydı" };
+  return "—";
+}
+
+/** Solgun metin düğümü — `tabloYap` hazır DOM düğümlerini olduğu gibi yerleştiriyor. */
+function soluk(metin) {
+  const span = document.createElement("span");
+  span.className = "deger-soluk";
+  span.textContent = metin;
+  return span;
+}
+
+function bolumBasligi(metin) {
+  const h = document.createElement("h2");
+  h.textContent = metin;
+  return h;
+}
+
+function bosSatir(metin = "Bu aralıkta kayıt yok.") {
+  const p = document.createElement("p");
+  p.className = "alt";
+  p.textContent = metin;
+  return p;
+}
+
+/**
+ * Aylık seyir — çubuklu bir tablo.
+ *
+ * Ayrı bir grafik düzeni değil, `tabloYap` üzerine kurulu: çubuk yalnızca bir
+ * hücrenin içeriği. Böylece sayılar okunur kalıyor ve dar ekranda tablo
+ * düzeninin kendisi devreye giriyor.
+ *
+ * Çubuklar tek başına bir şey ANLATMIYOR — tutarlar yanlarında yazılı olarak
+ * duruyor. Yalnızca çubuk çizilseydi rakamlar üstüne gelmeden okunamazdı ve
+ * dokunmatik ekranda "üstüne gelmek" diye bir şey yok.
+ */
+function seyirTablosu(aylar) {
+  // Ölçek: en yüksek tahsilat ya da gider. Sıfıra bölmemek için en az 1.
+  const enBuyuk = Math.max(1, ...aylar.flatMap((a) => [a.tahsilat, a.gider]));
+
   return tabloYap(
-    ["Tarih", "Tür", "Kategori", "Tutar", "Yöntem", "Açıklama"],
-    satirlar.map((k) => [
-      tarihYaz(k.occurred_at_ms), k.type, k.category,
-      tutarYaz(k.amount_minor), k.payment_method, k.description,
+    ["Ay", "Seyir", "Tahsilat", "Gider", "Net"],
+    aylar.map((a) => [
+      a.etiket,
+      cubukHucresi(a, enBuyuk),
+      tutarYaz(a.tahsilat),
+      tutarYaz(a.gider),
+      a.net < 0 ? renkli(tutarYaz(a.net), "deger-hata") : renkli(tutarYaz(a.net), "deger-iyi"),
     ]),
   );
+}
+
+function cubukHucresi(ay, enBuyuk) {
+  const kap = document.createElement("span");
+  kap.className = "seyir-cubuklar";
+  for (const [deger, sinif, etiket] of [
+    [ay.tahsilat, "seyir-gelir", "Tahsilat"],
+    [ay.gider, "seyir-gider", "Gider"],
+  ]) {
+    // Sıfır tutarda çubuk HİÇ çizilmiyor. Çubukların en küçük bir genişliği
+    // var (çok küçük tutarlar görünmez olmasın diye) ve sıfır da o genişlikte
+    // çizilseydi hareketsiz ay, küçük bir gider varmış gibi görünürdü.
+    // Ayın boş olduğu zaten komşu hücrelerdeki "₺0,00" ile yazılı.
+    if (deger <= 0) continue;
+
+    const cubuk = document.createElement("span");
+    cubuk.className = `seyir-cubuk ${sinif}`;
+    cubuk.style.width = `${(deger / enBuyuk) * 100}%`;
+    // Ekran okuyucu için: görsel uzunluk tek başına bilgi taşımıyor.
+    cubuk.title = `${etiket}: ${tutarYaz(deger)}`;
+    kap.appendChild(cubuk);
+  }
+  return kap;
+}
+
+function renkli(metin, sinif) {
+  const span = document.createElement("span");
+  span.className = sinif;
+  span.textContent = metin;
+  return span;
 }
 
 // ─── Açılış ─────────────────────────────────────────────────────────────────

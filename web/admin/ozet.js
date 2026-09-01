@@ -11,7 +11,7 @@
 // gerektiğinde doğru yol, tanımı sunucuda tek bir görünüme (view) taşımak —
 // böylece iki taraf da aynı yerden okur.
 
-import { uyelikDurumu } from "./domain.js";
+import { aktifDefterKayitlari, uyelikDurumu } from "./domain.js";
 
 /** Ayın ilk gününün epoch ms karşılığı. */
 export function ayBasi(simdiMs) {
@@ -60,13 +60,20 @@ export function yaklasanBitisler(uyeler, simdiMs, gun = 14) {
  * garanti ediyor. İşaretle yön belirtilseydi bir eksi unutulduğunda tahsilat
  * gider gibi toplanırdı.
  *
- * Ters kayıtlar (`reverses_id` dolu) toplamdan **düşülmüyor, çıkarılıyor**:
- * ters kayıt kendi türüyle zaten karşı yönde yazılıyor. Burada ayrıca işlem
- * yapmak çift sayıma yol açardı.
+ * ### Düzeltilen hata: ters kayıtlar toplamı ŞİŞİRİYORDU
+ * Buradaki eski yorum "ters kayıt kendi türüyle karşı yönde yazılıyor,
+ * ayrıca işlem yapmak çift sayıma yol açardı" diyordu ve **yanlıştı**: ters
+ * kayıt orijinalin birebir kopyası, aynı tür ve aynı pozitif tutar. İkisi de
+ * sayıldığında tutar götürülmüyor, ikiye katlanıyor.
+ *
+ * Yani iptal edilen 1.000 TL'lik bir tahsilat "Bu ay tahsilat" kutusunu
+ * 1.000 TL düşürmek yerine 1.000 TL artırıyordu — düzeltme, düzelttiği şeyin
+ * tersini gösteriyordu. Süzgeç artık `domain.js` içinde ve uygulamadaki
+ * kuralla aynı: çiftin iki tarafı da elenir.
  */
 export function defterToplami(kayitlar, baslangicMs, bitisMs) {
   const toplam = { PAYMENT: 0, CHARGE: 0, EXPENSE: 0 };
-  for (const k of kayitlar) {
+  for (const k of aktifDefterKayitlari(kayitlar)) {
     const an = Number(k.occurred_at_ms);
     if (!Number.isFinite(an) || an < baslangicMs || an > bitisMs) continue;
     const tutar = Number(k.amount_minor);

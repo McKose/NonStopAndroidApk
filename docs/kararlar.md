@@ -619,3 +619,38 @@ iki cihazdan aynı düzeltme yapıldığında tutar bir kez daha düşmemeli.
 **Toplu iptal ya hep ya hiç.** Yarısı uygulanmış bir düzeltmede kullanıcı
 "N kayıt iptal edildi" görür ama hangilerinin atlandığını bilmez; bilinmeyen bir
 kimlik işlemin tamamını düşürüyor.
+
+## Panelin finans bölümü rapor, kayıt dökümü değil
+
+**Karar:** Web panelindeki Finans sekmesi ham satır listesi olmaktan çıkıp özet
+kutuları, aylık seyir ve kategori/ödeme yöntemi kırılımları taşıyor. Bütün
+sayılar üstteki arama ve tarih süzgecine bağlı: aralığı daraltmak hepsini
+birlikte değiştiriyor.
+
+**Neden hepsi tek süzgece bağlı:** Bazı sayıları süzgeçten muaf tutmak (ör.
+"seyir her zaman son 6 ay") aynı ekranda iki farklı dönem tanımı yaratırdı ve
+hangi sayının neye ait olduğu ancak koda bakılarak anlaşılırdı.
+
+**Panelde neden hesap yapılıyor:** `ozet.js`in kuralı duruyor — üye bakiyesi ve
+hakediş burada hesaplanmıyor, ikisi de ortak Kotlin modülünde tanımlı gerçek iş
+kuralları. Buradakiler o sınıfa girmiyor: hepsi aynı satırların düz toplamı ve
+"bu ay ne kadar tahsilat" sorusunun tek bir doğru cevabı var.
+
+**Düzeltilen hata: ters kayıtlar toplamı ŞİŞİRİYORDU.** Ters kayıt, iptal
+ettiği kaydın birebir kopyası — aynı tür, aynı **pozitif** tutar. Panelin eski
+`defterToplami` fonksiyonu ikisini de sayıyordu, dolayısıyla iptal edilen bir
+tahsilat ciroyu düşürmek yerine **artırıyordu**: düzeltme, düzelttiği şeyin
+tersini gösteriyordu. Kodda bunun tersini iddia eden bir yorum da vardı. Süzgeç
+artık `domain.js`te tek yazımla duruyor ve uygulamadaki kuralla aynı: çiftin iki
+tarafı da elenir.
+
+**İptal edilmiş kayıt listede kalıyor**, "İptal edildi" / "İptal kaydı"
+rozetiyle ve solgun tutarla. Gizlenseydi denetim izi ekrandan kaybolurdu;
+işaretsiz bırakılsaydı aynı tutar iki kez görünür ve tahsilat iki kez yazılmış
+sanılırdı.
+
+**Demo istemcisi artık `order` seçeneğini uyguluyor.** Uygulamıyordu ve bu,
+`demo.js`in kendi kuralının ihlaliydi: demo ekranı gerçekte hiç görülmeyecek bir
+şey gösteriyordu — kayıtlar önizlemede tarihe göre karışık, gerçek panelde
+sıralıydı. Sıralamanın bozuk olduğu bir ekranı önizlemeye bakarak fark etmek
+mümkün olmazdı.

@@ -88,6 +88,20 @@ const RANDEVULAR = Array.from({ length: 8 }, (_, i) => ({
   deleted_at_ms: null,
 }));
 
+/**
+ * Örnek defter.
+ *
+ * Birkaç aya YAYILMIŞ olması bilinçli: finans panosundaki aylık seyir tek aya
+ * sıkışmış veriyle hiçbir şey göstermez ve grafiğin çalışıp çalışmadığı
+ * anlaşılmaz. Aynı sebeple bir de **iptal edilmiş çift** var (son iki satır):
+ * "İptal edildi / İptal kaydı" rozetleri ve iptal edilen tutarın toplamlara
+ * girmemesi ancak böyle bir çiftle görülebiliyor.
+ *
+ * Yedinci sütun `terslenenSira`: dolu olduğunda satır bir ters kayıt ve değer,
+ * iptal ettiği satırın bu dizideki sırası. Kimliği elle yazmak yerine sıradan
+ * türetiliyor: kimlik biçimi (`kimlik()`) değişirse elle yazılmış bir dize
+ * sessizce boşa düşer ve iptal çifti kopardı.
+ */
 const DEFTER = [
   ["PAYMENT", "MEMBERSHIP", 240000, "CASH", "Ayşe Yılmaz — aylık paket", 2],
   ["PAYMENT", "MARKET", 4500, "CARD", "Su + protein bar", 1],
@@ -95,7 +109,21 @@ const DEFTER = [
   ["PAYMENT", "MEMBERSHIP", 480000, "CARD", "Mehmet Kaya — reformer", 8],
   ["EXPENSE", "COMMISSION", 96000, "CASH", "Eğitmen hakedişi", 3],
   ["CHARGE", "MEMBERSHIP", 180000, "CASH", "Zeynep Demir — paket borcu", 10],
-].map(([tur, kat, tutar, yontem, aciklama, gunOnce], i) => ({
+
+  // Önceki aylar: seyir grafiğinin karşılaştıracağı bir şey olsun. Aylardan
+  // biri bilinçli olarak ZARARDA (kira + maaş aynı aya denk geliyor); grafiğin
+  // eksi neti kırmızı gösterdiği ancak böyle görülüyor.
+  ["PAYMENT", "MEMBERSHIP", 2620000, "CARD", "Geçen ay üyelikleri", 38],
+  ["EXPENSE", "RENT", 1500000, "CARD", "Geçen ay kirası", 36],
+  ["PAYMENT", "MEMBERSHIP", 150000, "MULTISPORT", "Multisport girişleri", 34],
+  ["PAYMENT", "MEMBERSHIP", 1890000, "CASH", "İki ay önceki üyelikler", 68],
+  ["EXPENSE", "SALARY", 900000, "CASH", "Eğitmen maaşı", 66],
+  ["EXPENSE", "BILL", 320000, "CARD", "Elektrik + doğalgaz", 64],
+
+  // İptal edilmiş çift: yanlış girilen bir tahsilat ve onu iptal eden kayıt.
+  ["PAYMENT", "MEMBERSHIP", 300000, "CASH", "Hatalı kayıt — deneme üyesi", 12],
+  ["PAYMENT", "MEMBERSHIP", 300000, "CASH", "İPTAL — hatalı kayıt silindi", 4, 12],
+].map(([tur, kat, tutar, yontem, aciklama, gunOnce, terslenenSira], i) => ({
   id: kimlik("defter", i),
   tenant_id: "demo",
   type: tur,
@@ -105,7 +133,7 @@ const DEFTER = [
   description: aciklama,
   occurred_at_ms: simdi - gunOnce * GUN,
   created_at_ms: simdi - gunOnce * GUN,
-  reverses_id: null,
+  reverses_id: terslenenSira == null ? null : kimlik("defter", terslenenSira),
 }));
 
 const URUNLER = [
@@ -301,6 +329,40 @@ const TABLOLAR = {
 };
 
 /**
+ * `order` seçeneğini uygular — sunucunun yaptığının karşılığı.
+ *
+ * ### Neden gerekli
+ * Demo bu seçeneği yok sayıyordu ve satırları dizideki sırayla döndürüyordu.
+ * Sonuç, bu dosyanın başındaki kuralın ihlaliydi: demo ekranı gerçekte hiç
+ * görülmeyecek bir şeyi gösteriyordu. Finans kayıtları önizlemede tarihe göre
+ * karışık, gerçek panelde sıralı görünüyordu — ve sıralamanın bozuk olduğu bir
+ * ekranı önizlemeye bakarak fark etmek imkânsızdı.
+ *
+ * Biçim PostgREST'inki: `"kolon.asc"` / `"kolon.desc"`, yön isteğe bağlı.
+ * Sıralama kopya üzerinde: `TABLOLAR` sabit kalmalı, aksi hâlde bir sekmenin
+ * açılışı başka bir sekmenin verisini kalıcı olarak yeniden dizerdi.
+ */
+function sirala(satirlar, order) {
+  if (typeof order !== "string" || order === "") return satirlar;
+
+  const [kolon, yon] = order.split(".");
+  if (!kolon) return satirlar;
+  const carpan = yon === "desc" ? -1 : 1;
+
+  return [...satirlar].sort((a, b) => {
+    const x = a?.[kolon];
+    const y = b?.[kolon];
+    // `null` her zaman sona: sunucu da `NULLS LAST` davranıyor ve boş bitiş
+    // tarihli (süresiz) üyeler listenin başını kapatmamalı.
+    if (x == null && y == null) return 0;
+    if (x == null) return 1;
+    if (y == null) return -1;
+    if (typeof x === "number" && typeof y === "number") return (x - y) * carpan;
+    return String(x).localeCompare(String(y), "tr") * carpan;
+  });
+}
+
+/**
  * Sunucu yerine örnek veri döndüren istemci.
  *
  * `SupabaseClient` ile **aynı yüzeyi** taşıyor; app.js hangisiyle çalıştığını
@@ -335,14 +397,18 @@ export function demoIstemcisi() {
       return { tur: "tamam", oturum };
     },
 
-    async oku(tablo) {
+    async oku(tablo, secenekler = {}) {
       if (!oturum) return { tur: "oturumsuz" };
       // `kesildi` gerçek istemcideki alanın karşılığı ve demoda her zaman
       // `false`: örnek veri sınıra dayanmıyor. Alanın burada da bulunması
       // gerekiyor çünkü app.js iki istemciyi ayırt etmiyor; eksik olsaydı
       // `undefined` gelir ve stok sekmesi demoda gerçekte olmayan bir yoldan
       // geçerdi.
-      return { tur: "tamam", satirlar: TABLOLAR[tablo] ?? [], kesildi: false };
+      return {
+        tur: "tamam",
+        satirlar: sirala(TABLOLAR[tablo] ?? [], secenekler.order),
+        kesildi: false,
+      };
     },
 
     /**
