@@ -2,6 +2,7 @@ package com.gymapp.data.sync
 
 import com.gymapp.data.auth.AuthApi
 import com.gymapp.data.auth.AuthResult
+import com.gymapp.data.auth.PasswordChange
 
 /**
  * Sunucu ayarları verilmediğinde bağlanan uçlar.
@@ -27,6 +28,11 @@ class MissingConfigAuthApi(private val reason: String = SUNUCU_AYARI_EKSIK) : Au
 
     override suspend fun refresh(refreshToken: String): AuthResult =
         AuthResult.Failed(reason, retryable = false)
+
+    override suspend fun updatePassword(
+        accessToken: String,
+        newPassword: String,
+    ): PasswordChange = PasswordChange.Failed(reason, retryable = false)
 }
 
 /**

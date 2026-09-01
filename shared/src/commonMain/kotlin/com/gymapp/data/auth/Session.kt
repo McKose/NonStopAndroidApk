@@ -122,12 +122,45 @@ fun interface TenantProvider {
 fun TenantProvider.requireTenantId(): String =
     currentTenantId() ?: error("Oturum yok: veri işlemleri giriş yapılmadan çağrılamaz.")
 
+/**
+ * Şifre değiştirmenin sonucu.
+ *
+ * [AuthResult] yeniden kullanılmadı: onun `Success`i bir [Session] taşıyor,
+ * şifre değiştirme ise jeton üretmiyor. Zorlamak, hiçbir zaman dolmayacak bir
+ * alanı taşıyan bir tip ya da uydurulmuş bir oturum demek olurdu.
+ */
+sealed interface PasswordChange {
+    data object Success : PasswordChange
+
+    /**
+     * Girilen **mevcut** şifre yanlış.
+     *
+     * Ayrı bir durum, çünkü yapılacak şey farklı ve tek "başarısız" mesajı
+     * kullanıcıyı yanlış yere bakmaya gönderirdi: burada sunucuda bir sorun
+     * yok, yazılan şifre tutmuyor.
+     */
+    data class WrongPassword(val reason: String) : PasswordChange
+
+    data class Failed(val reason: String, val retryable: Boolean) : PasswordChange
+}
+
 /** Kimlik doğrulama ucu. Uygulaması [SupabaseAuthApi]. */
 interface AuthApi {
     suspend fun signIn(email: String, password: String): AuthResult
 
     /** Erişim jetonunu yeniler; yenileme jetonu da tazelenir. */
     suspend fun refresh(refreshToken: String): AuthResult
+
+    /**
+     * Giriş yapmış kullanıcının şifresini değiştirir.
+     *
+     * Mevcut şifreyi **doğrulamıyor** — Supabase varsayılan olarak yalnızca
+     * geçerli bir jeton istiyor. Doğrulama çağıranın işi (bkz.
+     * [SessionManager.changePassword]) ve atlanması gerçek bir açık olurdu:
+     * salonun tezgâhında açık unutulmuş bir telefonla şifre değiştirilip
+     * hesap sahibi kilitlenebilirdi.
+     */
+    suspend fun updatePassword(accessToken: String, newPassword: String): PasswordChange
 }
 
 /**

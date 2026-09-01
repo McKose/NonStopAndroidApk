@@ -421,6 +421,20 @@ export function demoIstemcisi() {
      * değerlendiren kişi her açtığında aynı şeyi görsün. Formun çalıştığı,
      * "kaydedildi" mesajının görünmesinden anlaşılıyor.
      */
+    /**
+     * Demoda şifre değiştirme **denenebiliyor ama kalıcı değil**.
+     *
+     * Gerçek istemciyle aynı yüzeyi taşıması şart: app.js hangisiyle
+     * çalıştığını bilmiyor ve eksik bir yöntem demoda çökmeye yol açardı.
+     *
+     * "Mevcut şifre" demo girişinde herhangi bir değer kabul edildiği için
+     * burada da doğrulanmıyor; formun ve mesajların çalıştığı görülebiliyor.
+     */
+    async sifreDegistir() {
+      if (!oturum) return { tur: "oturumsuz" };
+      return { tur: "tamam" };
+    },
+
     async yaz() {
       if (!oturum) return { tur: "oturumsuz" };
       return { tur: "tamam" };

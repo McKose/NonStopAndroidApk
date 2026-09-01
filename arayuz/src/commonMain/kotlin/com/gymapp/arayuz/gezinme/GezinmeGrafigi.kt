@@ -354,6 +354,8 @@ private fun AyarlarBagla(navController: NavHostController) {
     val senkDurumu by model.syncState.collectAsState()
     val bekleyen by model.pendingCount.collectAsState()
     val cikistaBekleyen by model.cikistaBekleyen.collectAsState()
+    val sifreDurumu by model.sifreDurumu.collectAsState()
+    var sifreDiyaloguAcik by remember { mutableStateOf(false) }
 
     val cikisaGit: () -> Unit = {
         navController.navigate("login") {
@@ -366,6 +368,8 @@ private fun AyarlarBagla(navController: NavHostController) {
         senkDurumu = senkDurumu,
         bekleyen = bekleyen,
         cikistaBekleyen = cikistaBekleyen,
+        sifreDurumu = sifreDurumu,
+        sifreDiyaloguAcik = sifreDiyaloguAcik,
         onGeri = { navController.popBackStack() },
         onPersonel = { navController.navigate("personnel") },
         onSimdiEsitle = { model.syncNow() },
@@ -373,6 +377,14 @@ private fun AyarlarBagla(navController: NavHostController) {
         onCikisiOnayla = { model.confirmLogout(cikisaGit) },
         onCikistanVazgec = { model.cancelLogout() },
         onSalonAdiKaydet = { model.updateSalonName(it) },
+        onSifreDegistir = { mevcut, yeni, tekrar -> model.sifreDegistir(mevcut, yeni, tekrar) },
+        onSifreDiyaloguAc = { sifreDiyaloguAcik = true },
+        onSifreDiyaloguKapat = {
+            sifreDiyaloguAcik = false
+            // Sıfırlanmazsa bir önceki denemenin hatası, diyalog bir sonraki
+            // açılışında hiçbir şey yazılmadan karşılar.
+            model.sifreDurumunuSifirla()
+        },
     )
 }
 

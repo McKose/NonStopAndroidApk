@@ -654,3 +654,46 @@ sanılırdı.
 şey gösteriyordu — kayıtlar önizlemede tarihe göre karışık, gerçek panelde
 sıralıydı. Sıralamanın bozuk olduğu bir ekranı önizlemeye bakarak fark etmek
 mümkün olmazdı.
+
+## Şifre değiştirmeden önce mevcut şifre soruluyor
+
+**Karar:** Hem uygulamada (Ayarlar → Şifre Değiştir) hem panelde (sağ üstte
+Şifre değiştir) kullanıcı mevcut şifresini giriyor. Doğrulama gerçek bir giriş
+denemesiyle yapılıyor ve **yazmadan önce**.
+
+**Neden gerekli:** Supabase'in `PUT /auth/v1/user` ucu mevcut şifreyi
+sormuyor — geçerli bir jeton yetiyor. Tek başına kullanılsaydı açık somut
+olurdu: salonun tezgâhında açık unutulmuş bir telefonu ya da paneli eline alan
+biri şifreyi değiştirip hesap sahibini kendi hesabından kilitleyebilirdi. Jeton
+"bu kişi giriş yapmıştı" diyor, "bu kişi şu anda burada" demiyor.
+
+**Neden gerçek giriş denemesi:** Mevcut şifreyi bilmenin başka bir kanıtı yok.
+Yan etkisi bilinçli ve faydalı: başarılı giriş yeni bir jeton çifti üretiyor ve
+saklanıyor, yani yazma taze jetonla gidiyor.
+
+**Neden bu sırada:** Ters sırada (önce yaz, sonra doğrula) yanlış şifre
+girildiğinde şifre çoktan değişmiş olurdu — korumanın kendisi zararı üretirdi.
+
+**Bu ekranın var oluş sebebi `personel-davet`.** Davet geçici bir şifre üretip
+yöneticiye bir kez gösteriyor; kişinin onu değiştireceği bir yer olmadığı sürece
+geçici şifre kalıcı hâle geliyordu — yönetici tarafından bilinen, muhtemelen bir
+yere not edilmiş bir şifreyle çalışılıyordu.
+
+**Asgari uzunluk 8**, Supabase'in varsayılanı 6 iken. Bu akışa özgü bir
+gerekçe: kullanıcılar buraya geçici şifreyi "kendi seçtikleri kolay bir şeyle"
+değiştirmeye geliyor ve altı karakter, ortak kullanılan bir cihazda tahmin
+edilebilir bir şey yazmayı fazla kolaylaştırıyor. Kural iki yerde yazılı
+(Kotlin `SifreKurali`, panel `sifre.js`) ve iki taraftaki testler **aynı
+örnekleri** kullanıyor: tarayıcı Kotlin çalıştırmıyor, kopya kaçınılmaz, ama
+sapması sessiz olmamalı.
+
+**Baştaki/sondaki boşluk kırpılmıyor, reddediliyor.** Kırpmak sessiz bir tuzak
+olurdu: kullanıcı "abc12345 " yazar, sunucuya "abc12345" gider, sonra giriş
+ekranında yazdığının aynısını yazıp "şifre yanlış" cevabını alır — kaybettiği
+karakteri hiçbir yerde göremeden.
+
+**Panelde `[hidden]` kuralı eklendi.** `hidden` özniteliği, öğeye açıkça
+`display` veren her kuralın altında kalıyor: `form { display: grid }` tek
+başına onu geçersiz kılıyordu ve gizli başlaması gereken şifre formu açık
+açılıp düğmeyle kapanmıyordu. Tarayıcıda sürülmeden görülmeyecek bir hata;
+birim testleri ve tip denetimi ikisini de yakalayamazdı.

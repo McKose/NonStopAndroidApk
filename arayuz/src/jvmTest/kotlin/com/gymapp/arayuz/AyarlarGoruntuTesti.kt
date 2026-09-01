@@ -1,6 +1,7 @@
 package com.gymapp.arayuz
 
 import com.gymapp.arayuz.ayarlar.AyarlarEkrani
+import com.gymapp.arayuz.ayarlar.SifreDurumu
 import com.gymapp.arayuz.ayarlar.senkronizasyonOzeti
 import androidx.compose.runtime.Composable
 import com.gymapp.data.sync.SyncState
@@ -21,15 +22,21 @@ class AyarlarGoruntuTesti {
         durum: SyncState = SyncState.Idle,
         bekleyen: Int = 0,
         cikistaBekleyen: Int? = null,
+        sifreDurumu: SifreDurumu = SifreDurumu.Bosta,
+        sifreDiyaloguAcik: Boolean = false,
     ): @Composable () -> Unit = {
         AyarlarEkrani(
             salonAdi = "Non Stop GYM",
             senkDurumu = durum,
             bekleyen = bekleyen,
             cikistaBekleyen = cikistaBekleyen,
+            sifreDurumu = sifreDurumu,
+            sifreDiyaloguAcik = sifreDiyaloguAcik,
             onGeri = {}, onPersonel = {}, onSimdiEsitle = {},
             onCikisIste = {}, onCikisiOnayla = {}, onCikistanVazgec = {},
             onSalonAdiKaydet = {},
+            onSifreDegistir = { _, _, _ -> },
+            onSifreDiyaloguAc = {}, onSifreDiyaloguKapat = {},
         )
     }
 
@@ -57,6 +64,72 @@ class AyarlarGoruntuTesti {
             !uyarisiz.contentEquals(uyarili),
             "Çıkış uyarısı çizilmedi — `cikistaBekleyen` ekrana bağlanmamış olabilir",
         )
+    }
+
+    // ─── Şifre değiştirme ───────────────────────────────────────────────────
+
+    @Test
+    fun `sifre diyalogu ciziliyor`() {
+        cizildiginiDogrula(
+            ekraniCiz("ayarlar-sifre", icerik = ekran(sifreDiyaloguAcik = true))
+        )
+    }
+
+    /**
+     * Diyalog gerçekten açılıyor mu.
+     *
+     * `sifreDiyaloguAcik` çizime bağlanmamış olsaydı satıra basmak hiçbir şey
+     * yapmaz ve geçici şifreyi değiştirmenin yolu yine olmazdı — yani özellik
+     * kodda var, kullanıcı için yok olurdu.
+     */
+    @Test
+    fun `sifre diyalogu goruntuyu degistiriyor`() {
+        val kapali = ekraniCiz("ayarlar", icerik = ekran()).readBytes()
+        val acik = ekraniCiz("ayarlar-sifre", icerik = ekran(sifreDiyaloguAcik = true))
+            .readBytes()
+
+        assertTrue(!kapali.contentEquals(acik), "Şifre diyaloğu çizilmedi")
+    }
+
+    /**
+     * Hata mesajı diyalogda görünüyor mu.
+     *
+     * Görünmeseydi "Değiştir"e basan kullanıcı hiçbir tepki alamaz, şifresinin
+     * değiştiğini sanıp çıkardı — ve bir dahaki girişte hangi şifrenin geçerli
+     * olduğunu bilemezdi.
+     */
+    @Test
+    fun `sifre hatasi diyalogda goruniyor`() {
+        val bosta = ekraniCiz("ayarlar-sifre", icerik = ekran(sifreDiyaloguAcik = true))
+            .readBytes()
+        val hatali = ekraniCiz(
+            "ayarlar-sifre-hata",
+            icerik = ekran(
+                sifreDiyaloguAcik = true,
+                sifreDurumu = SifreDurumu.Hata("Mevcut şifreniz yanlış."),
+            ),
+        ).readBytes()
+
+        assertTrue(!bosta.contentEquals(hatali), "Hata mesajı çizilmedi")
+    }
+
+    /**
+     * Başarı ekranda KALIYOR, sessizce kapanmıyor.
+     *
+     * Kapansaydı kullanıcı şifresinin gerçekten değişip değişmediğini bilemezdi
+     * ve bu akışta bilememek pahalı: bir dahaki girişte hangi şifreyi yazacağını
+     * bilmiyor demek.
+     */
+    @Test
+    fun `sifre basarisi diyalogda goruniyor`() {
+        val bosta = ekraniCiz("ayarlar-sifre", icerik = ekran(sifreDiyaloguAcik = true))
+            .readBytes()
+        val basarili = ekraniCiz(
+            "ayarlar-sifre-basarili",
+            icerik = ekran(sifreDiyaloguAcik = true, sifreDurumu = SifreDurumu.Basarili),
+        ).readBytes()
+
+        assertTrue(!bosta.contentEquals(basarili), "Başarı mesajı çizilmedi")
     }
 
     /**

@@ -122,9 +122,10 @@ SMTP'nizi bağlamak ayrı bir kurulum işi. Birkaç kişilik bir salonda geçici
 şifreyi yüz yüze vermek hem daha hızlı hem de çalışmayan bir e-posta
 altyapısına bağlı değil.
 
-**Bilinen eksik:** personelin kendi şifresini belirleyeceği ekran henüz yok,
-yani geçici şifre kalıcı hâle geliyor. Bkz. `../../README.md` → "Henüz
-yapılmadı".
+Personel geçici şifreyle girdikten sonra kendi şifresini belirliyor:
+uygulamada **Ayarlar → Şifre Değiştir**, panelde sağ üstteki **Şifre değiştir**.
+İkisi de mevcut şifreyi soruyor (bkz. `../../README.md` → "Geçici şifreyi kişi
+kendisi değiştiriyor").
 
 ---
 

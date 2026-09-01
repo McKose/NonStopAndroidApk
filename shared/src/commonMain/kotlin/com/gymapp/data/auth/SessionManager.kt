@@ -69,6 +69,57 @@ class SessionManager(
         return result
     }
 
+    /**
+     * Şifreyi değiştirir — **önce mevcut şifreyi doğrulayarak**.
+     *
+     * ### Neden yeniden giriş yapılıyor
+     * Supabase'in şifre değiştirme ucu mevcut şifreyi sormuyor; geçerli bir
+     * jeton yetiyor. Tek başına kullanılsaydı açık somut olurdu: salonun
+     * tezgâhında açık unutulmuş bir telefonu eline alan biri şifreyi
+     * değiştirip hesap sahibini kendi hesabından kilitleyebilirdi. Jeton
+     * "bu kişi giriş yapmıştı" diyor, "bu kişi şu anda burada" demiyor.
+     *
+     * Doğrulama gerçek bir giriş denemesiyle yapılıyor — mevcut şifreyi
+     * bilmenin başka bir kanıtı yok.
+     *
+     * ### Yan etkisi bilinçli: oturum tazeleniyor
+     * Başarılı giriş yeni bir jeton çifti üretiyor ve saklanıyor. Eski jetonla
+     * devam etmenin bir faydası yok; tazesi hem daha uzun ömürlü hem de
+     * şifre değişiminden sonra kesinlikle geçerli.
+     *
+     * ### Sıra: önce doğrula, sonra yaz
+     * Ters sırada, yanlış mevcut şifre girildiğinde şifre çoktan değişmiş
+     * olurdu.
+     */
+    suspend fun changePassword(currentPassword: String, newPassword: String): PasswordChange {
+        val current = _session.value
+            ?: return PasswordChange.Failed("Oturum yok.", retryable = false)
+
+        // Kimlik kanıtı: mevcut şifreyle giriş.
+        val yenidenGiris = authApi.signIn(current.email, currentPassword)
+        val tazeOturum = when (yenidenGiris) {
+            is AuthResult.Success -> yenidenGiris.session
+            is AuthResult.InvalidCredentials ->
+                return PasswordChange.WrongPassword("Mevcut şifreniz yanlış.")
+            is AuthResult.Failed ->
+                return PasswordChange.Failed(yenidenGiris.reason, yenidenGiris.retryable)
+            // Hesap doğrulandı ama salon bağlantısı bozulmuş: şifre
+            // değiştirmenin bunu düzeltmesi mümkün değil ve devam etmek
+            // kullanıcıya işe yaramaz bir "başarılı" mesajı gösterirdi.
+            else -> return PasswordChange.Failed(
+                "Hesabınızın salon bağlantısı okunamadı; yöneticinize başvurun.",
+                retryable = false,
+            )
+        }
+
+        mutex.withLock {
+            _session.value = tazeOturum
+            store.save(tazeOturum)
+        }
+
+        return authApi.updatePassword(tazeOturum.accessToken, newPassword)
+    }
+
     suspend fun signOut() {
         mutex.withLock {
             _session.value = null

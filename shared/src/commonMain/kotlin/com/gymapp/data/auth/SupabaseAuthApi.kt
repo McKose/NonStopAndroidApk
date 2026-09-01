@@ -7,6 +7,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -53,6 +54,7 @@ class SupabaseAuthApi(
     // mesajdan anlaşılamıyordu; ikisi farklı sebeplere işaret ediyor.
     private val jetonUcu = "${config.url}/auth/v1/token"
     private val salonUcu = "${config.url}/rest/v1/gym_users"
+    private val kullaniciUcu = "${config.url}/auth/v1/user"
 
     override suspend fun signIn(email: String, password: String): AuthResult =
         token(
@@ -68,6 +70,55 @@ class SupabaseAuthApi(
             grantType = "refresh_token",
             body = buildJsonObject { put("refresh_token", refreshToken) },
         )
+
+    /**
+     * `PUT /auth/v1/user` — yalnızca `password` alanı gönderiliyor.
+     *
+     * Yanıt gövdesi güncellenmiş kullanıcı; **okunmuyor**. Okunacak bir şey yok:
+     * jeton üretilmiyor ve mevcut oturum geçerli kalıyor. Gövdeyi ayrıştırmak,
+     * yalnızca ayrıştırma hatası üretebilecek bir adım eklemek olurdu.
+     */
+    override suspend fun updatePassword(
+        accessToken: String,
+        newPassword: String,
+    ): PasswordChange {
+        val response = try {
+            httpClient.put(kullaniciUcu) {
+                header("apikey", config.anonKey)
+                header("Authorization", "Bearer $accessToken")
+                contentType(ContentType.Application.Json)
+                setBody(buildJsonObject { put("password", newPassword) }.toString())
+            }
+        } catch (e: Exception) {
+            val hata = networkFailure(e)
+            return PasswordChange.Failed(hata.reason, hata.retryable)
+        }
+
+        val status = response.status.value
+        if (status in 200..299) return PasswordChange.Success
+
+        val text = runCatching { response.bodyAsText() }.getOrDefault("")
+        return when (val hata = failureFor(status, text, kullaniciUcu)) {
+            // 401/403 burada "mevcut şifre yanlış" DEĞİL — çağıran mevcut
+            // şifreyi zaten doğruladı (bkz. `SessionManager.changePassword`).
+            // Buraya geldiyse jeton düşmüş demektir ve söylenecek şey farklı.
+            is AuthResult.InvalidCredentials ->
+                PasswordChange.Failed(
+                    "Oturumunuz artık geçerli değil. Çıkıp yeniden giriş yapın.",
+                    retryable = false,
+                )
+
+            is AuthResult.Failed -> PasswordChange.Failed(hata.reason, hata.retryable)
+
+            // `failureFor` yalnızca yukarıdaki ikisini üretiyor; bu dal
+            // ulaşılamaz ama `when`i tüketiyor ve ileride yeni bir durum
+            // eklendiğinde sessizce yutulmasını önlüyor.
+            else -> PasswordChange.Failed(
+                "Şifre değiştirilemedi (beklenmeyen yanıt $status).",
+                retryable = false,
+            )
+        }
+    }
 
     private suspend fun token(grantType: String, body: JsonObject): AuthResult {
         val response = try {

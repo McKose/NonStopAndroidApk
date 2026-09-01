@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gymapp.data.auth.PasswordChange
 import com.gymapp.data.auth.SessionManager
 import com.gymapp.data.local.db.GymDatabase
 import com.gymapp.data.local.preferences.AppPreferences
@@ -12,12 +13,36 @@ import com.gymapp.data.sync.ArkaPlanSenkronizasyonu
 import com.gymapp.data.sync.SyncCoordinator
 import com.gymapp.data.sync.SyncQueue
 import com.gymapp.data.sync.SyncState
+import com.gymapp.domain.SifreKurali
+import com.gymapp.domain.SifreSonucu
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/**
+ * Şifre değiştirme akışının o anki hâli.
+ *
+ * Dört hâl ve dördü de ekranda farklı bir şey gerektiriyor. Tek bir
+ * `hata: String?` ile temsil edilseydi "gönderiliyor" ile "bitti" ayrımı
+ * kaybolur, kullanıcı düğmeye ikinci kez basabilir ve iki istek giderdi.
+ */
+sealed interface SifreDurumu {
+    data object Bosta : SifreDurumu
+    data object Gonderiliyor : SifreDurumu
+    data class Hata(val mesaj: String) : SifreDurumu
+
+    /**
+     * Ayrı bir hâl, çünkü **görünmesi** gerekiyor.
+     *
+     * Diyalog sessizce kapansaydı kullanıcı şifresinin gerçekten değişip
+     * değişmediğini bilemezdi — ve bu akışta bilememek pahalı: bir dahaki
+     * girişte hangi şifreyi yazacağını bilmiyor demek.
+     */
+    data object Basarili : SifreDurumu
+}
 
 class SettingsViewModel(
     private val prefs: AppPreferences,
@@ -53,6 +78,52 @@ class SettingsViewModel(
     fun updateSalonName(value: String) {
         salonName = value
         prefs.salonName = value
+    }
+
+    // ─── Şifre değiştirme ───────────────────────────────────────────────────
+
+    private val _sifreDurumu = MutableStateFlow<SifreDurumu>(SifreDurumu.Bosta)
+    val sifreDurumu: StateFlow<SifreDurumu> = _sifreDurumu.asStateFlow()
+
+    /**
+     * Şifreyi değiştirir.
+     *
+     * ### Bu ekranın var oluş sebebi
+     * `personel-davet` yeni personele **geçici** bir şifre üretiyor ve yönetici
+     * onu bir kez görüp iletiyor. Kişinin kendi şifresini belirleyeceği bir yer
+     * olmadığı sürece o geçici şifre kalıcı hâle geliyor: yönetici tarafından
+     * bilinen, muhtemelen bir yere not edilmiş bir şifreyle çalışılıyor.
+     *
+     * ### Doğrulama neden burada, ekranda değil
+     * Kural tek yerde: aynı kontrolü ekranda da yazmak, ikisinin ayrışması
+     * durumunda kullanıcıya iki farklı cevap veren bir akış üretirdi. Ekran
+     * yalnızca sonucu gösteriyor.
+     */
+    fun sifreDegistir(mevcut: String, yeni: String, tekrar: String) {
+        val kontrol = SifreKurali.dogrula(yeni = yeni, tekrar = tekrar, mevcut = mevcut)
+        if (kontrol is SifreSonucu.Gecersiz) {
+            _sifreDurumu.value = SifreDurumu.Hata(kontrol.mesaj)
+            return
+        }
+        val gecerli = (kontrol as SifreSonucu.Gecerli).sifre
+
+        _sifreDurumu.value = SifreDurumu.Gonderiliyor
+        viewModelScope.launch {
+            _sifreDurumu.value = when (val sonuc = sessions.changePassword(mevcut, gecerli)) {
+                is PasswordChange.Success -> SifreDurumu.Basarili
+                // İki hata da kullanıcıya gösteriliyor ama sebepleri farklı ve
+                // sunucunun/oturumun kendi mesajı korunuyor: "değiştirilemedi"
+                // gibi sabit bir metin, yanlış şifre ile düşmüş oturumu aynı
+                // şey gibi gösterirdi.
+                is PasswordChange.WrongPassword -> SifreDurumu.Hata(sonuc.reason)
+                is PasswordChange.Failed -> SifreDurumu.Hata(sonuc.reason)
+            }
+        }
+    }
+
+    /** Diyalog kapanınca çağrılıyor; aksi hâlde eski hata bir sonraki açılışta karşılar. */
+    fun sifreDurumunuSifirla() {
+        _sifreDurumu.value = SifreDurumu.Bosta
     }
 
     /**

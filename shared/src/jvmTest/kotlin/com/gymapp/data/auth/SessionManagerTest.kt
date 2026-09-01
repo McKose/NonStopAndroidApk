@@ -37,11 +37,15 @@ class SessionManagerTest {
     private class SahteAuthApi(
         private val giris: (String, String) -> AuthResult = { _, _ -> AuthResult.NoGym("x") },
         private val yenileme: (String) -> AuthResult = { AuthResult.Failed("-", retryable = true) },
+        private val sifre: (String, String) -> PasswordChange = { _, _ -> PasswordChange.Success },
         private val gecikmeMs: Long = 0,
     ) : AuthApi {
         var girisSayisi = 0
         var yenilemeSayisi = 0
         var sonYenilemeJetonu: String? = null
+        var sifreSayisi = 0
+        var sonSifreJetonu: String? = null
+        var sonYeniSifre: String? = null
 
         override suspend fun signIn(email: String, password: String): AuthResult {
             girisSayisi++
@@ -54,6 +58,16 @@ class SessionManagerTest {
             sonYenilemeJetonu = refreshToken
             if (gecikmeMs > 0) delay(gecikmeMs)
             return yenileme(refreshToken)
+        }
+
+        override suspend fun updatePassword(
+            accessToken: String,
+            newPassword: String,
+        ): PasswordChange {
+            sifreSayisi++
+            sonSifreJetonu = accessToken
+            sonYeniSifre = newPassword
+            return sifre(accessToken, newPassword)
         }
     }
 
@@ -238,5 +252,110 @@ class SessionManagerTest {
         assertEquals("jeton-2", ilk.await())
         assertEquals("jeton-2", ikinci.await())
         assertEquals(1, api.yenilemeSayisi, "İkinci istek yenilenmiş jetonu beklemeli, yenisini istememeli")
+    }
+
+    // ─── Şifre değiştirme ───────────────────────────────────────────────────
+
+    /**
+     * Şifre değişmeden ÖNCE mevcut şifre doğrulanıyor.
+     *
+     * Supabase'in şifre değiştirme ucu mevcut şifreyi sormuyor; geçerli bir
+     * jeton yetiyor. Doğrulama atlanırsa açık somut: salonun tezgâhında açık
+     * unutulmuş bir telefonu eline alan biri şifreyi değiştirip hesap sahibini
+     * kilitleyebilir. Jeton "bu kişi giriş yapmıştı" diyor, "bu kişi şu anda
+     * burada" demiyor.
+     */
+    @Test
+    fun `sifre degistirmeden once mevcut sifre dogrulaniyor`() = runTest {
+        val taze = oturum(erisim = "jeton-2")
+        val api = SahteAuthApi(giris = { _, _ -> AuthResult.Success(taze) })
+        val store = InMemorySessionStore().apply { save(oturum()) }
+        val yonetici = SessionManager(api, store, now = { 0L })
+        yonetici.restore()
+
+        assertIs<PasswordChange.Success>(yonetici.changePassword("eski1234", "yeniSifre1"))
+
+        assertEquals(1, api.girisSayisi, "Mevcut şifre doğrulanmadan yazma yapılmış")
+        assertEquals("yeniSifre1", api.sonYeniSifre)
+    }
+
+    /**
+     * Yanlış mevcut şifrede sunucuya HİÇ yazılmıyor.
+     *
+     * Sıra tersine dönseydi (önce yaz, sonra doğrula) yanlış şifre girildiğinde
+     * şifre çoktan değişmiş olurdu — yani korumanın kendisi zararı üretirdi.
+     */
+    @Test
+    fun `yanlis mevcut sifrede yazma denenmiyor`() = runTest {
+        val api = SahteAuthApi(giris = { _, _ -> AuthResult.InvalidCredentials("bad") })
+        val store = InMemorySessionStore().apply { save(oturum()) }
+        val yonetici = SessionManager(api, store, now = { 0L })
+        yonetici.restore()
+
+        assertIs<PasswordChange.WrongPassword>(yonetici.changePassword("yanlis", "yeniSifre1"))
+        assertEquals(0, api.sifreSayisi, "Doğrulama düşmesine rağmen şifre yazılmış")
+    }
+
+    /** Yanlış mevcut şifre oturumu düşürmüyor: kullanıcı ekranda kalıp tekrar denemeli. */
+    @Test
+    fun `yanlis mevcut sifre oturumu dusurmuyor`() = runTest {
+        val api = SahteAuthApi(giris = { _, _ -> AuthResult.InvalidCredentials("bad") })
+        val store = InMemorySessionStore().apply { save(oturum()) }
+        val yonetici = SessionManager(api, store, now = { 0L })
+        yonetici.restore()
+
+        yonetici.changePassword("yanlis", "yeniSifre1")
+
+        assertNotNull(yonetici.session.value, "Oturum düşmüş")
+        assertNotNull(store.load(), "Saklanan oturum silinmiş")
+    }
+
+    /**
+     * Doğrulamadan dönen TAZE oturum saklanıyor ve yazmada o kullanılıyor.
+     *
+     * Eski jetonla devam etmenin faydası yok: doğrulama zaten yeni bir çift
+     * üretti, tazesi hem daha uzun ömürlü hem de şifre değişiminden sonra
+     * kesinlikle geçerli.
+     */
+    @Test
+    fun `dogrulamadan donen oturum saklaniyor`() = runTest {
+        val taze = oturum(erisim = "jeton-2", yenileme = "yenileme-2")
+        val api = SahteAuthApi(giris = { _, _ -> AuthResult.Success(taze) })
+        val store = InMemorySessionStore().apply { save(oturum()) }
+        val yonetici = SessionManager(api, store, now = { 0L })
+        yonetici.restore()
+
+        yonetici.changePassword("eski1234", "yeniSifre1")
+
+        assertEquals(taze, yonetici.session.value)
+        assertEquals(taze, store.load())
+        assertEquals("jeton-2", api.sonSifreJetonu, "Yazma eski jetonla yapılmış")
+    }
+
+    /** Oturum yokken çağrı sessizce başarılı görünmüyor. */
+    @Test
+    fun `oturum yokken sifre degistirilemiyor`() = runTest {
+        val api = SahteAuthApi()
+        val yonetici = SessionManager(api, InMemorySessionStore(), now = { 0L })
+
+        assertIs<PasswordChange.Failed>(yonetici.changePassword("a", "yeniSifre1"))
+        assertEquals(0, api.girisSayisi)
+        assertEquals(0, api.sifreSayisi)
+    }
+
+    /** Sunucu yazmayı reddederse sonuç aynen aktarılıyor. */
+    @Test
+    fun `sunucu reddi aktariliyor`() = runTest {
+        val api = SahteAuthApi(
+            giris = { _, _ -> AuthResult.Success(oturum()) },
+            sifre = { _, _ -> PasswordChange.Failed("çok kısa", retryable = false) },
+        )
+        val store = InMemorySessionStore().apply { save(oturum()) }
+        val yonetici = SessionManager(api, store, now = { 0L })
+        yonetici.restore()
+
+        val sonuc = yonetici.changePassword("eski1234", "kisa")
+        assertIs<PasswordChange.Failed>(sonuc)
+        assertEquals("çok kısa", sonuc.reason)
     }
 }

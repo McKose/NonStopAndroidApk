@@ -55,6 +55,19 @@
 
 * { box-sizing: border-box; }
 
+/* `hidden` özniteliği, öğeye açıkça `display` veren HER kuralın altında kalıyor.
+ *
+ * Tarayıcının kendi `[hidden] { display: none }` kuralı yazar tablosunda değil,
+ * kullanıcı-ajanı tablosunda; aşağıdaki `form { display: grid }` gibi tek bir
+ * satır onu geçersiz kılıyor. Sonuç sessiz ve kafa karıştırıcı: `hidden`
+ * öznitelikli bir form ekranda duruyor ve JavaScript'teki `hidden = true`
+ * hiçbir şey yapmıyor gibi görünüyor.
+ *
+ * Bu tam olarak yaşandı: şifre değiştirme formu gizli başlaması gerekirken
+ * açık açılıyor ve düğmeyle kapanmıyordu. `!important` burada gerekli, çünkü
+ * amaç zaten diğer `display` kurallarını bastırmak. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   padding: 24px;
@@ -110,6 +123,29 @@ button.ikincil { background: transparent; color: var(--soluk); border: 1px solid
   padding-bottom: 16px;
   border-bottom: 1px solid var(--kenar);
 }
+
+/* Başlıktaki eylem düğmeleri. Dar ekranda alt alta değil yan yana kalıyorlar:
+ * ikisi de kısa ve sarmaları başlığı gereksiz yükseltirdi. */
+.baslik-eylemler { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Tek satıra yayılan form (şifre değiştirme). Dar ekranda alanlar alt alta
+ * geçiyor; `grid` yerine `flex` çünkü alanların genişliği eşit olmak zorunda
+ * değil ve düğme kendi boyunda kalmalı. */
+.satir-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 16px;
+  background: var(--yuzey);
+  border: 1px solid var(--kenar);
+  border-radius: 12px;
+}
+.satir-form label { flex: 1 1 180px; }
+/* Mesaj satırları kendi satırlarını alıyor: düğmenin yanında sıkışsalardı
+ * uzun bir hata metni formu yatay olarak taşırırdı. */
+.satir-form > p { flex-basis: 100%; margin: 0; }
 
 .sekmeler { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
 .sekmeler button {
