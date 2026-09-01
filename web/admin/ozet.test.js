@@ -72,6 +72,24 @@ test("defter toplamı türe göre ayrışır", () => {
   });
 });
 
+/**
+ * Özet kutusundaki "Bu ay tahsilat" iptal edilen kayıtla ŞİŞMİYOR.
+ *
+ * Ters kayıt orijinalin birebir kopyası: aynı tür, aynı pozitif tutar. İkisi de
+ * sayıldığında tutar götürülmüyor, ikiye katlanıyor — yani iptal edilen bir
+ * tahsilat ciroyu düşürmek yerine artırıyordu. Kutu tek bir sayı gösterdiği
+ * için hata da tek bir yanlış sayı olarak, hiçbir uyarı vermeden görünüyordu.
+ */
+test("iptal edilen tahsilat ay toplamını artırmıyor", () => {
+  const kayitlar = [
+    { id: "a", type: "PAYMENT", amount_minor: 100000, occurred_at_ms: 100, reverses_id: null },
+    { id: "a-ters", type: "PAYMENT", amount_minor: 100000, occurred_at_ms: 150, reverses_id: "a" },
+    { id: "b", type: "PAYMENT", amount_minor: 25000, occurred_at_ms: 120, reverses_id: null },
+  ];
+
+  assert.equal(defterToplami(kayitlar, 0, 200).PAYMENT, 25000);
+});
+
 test("aralık dışındaki kayıtlar toplanmaz", () => {
   const kayitlar = [
     { type: "PAYMENT", amount_minor: 100, occurred_at_ms: 50 },

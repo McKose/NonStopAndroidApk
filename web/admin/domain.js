@@ -77,6 +77,44 @@ export function durumEtiketi(durum) {
 }
 
 /**
+ * Bu listede iptal edilmiş defter kayıtlarının kimlikleri.
+ *
+ * Ters kayıt neyi iptal ettiğini `reverses_id` ile söylüyor; iptal edilmiş
+ * kaydın kendisinde bunu gösteren hiçbir alan yok. Dolayısıyla "iptal edildi
+ * mi" sorusu tek satıra bakarak yanıtlanamıyor, listenin tamamı gerekiyor.
+ */
+export function iptalEdilenKimlikler(kayitlar) {
+  const kume = new Set();
+  for (const k of kayitlar) {
+    if (k?.reverses_id) kume.add(k.reverses_id);
+  }
+  return kume;
+}
+
+/**
+ * Toplamlara giren defter kayıtları: ne ters kayıt, ne de iptal edilmiş.
+ *
+ * ### Bu süzgeç neden ŞART
+ * Ters kayıt, iptal ettiği kaydın **birebir kopyası**: aynı tür, aynı pozitif
+ * tutar — yalnızca `reverses_id` dolu. Yani ikisi toplamda birbirini
+ * götürmüyor, tam tersine tutarı **ikiye katlıyor**. İptal edilen 1.000 TL'lik
+ * bir tahsilat, süzülmediğinde ciroyu 1.000 TL düşürmek yerine 1.000 TL
+ * artırıyor.
+ *
+ * Uygulamadaki karşılığı `LedgerDao.outstandingBalanceMinor` ve
+ * `FinansKaydi.isVoided`: ikisi de çiftin iki tarafını da eliyor.
+ *
+ * Süzgecin iki yönlü olması bu yüzden zorunlu. Yalnızca `reverses_id == null`
+ * bakılsaydı iptal edilen asıl kayıt toplamda kalırdı; yalnızca "birinin
+ * işaret ettiği" elenseydi ters kaydın kendisi kalırdı. İkisi de tutarı tek
+ * taraflı olarak sayardı.
+ */
+export function aktifDefterKayitlari(kayitlar) {
+  const iptalEdilenler = iptalEdilenKimlikler(kayitlar);
+  return kayitlar.filter((k) => !k?.reverses_id && !iptalEdilenler.has(k?.id));
+}
+
+/**
  * Silinmiş satırları ayıklar.
  *
  * Sunucudan tombstone'lar da geliyor — silme senkronize edilebilsin diye satır

@@ -58,6 +58,7 @@ export const BIRLESTIRILEN = [
   "supabase.js",
   "domain.js",
   "ozet.js",
+  "finans.js",
   "suzme.js",
   "roller.js",
   "sekmeler.js",

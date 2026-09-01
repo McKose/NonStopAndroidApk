@@ -192,7 +192,43 @@ code { font-size: 13px; }
   border-radius: 12px;
 }
 .kutu strong { display: block; margin-top: 4px; font-size: 22px; font-variant-numeric: tabular-nums; }
-h2 { font-size: 16px; margin: 0 0 10px; }
+h2 { font-size: 16px; margin: 24px 0 10px; }
+
+/* Tutar renkleri. Renk tek başına bilgi TAŞIMIYOR: negatif tutar zaten eksi
+ * işaretiyle, iptal edilmiş kayıt rozetiyle yazılı. Renk yalnızca gözü doğru
+ * satıra götürüyor, tek ayırt edici olsaydı renk körlüğünde okunamazdı. */
+.deger-iyi { color: var(--iyi); }
+.deger-hata { color: var(--hata); }
+.deger-uyari { color: var(--uyari); }
+.deger-soluk { color: var(--soluk); }
+
+/* Finans kayıtlarının iptal durumu. Üyelik rozetlerinin sınıfları yeniden
+ * kullanılmıyor: "iptal edildi" ile "süresi doldu" aynı renkte olsaydı ikisi
+ * aynı şey sanılırdı, oysa biri düzeltme diğeri bir üyelik durumu. */
+.rozet-finans-iptal { color: var(--hata); background: color-mix(in srgb, var(--hata) 12%, transparent); }
+.rozet-finans-ters { color: var(--soluk); background: color-mix(in srgb, var(--soluk) 15%, transparent); }
+
+/* Aylık seyir çubukları. Tablonun bir hücresinin içinde duruyorlar; ayrı bir
+ * grafik düzeni yok, dolayısıyla dar ekranda tablo düzeninin kendisi geçerli.
+ * Tutarlar komşu hücrelerde YAZILI — çubuk yalnızca karşılaştırmayı
+ * kolaylaştırıyor, bilgiyi o taşımıyor. */
+.seyir-cubuklar {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 90px;
+}
+.seyir-cubuk {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  /* Çok küçük bir tutar da görünsün. Sıfır tutarda çubuk zaten hiç
+   * çizilmiyor (bkz. `cubukHucresi`), yoksa hareketsiz ay küçük bir gider
+   * varmış gibi görünürdü. */
+  min-width: 3px;
+}
+.seyir-gelir { background: var(--iyi); }
+.seyir-gider { background: var(--hata); }
 
 /* Yalnızca tek dosyalık önizlemede görünür (bkz. onizleme.mjs); panelin
  * kendisinde bu öğe yok. */
