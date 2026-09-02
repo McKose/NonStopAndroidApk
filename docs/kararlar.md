@@ -697,3 +697,37 @@ karakteri hiçbir yerde göremeden.
 başına onu geçersiz kılıyordu ve gizli başlaması gereken şifre formu açık
 açılıp düğmeyle kapanmıyordu. Tarayıcıda sürülmeden görülmeyecek bir hata;
 birim testleri ve tip denetimi ikisini de yakalayamazdı.
+
+## Uygulama simgesi: kelime işaretinden alınan NS monogramı
+
+**Karar:** Başlatıcı simgesi, markanın siyahı üzerinde beyaz "NS". Harfler
+çizilmedi; `web/varliklar/nonstop-gym.svg` içindeki gerçek N ve S glifleri
+olduğu gibi alındı.
+
+**Neden logonun tamamı değil:** Logo 919×1130 oranında bir kelime işareti
+("NON STOP / GYM"). 48dp'lik bir simgede okunamaz — küçültüldüğünde gri bir
+lekeye dönüşür. Simge uzaktan tanınabilecek kadar basit olmak zorunda ve iki
+harf o eşiği geçiyor; 24dp'de bile okunuyor.
+
+**Neden glifler kopyalandı:** Benzer bir yazı tipiyle yeniden çizilseydi simge
+markadan fark edilmeden saparadı — aynı görünüp aynı olmayan bir işaret, hiç
+benzemeyenden daha kötü. Kopyalanmış yol verisi bu riski tamamen kaldırıyor.
+
+**İki harf farklı ölçekle büyütülüyor.** Logoda "NON" üst satırda, "STOP" alt
+satırda ve farklı puntolarda: N'in büyük harf yüksekliği 413.51, S'inki 333.08.
+Tek ölçek kullanılsaydı S belirgin biçimde kısa kalırdı.
+
+**Güvenli alan.** İşaret 108×108 tuvalde x 26.7–81.3, y 29–79 aralığında.
+Uyarlanabilir simgede yalnızca ortadaki 72×72 (18–90) alanının görüneceği
+garanti; dışı başlatıcının maskesine göre kırpılıyor. Daire, squircle ve kare
+maskelerde tarayıcıda çizdirilip bakıldı.
+
+**Zemin düz tek renk.** Şablonun ızgara deseni kaldırıldı: uyarlanabilir
+simgede zemin katmanı başlatıcının paralaks animasyonuyla kayıyor ve desenli
+bir zemin o harekette titriyor. 48dp'de desen zaten görünmüyor, yalnızca
+kenarları kirletiyor.
+
+**Şablon `.webp` bitmap'leri silindi.** `minSdk = 26` ve `mipmap-anydpi/`
+altındaki uyarlanabilir simge her yoğunlukta kazanıyor, dolayısıyla o on dosya
+hiçbir cihazda kullanılmıyordu — ama içerikleri hâlâ Android Studio'nun yeşil
+robotuydu ve APK'da taşınıyorlardı.
