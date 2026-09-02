@@ -43,6 +43,7 @@ import {
   davetHataMesaji,
   davetBasariMesaji,
 } from "./davet.js";
+import { SIFRE_EN_AZ_UZUNLUK, sifreyiDogrula, sifreHataMesaji } from "./sifre.js";
 import { SEKME_VERISI } from "./sekmeler.js";
 
 const $ = (id) => document.getElementById(id);
@@ -117,6 +118,73 @@ $("cikis").addEventListener("click", () => {
   istemci.oturumSil();
   goster("giris");
 });
+
+// ─── Şifre değiştirme ───────────────────────────────────────────────────────
+//
+// Panelde olmasının sebebi `personel-davet`: yeni personele geçici bir şifre
+// üretiliyor ve kişinin onu değiştireceği bir yer olmadığı sürece o geçici
+// şifre kalıcı hâle geliyordu — yönetici tarafından bilinen, muhtemelen bir
+// yere not edilmiş bir şifreyle çalışılıyordu.
+
+// En az uzunluk tek yerde tanımlı (`sifre.js`); HTML'e elle yazılsaydı ikisi
+// sessizce ayrışır ve ekranda yazan sayı ile uygulanan kural farklı olurdu.
+$("sifre-ipucu").textContent = `Yeni şifre en az ${SIFRE_EN_AZ_UZUNLUK} karakter olmalı.`;
+
+$("sifre-degistir").addEventListener("click", () => {
+  const form = $("sifre-formu");
+  form.hidden = !form.hidden;
+  if (form.hidden) {
+    // Kapanırken alanlar temizleniyor: açık kalan bir "yeni şifre" kutusu,
+    // ekranı bırakıp giden kullanıcının şifresini bir sonraki kişiye gösterir.
+    form.reset();
+    sifreSonucuYaz(null);
+  } else {
+    form.elements.mevcut.focus();
+  }
+});
+
+$("sifre-formu").addEventListener("submit", async (olay) => {
+  olay.preventDefault();
+  const form = olay.currentTarget;
+
+  const kontrol = sifreyiDogrula({
+    mevcut: form.elements.mevcut.value,
+    yeni: form.elements.yeni.value,
+    tekrar: form.elements.tekrar.value,
+  });
+  if (!kontrol.gecerli) return sifreSonucuYaz(kontrol.mesaj, "hata");
+
+  const dugme = $("sifre-kaydet");
+  // Çift tıklama iki isteğe dönüşürdü ve ikincisi artık geçersiz olan eski
+  // şifreyle gider, "mevcut şifreniz yanlış" derdi.
+  dugme.disabled = true;
+  sifreSonucuYaz("Gönderiliyor…");
+
+  const sonuc = await istemci.sifreDegistir({
+    mevcut: form.elements.mevcut.value,
+    yeni: kontrol.sifre,
+  });
+  dugme.disabled = false;
+
+  if (sonuc.tur === "tamam") {
+    form.reset();
+    return sifreSonucuYaz("Şifreniz değiştirildi. Bundan sonra yeni şifrenizle girin.", "iyi");
+  }
+  if (sonuc.tur === "yanlis-sifre") return sifreSonucuYaz(sonuc.mesaj, "hata");
+  if (sonuc.tur === "oturumsuz") {
+    istemci.oturumSil();
+    hataYaz("giris-hata", "Oturumunuzun süresi doldu, tekrar giriş yapın.");
+    return goster("giris");
+  }
+  sifreSonucuYaz(sifreHataMesaji(sonuc.kod ?? -1, sonuc.govde), "hata");
+});
+
+function sifreSonucuYaz(mesaj, sinif = null) {
+  const alan = $("sifre-sonuc");
+  alan.hidden = mesaj === null;
+  alan.textContent = mesaj ?? "";
+  alan.className = sinif === "hata" ? "hata" : sinif === "iyi" ? "alt deger-iyi" : "alt";
+}
 
 function paneliAc(oturum) {
   $("salon-adi").textContent = oturum.gym_name || "Salon";

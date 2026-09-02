@@ -12,10 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.Sync
@@ -33,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,8 +45,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.gymapp.data.sync.SyncState
+import com.gymapp.domain.SifreKurali
 
 /**
  * Ayarlar — `app`'teki `SettingsScreen`'in ortak modüle taşınmış hâli.
@@ -67,8 +73,17 @@ import com.gymapp.data.sync.SyncState
  * ile aynı ayrım: yazma durumu uygulamanın verisi değil. Dışarı çıkarılsaydı
  * her tuş vuruşu ViewModel'e gidip geri gelirdi.
  *
+ * ### Şifre diyaloğu neden dışarıda — salon diyaloğu içerideyken
+ * Aradaki fark sınanabilirlik: bu diyaloğun DÖRT hâli var (boşta, gönderiliyor,
+ * hata, başarılı) ve dördü de ekranda farklı bir şey çiziyor. Açık/kapalı bilgisi
+ * içeride kalsaydı görüntü testleri diyaloğu hiç açamaz, dolayısıyla hiçbirini
+ * çizemezdi — ve "başarılı" hâlinin görünmesi bu özelliğin bütün amacı. Salon
+ * diyaloğunun tek bir hâli var, orada aynı gerekçe yok.
+ *
  * @param cikistaBekleyen çıkış onayı bekliyorsa gönderilmemiş kayıt sayısı,
  *   beklemiyorsa `null`
+ * @param sifreDurumu şifre değiştirme akışının o anki hâli; diyalog açıkken
+ *   çiziliyor
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,6 +92,8 @@ fun AyarlarEkrani(
     senkDurumu: SyncState,
     bekleyen: Int,
     cikistaBekleyen: Int?,
+    sifreDurumu: SifreDurumu,
+    sifreDiyaloguAcik: Boolean,
     onGeri: () -> Unit,
     onPersonel: () -> Unit,
     onSimdiEsitle: () -> Unit,
@@ -84,6 +101,9 @@ fun AyarlarEkrani(
     onCikisiOnayla: () -> Unit,
     onCikistanVazgec: () -> Unit,
     onSalonAdiKaydet: (String) -> Unit,
+    onSifreDegistir: (mevcut: String, yeni: String, tekrar: String) -> Unit,
+    onSifreDiyaloguAc: () -> Unit,
+    onSifreDiyaloguKapat: () -> Unit,
 ) {
     var salonDiyalogu by remember { mutableStateOf(false) }
 
@@ -166,9 +186,19 @@ fun AyarlarEkrani(
                 onTikla = { salonDiyalogu = true },
             )
 
-            // KALDIRILDI: "Giriş Şifresi". Giriş artık Supabase Auth ile
-            // yapılıyor ve şifre panelden/hesap sahibinden değişiyor; buradaki
-            // alan hiçbir yerde okunmayan bir tercihi yazıyordu.
+            // Bir zamanlar burada hiçbir yerde okunmayan bir tercihi yazan
+            // "Giriş Şifresi" alanı vardı; kaldırılmıştı. Bu satır onun yerine
+            // GERÇEĞİNİ koyuyor: Supabase Auth üzerindeki şifreyi değiştiriyor.
+            //
+            // Gerekçesi `personel-davet`: yeni personele geçici bir şifre
+            // üretiliyor ve kişinin onu değiştireceği bir yer olmadığı sürece
+            // geçici şifre kalıcı hâle geliyordu.
+            AyarSatiri(
+                baslik = "Şifre Değiştir",
+                altBaslik = "Giriş şifrenizi güncelleyin",
+                ikon = Icons.Default.Lock,
+                onTikla = onSifreDiyaloguAc,
+            )
 
             AyarSatiri(
                 baslik = "Sunucuya Eşitle",
@@ -216,7 +246,121 @@ fun AyarlarEkrani(
                 }
             }
         }
+
+        if (sifreDiyaloguAcik) {
+            SifreDiyalogu(
+                durum = sifreDurumu,
+                onKapat = onSifreDiyaloguKapat,
+                onKaydet = onSifreDegistir,
+            )
+        }
     }
+}
+
+/**
+ * Şifre değiştirme diyaloğu.
+ *
+ * ### Mevcut şifre neden soruluyor
+ * Sunucu istemiyor — geçerli bir jeton yetiyor. Sormamak, salonun tezgâhında
+ * açık unutulmuş bir telefonu eline alan birinin şifreyi değiştirip hesap
+ * sahibini kilitlemesine izin vermek olurdu.
+ *
+ * ### Başarı neden diyaloğu kapatmıyor
+ * Kapansaydı kullanıcı şifresinin gerçekten değişip değişmediğini bilemezdi ve
+ * bu akışta bilememek pahalı: bir dahaki girişte hangi şifreyi yazacağını
+ * bilmiyor demek. Diyalog "değişti" diyor, kapatmayı kullanıcı yapıyor.
+ *
+ * Kutular da o anda temizleniyor: açık kalan bir "yeni şifre" alanı, ekranı
+ * bırakıp giden kullanıcının şifresini bir sonraki kişiye gösterirdi.
+ */
+@Composable
+private fun SifreDiyalogu(
+    durum: SifreDurumu,
+    onKapat: () -> Unit,
+    onKaydet: (mevcut: String, yeni: String, tekrar: String) -> Unit,
+) {
+    var mevcut by remember { mutableStateOf("") }
+    var yeni by remember { mutableStateOf("") }
+    var tekrar by remember { mutableStateOf("") }
+
+    val basarili = durum is SifreDurumu.Basarili
+    val gonderiliyor = durum is SifreDurumu.Gonderiliyor
+
+    // Başarıdan sonra alanlar boşaltılıyor; şifre ekranda asılı kalmasın.
+    LaunchedEffect(basarili) {
+        if (basarili) {
+            mevcut = ""
+            yeni = ""
+            tekrar = ""
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!gonderiliyor) onKapat() },
+        title = { Text("Şifre Değiştir") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (basarili) {
+                    Text(
+                        "Şifreniz değiştirildi. Bundan sonra yeni şifrenizle giriş yapın.",
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                } else {
+                    SifreAlani("Mevcut şifre", mevcut, gonderiliyor) { mevcut = it }
+                    SifreAlani("Yeni şifre", yeni, gonderiliyor) { yeni = it }
+                    SifreAlani("Yeni şifre (tekrar)", tekrar, gonderiliyor) { tekrar = it }
+
+                    Text(
+                        "En az ${SifreKurali.EN_AZ_UZUNLUK} karakter.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                    )
+
+                    if (durum is SifreDurumu.Hata) {
+                        Text(durum.mesaj, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (basarili) {
+                TextButton(onClick = onKapat) { Text("Tamam") }
+            } else {
+                TextButton(
+                    // Gönderim sırasında pasif: çift dokunma iki isteğe
+                    // dönüşürdü ve ikincisi artık geçersiz olan eski şifreyle
+                    // gider, "mevcut şifreniz yanlış" derdi.
+                    enabled = !gonderiliyor,
+                    onClick = { onKaydet(mevcut, yeni, tekrar) },
+                ) { Text(if (gonderiliyor) "Gönderiliyor…" else "Değiştir") }
+            }
+        },
+        dismissButton = {
+            if (!basarili) {
+                TextButton(enabled = !gonderiliyor, onClick = onKapat) { Text("Vazgeç") }
+            }
+        },
+    )
+}
+
+@Composable
+private fun SifreAlani(
+    etiket: String,
+    deger: String,
+    pasif: Boolean,
+    onDegisti: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = deger,
+        onValueChange = onDegisti,
+        label = { Text(etiket) },
+        singleLine = true,
+        enabled = !pasif,
+        // Şifre gizleniyor ve klavye öneri/otomatik tamamlama yapmıyor.
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable

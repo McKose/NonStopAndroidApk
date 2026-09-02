@@ -339,6 +339,64 @@ export class SupabaseClient {
     return { tur: "tamam", yanit: govde };
   }
 
+  /**
+   * Giriş şifresini değiştirir — **önce mevcut şifreyi doğrulayarak**.
+   *
+   * ### Neden yeniden giriş yapılıyor
+   * Supabase'in `PUT /auth/v1/user` ucu mevcut şifreyi sormuyor; geçerli bir
+   * jeton yetiyor. Tek başına kullanılsaydı açık somut olurdu: salonun ortak
+   * bilgisayarında açık unutulmuş bir panelde şifre değiştirilip hesap sahibi
+   * kilitlenebilirdi. Jeton "bu kişi giriş yapmıştı" diyor, "bu kişi şu anda
+   * burada" demiyor.
+   *
+   * Doğrulama gerçek bir giriş denemesiyle yapılıyor — mevcut şifreyi bilmenin
+   * başka bir kanıtı yok. Yan etkisi bilinçli: [girisYap] başarılı olduğunda
+   * oturum tazeleniyor ve saklanıyor, dolayısıyla yazma taze jetonla gidiyor.
+   *
+   * ### Sıra: önce doğrula, sonra yaz
+   * Ters sırada, yanlış mevcut şifre girildiğinde şifre çoktan değişmiş
+   * olurdu — yani korumanın kendisi zararı üretirdi.
+   *
+   * Hata durumunda ham durum kodu ve gövde dönüyor; okunur mesaja çeviren yer
+   * `sifre.js` (orada sınanabiliyor).
+   */
+  async sifreDegistir({ mevcut, yeni }) {
+    const oturum = this.oturumOku();
+    if (!oturum) return { tur: "oturumsuz" };
+
+    // Kimlik kanıtı. `girisYap` başarılıysa oturumu da tazeleyip saklıyor.
+    const dogrulama = await this.girisYap(oturum.email, mevcut);
+    if (dogrulama.tur === "kimlik") {
+      return { tur: "yanlis-sifre", mesaj: "Mevcut şifreniz yanlış." };
+    }
+    if (dogrulama.tur !== "tamam") return dogrulama;
+
+    const yanit = await fetch(`${this.url}/auth/v1/user`, {
+      method: "PUT",
+      headers: {
+        apikey: this.anonKey,
+        Authorization: `Bearer ${dogrulama.oturum.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ password: yeni }),
+    }).catch(() => null);
+
+    if (!yanit) return { tur: "hata", kod: 0, govde: null };
+
+    if (!yanit.ok) {
+      const ham = await yanit.json().catch(() => ({}));
+      // Sunucunun kendi metni tek bir alana toplanıyor: GoTrue sürüme göre
+      // `msg`, `message` ya da `error_description` kullanıyor ve üçünü de
+      // çağıran tarafta aramak, birinin unutulmasıyla mesajı kaybettirirdi.
+      const mesaj = ham.msg || ham.message || ham.error_description || ham.error || "";
+      return { tur: "hata", kod: yanit.status, govde: { mesaj } };
+    }
+
+    // Yanıt gövdesi güncellenmiş kullanıcı; okunacak bir şey yok. Jeton
+    // üretilmiyor ve mevcut oturum geçerli kalıyor.
+    return { tur: "tamam" };
+  }
+
   async dosyaYukle(dosya, salonId) {
     const oturum = this.oturumOku();
     if (!oturum) return { tur: "oturumsuz" };

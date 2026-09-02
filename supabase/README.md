@@ -236,6 +236,27 @@ hesap açıp UID'yi `gym_users` ve `staff` satırlarına yazarak), ama elle
 yapıldığında adımlardan biri atlanabiliyor — bu fonksiyon tam olarak o yüzden
 var.
 
+### Geçici şifreyi kişi kendisi değiştiriyor
+
+Davet **geçici** bir şifre üretiyor ve yönetici onu bir kez görüp iletiyor.
+Kişi ilk girişten sonra kendi şifresini belirliyor:
+
+| Nerede | Yol |
+|---|---|
+| Uygulama | Ayarlar → **Şifre Değiştir** |
+| Panel | Sağ üstte **Şifre değiştir** |
+
+İkisi de mevcut şifreyi **soruyor**. Supabase'in şifre değiştirme ucu bunu
+istemiyor — geçerli bir jeton yetiyor — ama sormamak açık bir kapı bırakırdı:
+tezgâhta açık unutulmuş bir telefonu ya da paneli eline alan biri şifreyi
+değiştirip hesap sahibini kilitleyebilirdi. Jeton "bu kişi giriş yapmıştı"
+diyor, "bu kişi şu anda burada" demiyor. Doğrulama gerçek bir giriş denemesiyle
+yapılıyor ve **yazmadan önce**: ters sırada, yanlış şifre girildiğinde şifre
+çoktan değişmiş olurdu.
+
+Yönetici başkasının şifresini **değiştiremiyor**; yalnızca yeni bir davet
+gönderip yeni bir geçici şifre üretebiliyor.
+
 ## Kim neyi yazabilir
 
 Salona bağlı olmak artık tek başına yetmiyor; `gym_users.role` ne
@@ -323,11 +344,6 @@ görünmeye devam ederdi.
 
 ## Henüz yapılmadı
 
-- **Şifre değiştirme ekranı yok.** `personel-davet` geçici bir şifre üretip
-  yöneticiye bir kez gösteriyor; personel o şifreyle giriyor. Kendi şifresini
-  belirleyebileceği bir ekran henüz yok, dolayısıyla geçici şifre kalıcı hâle
-  geliyor. Ekran teknik olarak küçük (giriş yapmış kullanıcı için tek bir
-  `updateUser` çağrısı, e-posta göndermeye gerek yok) ama henüz yazılmadı.
 - **Erişimi geri alma akışı yok.** İşten ayrılan birinin `gym_users` satırı
   elle silinmeli. Fonksiyona `delete` yetkisi bilerek verilmedi: yanlışlıkla
   silinen bir satır o kişinin bütün geçmişini görünmez kılar ve bu ayrı

@@ -64,6 +64,7 @@ export const BIRLESTIRILEN = [
   "sekmeler.js",
   "stok.js",
   "davet.js",
+  "sifre.js",
   "demo.js",
   "app.js",
 ];
