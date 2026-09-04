@@ -310,6 +310,49 @@ export class SupabaseClient {
    * olacak şekilde yazıldı.
    */
   async personelDavetEt({ personelId, eposta, yetki }) {
+    return await this.#edgeCagir("personel-davet", (oturum) => ({
+      gym_id: oturum.gym_id,
+      staff_id: personelId,
+      email: eposta,
+      role: yetki,
+    }));
+  }
+
+  /**
+   * Personelin bu salona erişimini kaldırır.
+   *
+   * Davetin tersi ve aynı sebeple sunucuda: `gym_users` satırını silmek de
+   * yazmak kadar hassas. Üstelik `delete` yetkisi istemci rollerinden tamamen
+   * alındı (bkz. migrasyon `0008`), yani panel bunu deneseydi yetki hatasıyla
+   * dönerdi — tabloya silme yetkisi olan tek yer `service_role`.
+   *
+   * `gym_id` yine OTURUMDAN alınıyor, ekrandan değil.
+   */
+  async personelErisimKaldir({ personelId }) {
+    return await this.#edgeCagir("personel-erisim-kaldir", (oturum) => ({
+      gym_id: oturum.gym_id,
+      staff_id: personelId,
+    }));
+  }
+
+  /**
+   * Personel yetkisi uçlarının ortak gövdesi.
+   *
+   * İkisi de aynı şeyi yapıyor: oturumu doğrula, jetonla POST at, yanıtı
+   * `{ tur }` biçimine çevir. Kopyalanmış olsaydı ayrışırdı ve ayrışma sessiz
+   * olurdu — ör. biri süresi dolmuş jetonu temizler, diğeri temizlemez ve
+   * kullanıcı bir düğmede çıkışa yönlendirilirken diğerinde anlamsız bir 401
+   * görürdü.
+   *
+   * Hata durumunda ham durum kodu ve gövde dönüyor; okunur mesaja çeviren yer
+   * `davet.js` (orada sınanabiliyor). Ağ hatası `kod: 0` ile ayrı tutuluyor:
+   * yapılacak şey farklı — tekrar denemek güvenli, iki uç da tekrar
+   * edilebilir olacak şekilde yazıldı.
+   *
+   * @param ad fonksiyonun adı (`/functions/v1/<ad>`)
+   * @param govdeYap oturumu alıp istek gövdesini üreten işlev
+   */
+  async #edgeCagir(ad, govdeYap) {
     const oturum = this.oturumOku();
     if (!oturum) return { tur: "oturumsuz" };
     if (Date.now() >= oturum.expires_at_ms) {
@@ -317,19 +360,14 @@ export class SupabaseClient {
       return { tur: "oturumsuz" };
     }
 
-    const yanit = await fetch(`${this.url}/functions/v1/personel-davet`, {
+    const yanit = await fetch(`${this.url}/functions/v1/${ad}`, {
       method: "POST",
       headers: {
         apikey: this.anonKey,
         Authorization: `Bearer ${oturum.access_token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        gym_id: oturum.gym_id,
-        staff_id: personelId,
-        email: eposta,
-        role: yetki,
-      }),
+      body: JSON.stringify(govdeYap(oturum)),
     }).catch(() => null);
 
     if (!yanit) return { tur: "hata", kod: 0, govde: null };

@@ -145,3 +145,98 @@ export function davetBasariMesaji(yanit) {
     ? `${ad}için mevcut hesap salona bağlandı. Şifresi değişmedi.`
     : `${ad}için hesap açıldı.`;
 }
+
+// ─── Erişimi kaldırma ───────────────────────────────────────────────────────
+//
+// Davetin tersi. Aynı kurallar sunucudaki `personel-erisim-kaldir` fonksiyonunda
+// da var ve orada olması ŞART — buradakiler yalnızca geri bildirim için:
+// yönetici, sunucuya gidip 409 ile dönmek yerine düğmenin neden kapalı
+// olduğunu anında görsün.
+
+/**
+ * Bu personelin erişimi kaldırılabilir mi.
+ *
+ * @param durum `erisimDurumu()` sonucundaki `durum`
+ * @param personelAuthId `staff.auth_user_id`
+ * @param oturumKullaniciId oturumu açık olan kişinin `user_id`si
+ * @returns `{ olur: true }` ya da `{ olur: false, sebep }`
+ */
+export function erisimKaldirilabilirMi({
+  durum,
+  personelAuthId = null,
+  oturumKullaniciId = null,
+} = {}) {
+  if (durum === "hesap_yok" || !personelAuthId) {
+    return { olur: false, sebep: "Bu personelin kaldırılacak bir erişimi yok." };
+  }
+
+  // Kendi erişimini kaldıramıyor. Salonun kilitlenmesini engelleyen tek kontrol
+  // bu ve yeterli: bu ekranı yalnızca ADMIN görüyor, çağıran kendini
+  // kaldıramadığına göre salonda her zaman en az bir ADMIN kalıyor.
+  //
+  // "Son yönetici mi" diye ayrıca saymak DAHA İYİ DEĞİL, daha kötü olurdu:
+  // sayım yarışa açık — iki yönetici aynı anda birbirini kaldırırsa ikisi de
+  // "diğeri duruyor" görür ve salon yöneticisiz kalır.
+  if (personelAuthId === oturumKullaniciId) {
+    return {
+      olur: false,
+      sebep: "Kendi erişiminizi kaldıramazsınız. Bunu salonun başka bir yöneticisi yapmalı.",
+    };
+  }
+
+  // `yetki_yok` de kaldırılabilir ve edilmeli: orada `gym_users` satırı zaten
+  // yok ama `staff.auth_user_id` duruyor. O artık bağ panelde bir ARIZA uyarısı
+  // üretiyor ("giriş yapıyor, boş ekran görüyor") ve kaldırma onu temizliyor.
+  return { olur: true };
+}
+
+/**
+ * Onay metni.
+ *
+ * Ne olacağını ve ne OLMAYACAĞINI birlikte söylüyor. İkincisi olmadan yönetici
+ * düğmeye basmaktan çekinirdi: "erişimi kaldır" ifadesi, kişinin geçmişinin de
+ * silineceği izlenimini verebiliyor.
+ */
+export function kaldirmaOnayMetni(personelAdi) {
+  const ad = personelAdi || "Bu personel";
+  return (
+    `${ad} artık bu salonun hiçbir verisini göremeyecek.\n\n` +
+    "Personel kaydı ve geçmişi (satışlar, randevular, hakedişler) DURUYOR — " +
+    "raporlardan düşmüyor. Hesabı da silinmiyor; yalnızca bu salona bağlılığı " +
+    "kaldırılıyor.\n\nDevam edilsin mi?"
+  );
+}
+
+/** Sunucu yanıtını okunur bir mesaja çevirir. */
+export function kaldirmaHataMesaji(durumKodu, govde) {
+  const sunucudan = typeof govde?.hata === "string" ? govde.hata : "";
+
+  switch (durumKodu) {
+    case 401:
+      return "Oturumunuz sona ermiş. Çıkıp yeniden giriş yapın.";
+    case 403:
+      return "Bu işlem için salon yöneticisi olmanız gerekiyor.";
+    case 404:
+      return "Personel kaydı bulunamadı. Sayfayı yenileyip tekrar deneyin.";
+    case 409:
+      // Tek 409 sebebi kendi erişimini kaldırma denemesi; sunucunun mesajı
+      // zaten bunu anlatıyor ve uydurmaktan iyi.
+      return sunucudan || "Bu erişim kaldırılamaz.";
+    case 502:
+      // Yarım kalmış olabilir ve yapılacak şey belli: tekrar çalıştırmak.
+      // Sunucunun mesajı bunu söylüyor, o yüzden öne alınıyor.
+      return sunucudan || "İşlem yarıda kaldı. Bir kez daha deneyin.";
+    case 0:
+      return "Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.";
+    default:
+      return sunucudan || `Erişim kaldırılamadı (${durumKodu}).`;
+  }
+}
+
+/** Başarılı yanıtın ekranda görünecek özeti. */
+export function kaldirmaBasariMesaji(yanit) {
+  const ad = yanit?.personel ? `${yanit.personel} ` : "";
+  return yanit?.durum === "zaten_yok"
+    ? `${ad}için zaten bir erişim yoktu; personel kaydı temizlendi.`
+    : `${ad}artık bu salonun verilerini göremiyor.`;
+}

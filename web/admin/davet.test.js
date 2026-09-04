@@ -16,6 +16,10 @@ import {
   davetiDogrula,
   davetHataMesaji,
   davetBasariMesaji,
+  erisimKaldirilabilirMi,
+  kaldirmaOnayMetni,
+  kaldirmaHataMesaji,
+  kaldirmaBasariMesaji,
 } from "./davet.js";
 
 // ─── Erişim durumu ──────────────────────────────────────────────────────────
@@ -169,4 +173,117 @@ test("başarı mesajı iki durumu ayırıyor", () => {
   // Mevcut hesap bağlandığında şifre DEĞİŞMİYOR ve bunun yazması gerekiyor:
   // yönetici geçici şifre bekleyip bulamayınca işlemin yarım kaldığını sanar.
   assert.match(baglandi, /şifre/i);
+});
+
+// ─── Erişimi kaldırma ───────────────────────────────────────────────────────
+
+const BEN = "11111111-1111-1111-1111-111111111111";
+const BASKASI = "22222222-2222-2222-2222-222222222222";
+
+test("erişimi olan personelin erişimi kaldırılabiliyor", () => {
+  const sonuc = erisimKaldirilabilirMi({
+    durum: "erisim_var",
+    personelAuthId: BASKASI,
+    oturumKullaniciId: BEN,
+  });
+  assert.equal(sonuc.olur, true);
+});
+
+/**
+ * Salonun kilitlenmesini engelleyen tek kontrol bu.
+ *
+ * Bu ekranı yalnızca ADMIN görüyor; çağıran kendini kaldıramadığına göre
+ * salonda her zaman en az bir ADMIN kalıyor. Kontrol düşerse belirti geç ve
+ * geri dönülmez: son yönetici kendini kaldırır, panele kimse giremez ve
+ * düzeltmek Supabase paneli gerektirir.
+ */
+test("kendi erişimini kaldıramıyor", () => {
+  const sonuc = erisimKaldirilabilirMi({
+    durum: "erisim_var",
+    personelAuthId: BEN,
+    oturumKullaniciId: BEN,
+  });
+  assert.equal(sonuc.olur, false);
+  assert.match(sonuc.sebep, /[Kk]endi/);
+});
+
+test("hesabı olmayanda kaldırılacak bir şey yok", () => {
+  const sonuc = erisimKaldirilabilirMi({
+    durum: "hesap_yok",
+    personelAuthId: null,
+    oturumKullaniciId: BEN,
+  });
+  assert.equal(sonuc.olur, false);
+});
+
+/**
+ * `yetki_yok` KALDIRILABİLİR olmalı.
+ *
+ * Orada `gym_users` satırı zaten yok ama `staff.auth_user_id` duruyor ve o
+ * artık bağ panelde bir arıza uyarısı üretiyor ("giriş yapıyor, boş ekran
+ * görüyor"). Kaldırma kapatılsaydı o satırı temizlemenin panelden yolu
+ * kalmazdı — yani bu akışın var oluş sebebi olan duruma geri dönülürdü.
+ */
+test("yetkisi eksik personelin artık bağı temizlenebiliyor", () => {
+  const sonuc = erisimKaldirilabilirMi({
+    durum: "yetki_yok",
+    personelAuthId: BASKASI,
+    oturumKullaniciId: BEN,
+  });
+  assert.equal(sonuc.olur, true);
+});
+
+/** Eksik/boş girdi kaldırmayı açmamalı: varsayılan "hayır" olmalı. */
+test("kimlik bilinmiyorsa kaldırma kapalı", () => {
+  assert.equal(erisimKaldirilabilirMi().olur, false);
+  assert.equal(
+    erisimKaldirilabilirMi({ durum: "erisim_var", personelAuthId: null }).olur,
+    false,
+  );
+});
+
+/**
+ * Onay metni ne OLMAYACAĞINI da söylüyor.
+ *
+ * "Erişimi kaldır" ifadesi kişinin geçmişinin de silineceği izlenimini
+ * verebiliyor. Metin bunu açıkça yalanlamazsa yönetici düğmeye basmaktan
+ * çekinir ve akış kullanılmaz — yazılmamış olmasından farkı kalmaz.
+ */
+test("onay metni geçmişin durduğunu söylüyor", () => {
+  const metin = kaldirmaOnayMetni("Ayşe");
+  assert.match(metin, /Ayşe/);
+  assert.match(metin, /geçmiş/i);
+  assert.match(metin, /silinmiyor|DURUYOR/);
+});
+
+test("onay metni ad yoksa da anlamlı", () => {
+  assert.match(kaldirmaOnayMetni(""), /personel/i);
+});
+
+test("kaldırma hataları okunur mesaja çevriliyor", () => {
+  assert.match(kaldirmaHataMesaji(401, {}), /[Oo]turum/);
+  assert.match(kaldirmaHataMesaji(403, {}), /yönetici/i);
+  assert.match(kaldirmaHataMesaji(0, {}), /[Bb]ağlantı/);
+  assert.match(kaldirmaHataMesaji(418, {}), /418/);
+});
+
+/**
+ * 409 ve 502'de sunucunun kendi mesajı korunuyor.
+ *
+ * İkisi de "ne yapmalı" bilgisi taşıyor: 409 kendi erişimini kaldırma
+ * denemesini, 502 yarıda kalmış bir işlemi anlatıyor ve ikincisinde yapılacak
+ * şey somut — tekrar çalıştırmak. Sabit bir metinle değiştirmek o bilgiyi
+ * atardı.
+ */
+test("kaldırmada sunucu mesajı korunuyor", () => {
+  const mesaj = "Erişim kaldırıldı ama hesap bağı temizlenemedi.";
+  assert.equal(kaldirmaHataMesaji(502, { hata: mesaj }), mesaj);
+  assert.equal(kaldirmaHataMesaji(409, { hata: mesaj }), mesaj);
+});
+
+test("kaldırma başarı mesajı iki durumu ayırıyor", () => {
+  const kaldirildi = kaldirmaBasariMesaji({ durum: "kaldirildi", personel: "Ayşe" });
+  const zaten = kaldirmaBasariMesaji({ durum: "zaten_yok", personel: "Ayşe" });
+  assert.notEqual(kaldirildi, zaten);
+  assert.match(zaten, /zaten/i);
 });

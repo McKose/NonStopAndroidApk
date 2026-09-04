@@ -236,6 +236,32 @@ hesap açıp UID'yi `gym_users` ve `staff` satırlarına yazarak), ama elle
 yapıldığında adımlardan biri atlanabiliyor — bu fonksiyon tam olarak o yüzden
 var.
 
+### Erişimi geri alma
+
+İşten ayrılan biri için panelde **Personel Erişimi** sekmesindeki satırın
+sonunda **"Erişimi kaldır"** düğmesi var. Arkasındaki Edge Function
+**`personel-erisim-kaldir`**; `gym_users` satırını siliyor ve
+`staff.auth_user_id`yi boşaltıyor.
+
+Ne silinmediği, silindiği kadar önemli:
+
+| Ne olur | Ne OLMAZ |
+|---|---|
+| Salona bağlılık (`gym_users`) silinir | `auth.users` hesabı silinmez — kişi başka bir salonda çalışıyor olabilir |
+| Personel kaydının hesap bağı boşalır | `staff` satırı ve geçmişi (satış, randevu, hakediş) durur; raporlardan düşmez |
+
+**Kendi erişiminizi kaldıramazsınız.** Salonun yöneticisiz kalmasını engelleyen
+tek kontrol bu ve yeterli: düğmeyi yalnızca ADMIN görüyor, kendini
+kaldıramadığına göre her zaman en az bir ADMIN kalıyor. "Son yönetici mi" diye
+saymak daha kötü olurdu — sayım yarışa açık, iki yönetici aynı anda birbirini
+kaldırırsa ikisi de "diğeri duruyor" görür.
+
+Erişimi geri vermek yeniden davet etmekle oluyor. Hesap silinmediği için davet
+onu bulup salona geri bağlıyor: **şifre değişmiyor**, kişi eski şifresiyle
+giriyor ve yeni bir geçici şifre üretilmiyor (yanıt "mevcut hesap bağlandı"
+diyor). Şifresini unutmuşsa çözüm davet değil, Supabase panelinden şifre
+sıfırlama.
+
 ### Geçici şifreyi kişi kendisi değiştiriyor
 
 Davet **geçici** bir şifre üretiyor ve yönetici onu bir kez görüp iletiyor.
@@ -379,11 +405,10 @@ görünmeye devam ederdi.
 
 ## Henüz yapılmadı
 
-- **Erişimi geri alma akışı yok.** İşten ayrılan birinin `gym_users` satırı
-  elle silinmeli. Ekran yazılmadı çünkü yanlışlıkla silinen bir satır o kişinin
-  bütün geçmişini görünmez kılar ve bu ayrı düşünülmesi gereken bir karar.
-  Yazıldığında yeri belli: davet fonksiyonunun yanında, `service_role` ile —
-  o rolün `delete` yetkisi bu yüzden `0008`de de duruyor.
+- **Personel kaydını tamamen silme yolu yok.** Erişimi kaldırmak var (aşağıya
+  bakın) ama `staff` satırının kendisi duruyor ve durması gerekiyor: geçmiş
+  satışlar, randevular ve hakedişler ona bağlı. Gerçekten silinmesi gereken
+  bir kayıt (ör. yanlışlıkla açılmış) için hâlâ Supabase paneli gerekiyor.
 - **iOS tarafında oturum saklama yok.** Android'de oturum Keystore ile
   şifrelenip saklanıyor ve uygulama kapansa da korunuyor; iOS uygulaması
   yazıldığında Keychain karşılığı `SessionStore` arayüzünün arkasına eklenecek.
