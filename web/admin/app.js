@@ -42,6 +42,10 @@ import {
   davetiDogrula,
   davetHataMesaji,
   davetBasariMesaji,
+  erisimKaldirilabilirMi,
+  kaldirmaOnayMetni,
+  kaldirmaHataMesaji,
+  kaldirmaBasariMesaji,
 } from "./davet.js";
 import { SIFRE_EN_AZ_UZUNLUK, sifreyiDogrula, sifreHataMesaji } from "./sifre.js";
 import { SEKME_VERISI } from "./sekmeler.js";
@@ -1027,8 +1031,15 @@ async function personelErisimYukle(ad) {
   baslik.textContent = "Personel";
   kap.appendChild(baslik);
 
+  // Kaldırma sonucu tablonun ÜSTÜNDE: satır içi bir mesaj, uzun listede
+  // ekranın dışında kalabiliyor ve yönetici işlemin olup olmadığını göremezdi.
+  const kaldirmaSonucu = document.createElement("div");
+  kap.appendChild(kaldirmaSonucu);
+
+  const benimKimligim = istemci.oturumOku()?.user_id ?? null;
+
   kap.appendChild(tabloYap(
-    ["Ad Soyad", "Unvan", "Durum", "Uygulama yetkisi"],
+    ["Ad Soyad", "Unvan", "Durum", "Uygulama yetkisi", ""],
     durumlar.map(({ p, durum, yetki }) => [
       p.full_name,
       p.title,
@@ -1039,10 +1050,83 @@ async function personelErisimYukle(ad) {
       // yetkiyi belirleyen bu. `staff.role` gösterilseydi yönetici birine
       // ADMIN verdiğini sanırken kişi eğitmen yetkisiyle gezebilirdi.
       yetki ?? "—",
+      kaldirmaDugmesi(p, durum, benimKimligim, kaldirmaSonucu),
     ]),
   ));
 
   $("icerik").appendChild(kap);
+}
+
+/**
+ * Bir personelin "Erişimi kaldır" düğmesi.
+ *
+ * ### Neden satır içinde, ayrı bir form değil
+ * Davet bir form: üç alan doldurulup gönderiliyor. Kaldırma tek bir seçim ve o
+ * seçim zaten tabloda duruyor. Ayrı bir açılır liste, yöneticiyi aynı kişiyi
+ * ikinci kez seçmeye zorlardı — ve yanlış satırı seçme ihtimalini yaratırdı.
+ *
+ * ### Kapalı düğme gizlenmiyor
+ * Kaldırılamayan satırda düğme duruyor ama `disabled` ve sebebi `title`da.
+ * Gizlenseydi yönetici kendi satırında düğmenin yokluğunu bir arıza sanabilirdi;
+ * asıl bilgi, kaldırmanın neden mümkün olmadığı.
+ */
+function kaldirmaDugmesi(personel, durum, benimKimligim, sonucAlani) {
+  const izin = erisimKaldirilabilirMi({
+    durum,
+    personelAuthId: personel.auth_user_id ?? null,
+    oturumKullaniciId: benimKimligim,
+  });
+
+  const dugme = document.createElement("button");
+  dugme.type = "button";
+  dugme.className = "ikincil";
+  dugme.textContent = "Erişimi kaldır";
+
+  if (!izin.olur) {
+    dugme.disabled = true;
+    dugme.title = izin.sebep;
+    return dugme;
+  }
+
+  dugme.addEventListener("click", async () => {
+    // Onay ŞART: işlem tek tıkla ve geri alma düğmesi yok. Geri almanın yolu
+    // yeniden davet etmek ve o, kişiye YENİ bir geçici şifre üretiyor —
+    // yani yanlışlıkla basmak, karşı tarafı da ilgilendiren bir iş çıkarıyor.
+    if (!globalThis.confirm(kaldirmaOnayMetni(personel.full_name))) return;
+
+    sonucAlani.replaceChildren();
+    dugme.disabled = true;
+    dugme.textContent = "Kaldırılıyor…";
+
+    const sonuc = await istemci.personelErisimKaldir({ personelId: personel.id });
+
+    if (sonuc.tur === "oturumsuz") {
+      hataYaz("giris-hata", "Oturumunuzun süresi doldu, tekrar giriş yapın.");
+      return goster("giris");
+    }
+    if (sonuc.tur !== "tamam") {
+      // Düğme geri açılıyor: hataların çoğunda tekrar denemek doğru olan şey
+      // (ağ hatası, yarıda kalmış işlem) ve akış tekrar edilebilir yazıldı.
+      dugme.disabled = false;
+      dugme.textContent = "Erişimi kaldır";
+      sonucAlani.appendChild(
+        mesajSatiri("hata", kaldirmaHataMesaji(sonuc.kod, sonuc.govde)),
+      );
+      return;
+    }
+
+    // Liste tazeleniyor: durum sütunu ve üstteki sayaçlar artık yanlış.
+    // Davetteki gibi korunacak bir şey yok — kaldırma tek seferlik bir sır
+    // üretmiyor, dolayısıyla baştan çizmenin bir bedeli de yok.
+    //
+    // `await` ŞART: `sekmeYukle` asenkron ve `#icerik`i baştan çiziyor.
+    // Beklenmeseydi başarı mesajı çizimden ÖNCE eklenir ve saniyesinde
+    // silinirdi — işlem başarılı olur, yönetici hiçbir şey görmezdi.
+    await sekmeYukle(aktifSekme);
+    $("icerik").prepend(mesajSatiri("alt", kaldirmaBasariMesaji(sonuc.yanit)));
+  });
+
+  return dugme;
 }
 
 /** Davet formu: personel seç, e-posta ve yetki gir, gönder. */

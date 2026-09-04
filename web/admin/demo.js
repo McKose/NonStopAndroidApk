@@ -375,6 +375,56 @@ export function demoIstemcisi() {
   // mesajları ve düğme durumları hiç görülmezdi.
   let oturum = null;
 
+  /**
+   * Erişimi kaldırılan personel kimlikleri.
+   *
+   * Bu dosyadaki diğer yazmalar kalıcı DEĞİL ("kaydedildi" der, listeye
+   * dokunmaz) ve gerekçesi geçerli: demo verisi sabit kalsın, ekranı
+   * değerlendiren kişi her açtığında aynı şeyi görsün.
+   *
+   * Kaldırma bir istisna ve sebebi dosyanın başındaki daha güçlü kural:
+   * demo, gerçekte olmayacak bir şeyi göstermemeli. Kalıcı olmasaydı ekran
+   * KENDİ İÇİNDE çelişirdi — üstte "artık bu salonun verilerini göremiyor"
+   * yazarken hemen altındaki satır "Erişimi var" derdi. Davette bu çelişki
+   * yok (yeni satır eklenmiyor, var olan bir satır yalanlanmıyor).
+   *
+   * Kapsam istemci örneğine ait, `TABLOLAR`a değil: sayfayı yenilemek demoyu
+   * baştaki hâline döndürüyor ve `TABLOLAR` sabit kalıyor.
+   */
+  const erisimiKaldirilanlar = new Set();
+
+  /**
+   * Kaldırılan erişimleri okunan satırlara yansıtır.
+   *
+   * Gerçek sunucunun yaptığı İKİ şeyin karşılığı ve ikisi de gerekli:
+   *  - `staff.auth_user_id` boşalıyor → personel "Hesabı yok" görünüyor
+   *  - `gym_users` satırı siliniyor → yetki sütunu boşalıyor
+   *
+   * Yalnızca biri yapılsaydı demo, gerçekte oluşmayan bir ara duruma düşerdi:
+   * yalnızca ilki "hesabı yok ama yetkisi duruyor", yalnızca ikincisi ise
+   * "hesabı var, yetkisi yok" gösterirdi — ki ikincisi panelde bir ARIZA
+   * uyarısı bastırıyor ve kasıtlı bir kaldırmadan sonra o uyarı yanlış olurdu.
+   *
+   * Kopya üzerinde çalışıyor: `TABLOLAR` sabit kalmalı.
+   */
+  function kaldirmaUygula(tablo, satirlar) {
+    if (erisimiKaldirilanlar.size === 0) return satirlar;
+
+    if (tablo === "staff") {
+      return satirlar.map((s) =>
+        erisimiKaldirilanlar.has(s.id) ? { ...s, auth_user_id: null } : s,
+      );
+    }
+    if (tablo === "gym_users") {
+      const dusenHesaplar = new Set(
+        PERSONEL.filter((p) => erisimiKaldirilanlar.has(p.id))
+          .map((p) => p.auth_user_id),
+      );
+      return satirlar.filter((y) => !dusenHesaplar.has(y.user_id));
+    }
+    return satirlar;
+  }
+
   const yeniOturum = (eposta) => ({
     access_token: "demo",
     expires_at_ms: Date.now() + 60 * 60 * 1000,
@@ -382,6 +432,14 @@ export function demoIstemcisi() {
     gym_id: "demo",
     gym_name: "NonStop Studio (demo)",
     role: "ADMIN",
+    // Gerçek oturumda da var (`supabase.js`) ve burada bulunması ŞART:
+    // "erişimi kaldır" düğmesi kişinin KENDİ satırında kapalı olmalı ve panel
+    // bunu `user_id` karşılaştırarak anlıyor. Eksik olsaydı önizlemede o
+    // koruma hiç görünmez, üstelik salon sahibinin kendi satırındaki düğme
+    // açık görünürdü — yani demo, gerçekte olmayan bir şeyi gösterirdi.
+    //
+    // Değer `PERSONEL` listesindeki salon sahibinin `auth_user_id`si.
+    user_id: "auth-demo-0",
   });
 
   return {
@@ -406,7 +464,7 @@ export function demoIstemcisi() {
       // geçerdi.
       return {
         tur: "tamam",
-        satirlar: sirala(TABLOLAR[tablo] ?? [], secenekler.order),
+        satirlar: sirala(kaldirmaUygula(tablo, TABLOLAR[tablo] ?? []), secenekler.order),
         kesildi: false,
       };
     },
@@ -478,6 +536,33 @@ export function demoIstemcisi() {
           personel: kisi?.full_name ?? "Personel",
           yetki,
           gecici_sifre: rastgele,
+        },
+      };
+    },
+
+    /**
+     * Demo modda erişim kaldırma **çalışıyor ve ekranda görünüyor**.
+     *
+     * Gerçek istemciyle aynı yüzeyi taşıması şart: app.js hangisiyle
+     * çalıştığını bilmiyor ve eksik bir yöntem demoyu çökertirdi.
+     *
+     * Bu dosyadaki diğer yazmaların aksine sonucu listeye YANSIYOR; gerekçesi
+     * `erisimiKaldirilanlar`ın başında. Kalıcılık sayfa yenilenene kadar.
+     */
+    async personelErisimKaldir({ personelId }) {
+      if (!oturum) return { tur: "oturumsuz" };
+
+      const kisi = PERSONEL.find((p) => p.id === personelId);
+      // Zaten kaldırılmışsa gerçek sunucu da `zaten_yok` dönüyor; tekrar
+      // çalıştırmanın hata olmaması akışın tasarım kararı.
+      const vardi = Boolean(kisi?.auth_user_id) && !erisimiKaldirilanlar.has(personelId);
+      if (kisi) erisimiKaldirilanlar.add(personelId);
+
+      return {
+        tur: "tamam",
+        yanit: {
+          durum: vardi ? "kaldirildi" : "zaten_yok",
+          personel: kisi?.full_name ?? "Personel",
         },
       };
     },

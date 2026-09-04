@@ -49,6 +49,21 @@
 // geri dönerdi.
 // ---------------------------------------------------------------------------
 
+// Bu dosyayı MODÜL yapıyor ve tek işi bu.
+//
+// `import`/`export` içermeyen bir `.ts` dosyasını TypeScript "global betik"
+// sayıyor; Deno ise her dosyayı modül olarak çalıştırıyor. Fark, tek fonksiyon
+// varken görünmüyordu. İkinci fonksiyon (`personel-erisim-kaldir`) eklenince
+// CI düştü: denetim bütün fonksiyonları TEK `tsc` çağrısına veriyor ve iki
+// dosyanın `SUPABASE_URL`, `hata`, `sunucu` gibi tepe seviye adları aynı
+// global kapsamda çakıştı.
+//
+// Asıl tehlike o hata değil, tersi: aynı kapsam yüzünden bu dosya ÖTEKİ
+// fonksiyonda tanımlı bir yardımcıyı kullanabilir ve `tsc` sorun görmezdi —
+// oysa Deno her fonksiyonu ayrı derliyor ve canlıda "tanımsız" ile çökerdi.
+// Sessiz olan yön bu. Modül yapmak ikisini birden kapatıyor.
+export {};
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
