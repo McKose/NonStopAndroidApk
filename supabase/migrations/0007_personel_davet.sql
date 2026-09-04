@@ -128,8 +128,22 @@ create policy gym_users_admin_select on public.gym_users
 -- içinde "permission denied for table gym_users" diye çıkar ve davet
 -- ekranında sebebi anlaşılmaz bir hata olarak görünür.
 --
--- Açıkça verilenler yalnızca davetin ihtiyacı kadar. `delete` YOK: bir kişinin
--- erişimini kaldırmak ayrı bir akış ve ayrı düşünülmeli — yanlışlıkla silinen
--- bir satır, o kişinin bütün geçmişini görünmez kılar.
+-- Açıkça verilenler davetin ihtiyacı kadar. `delete` LİSTEDE YOK ama bu bir
+-- KISITLAMA DEĞİL, yalnızca bir niyet beyanı: Supabase yeni bir tabloyu
+-- `anon`, `authenticated` ve `service_role` rollerine bütün ayrıcalıklarla
+-- (`delete` ve `truncate` dâhil) açıyor ve `grant` yalnızca ekleme yapıyor.
+-- Yani bu satırlar çalıştıktan sonra da `service_role` bu tabloları
+-- silebiliyor. Doğrulandı: `information_schema.role_table_grants`.
+--
+-- Gerçek koruma tablo yetkisi değil, RLS: `gym_users` üzerinde RLS açık ve
+-- HİÇBİR yazma kuralı yok (yukarıdaki tek kural `for select`). İstemci —
+-- `anon` da `authenticated` de — bu tabloya yazamıyor. `service_role` RLS'i
+-- baypas ediyor, dolayısıyla ona karşı tek koruma Edge Function'ın kendi
+-- yetki kontrolü; anahtar da yalnızca sunucuda duruyor.
+--
+-- `revoke delete` YAZILMADI: bir kişinin erişimini kaldırma akışı hâlâ eksik
+-- (bkz. supabase/README.md) ve yazıldığında `gym_users`tan satır silmesi
+-- gerekecek. Bugün yetkiyi geri almak, yarın onu geri vermekten başka bir işe
+-- yaramazdı.
 grant select, insert, update on public.gym_users to service_role;
 grant select, update on public.staff to service_role;
