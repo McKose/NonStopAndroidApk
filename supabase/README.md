@@ -257,6 +257,30 @@ yapılıyor ve **yazmadan önce**: ters sırada, yanlış şifre girildiğinde �
 Yönetici başkasının şifresini **değiştiremiyor**; yalnızca yeni bir davet
 gönderip yeni bir geçici şifre üretebiliyor.
 
+#### Panelden açılabilecek iki ayar
+
+İkisi de Supabase panelinde **Authentication → Sign In / Providers → Email**
+altında ve ikisi de bugünkü davranışı iyileştiriyor. Kod tarafında yapılacak bir
+şey olmadığı için burada duruyorlar:
+
+- **Prevent use of leaked passwords.** Sızmış şifre listelerinde
+  (HaveIBeenPwned) geçen şifreleri reddediyor. Şu anda **kapalı** — proje
+  danışmanı da (`get_advisors`) bunu uyarı olarak veriyor. Personel kendi
+  şifresini kendisi seçtiği için doğrudan bu akışı ilgilendiriyor: en olası
+  zayıf şifre, kişinin başka bir sitede zaten kullandığı şifre.
+  **Ücretli plan gerektiriyor** (Pro ve üstü); ücretsiz planda görünmüyor.
+- **Minimum password length.** Supabase'in varsayılanı 6, uygulama ve panel ise
+  8 dayatıyor (`SifreKurali.EN_AZ_UZUNLUK`, `SIFRE_EN_AZ_UZUNLUK`). Sunucuyu da
+  8'e çekmek istemci kuralını yedeklerdi; bugün 7 karakterli bir şifre yalnızca
+  istemci kontrolü atlanırsa geçer.
+
+Üçüncü bir ayar var ama **açılmamalı**: *Require current password when changing
+password*. Doğru fikir, ama açıldığında `PUT /auth/v1/user` isteği gövdesinde
+`current_password` bekliyor ve uygulama/panel bunu göndermiyor — şifre
+değiştirme akışının tamamı kırılırdı. Bugün aynı korumayı istemci sağlıyor
+(yazmadan önce gerçek bir giriş denemesi). Sunucuya devretmek istenirse önce
+`current_password` alanının gönderilmesi gerekiyor; sırası bu, tersi değil.
+
 ## Kim neyi yazabilir
 
 Salona bağlı olmak artık tek başına yetmiyor; `gym_users.role` ne
@@ -272,11 +296,22 @@ yazabileceğinizi de belirliyor (migrasyon `0004`).
 listesini, satış yapabilmesi için fiyatı görmesi zaten gerekiyor. Okumayı role
 göre daraltmak ekranları boş gösterirdi.
 
-**Silme hiçbir role açık değil.** Uygulama zaten hiç `DELETE` göndermiyor:
-silme mezar taşıyla yapılıyor (`deleted_at_ms` doldurulur), yani sunucuya giden
-şey bir güncelleme. Yetkiyi tamamen geri almak bu yüzden hiçbir şeye mal olmuyor
-ama kalıcı veri kaybını imkânsız kılıyor — ele geçirilmiş bir jetonla bile satır
-silinemez, en fazla mezar taşı konur ve mezar taşı geri alınabilir.
+**Silme hiçbir istemci rolüne açık değil.** Uygulama zaten hiç `DELETE`
+göndermiyor: silme mezar taşıyla yapılıyor (`deleted_at_ms` doldurulur), yani
+sunucuya giden şey bir güncelleme. Yetkiyi tamamen geri almak bu yüzden hiçbir
+şeye mal olmuyor ama kalıcı veri kaybını imkânsız kılıyor — ele geçirilmiş bir
+jetonla bile satır silinemez, en fazla mezar taşı konur ve mezar taşı geri
+alınabilir.
+
+Yetki iki adımda geri alındı ve ikincisinin sebebi ilkinin eksik kalması:
+`0004` yalnızca `authenticated` rolünden aldı, `0008` ise `anon` rolünden de
+aldı — o rol **yayınlanmış anahtarla** çalışıyor, yani anahtarı uygulamanın
+içinden ya da panelin kaynağından okuyan herkes o rolde istek atabiliyor.
+Aradaki dönemde silmeyi kapatan tek şey RLS'ti (hiçbir tabloda `for delete`
+kuralı yok). Yanlış değildi ama tek katmandı: ileride biri `for all` diye geniş
+bir kural yazsa — `for all` `delete`i de kapsıyor — silme sessizce açılırdı.
+`service_role` dışarıda bırakıldı; erişim geri alma akışı yazıldığında
+`gym_users` satırını silecek olan o.
 
 ### Uygulama da aynı kuralı biliyor
 
@@ -345,9 +380,10 @@ görünmeye devam ederdi.
 ## Henüz yapılmadı
 
 - **Erişimi geri alma akışı yok.** İşten ayrılan birinin `gym_users` satırı
-  elle silinmeli. Fonksiyona `delete` yetkisi bilerek verilmedi: yanlışlıkla
-  silinen bir satır o kişinin bütün geçmişini görünmez kılar ve bu ayrı
-  düşünülmesi gereken bir karar.
+  elle silinmeli. Ekran yazılmadı çünkü yanlışlıkla silinen bir satır o kişinin
+  bütün geçmişini görünmez kılar ve bu ayrı düşünülmesi gereken bir karar.
+  Yazıldığında yeri belli: davet fonksiyonunun yanında, `service_role` ile —
+  o rolün `delete` yetkisi bu yüzden `0008`de de duruyor.
 - **iOS tarafında oturum saklama yok.** Android'de oturum Keystore ile
   şifrelenip saklanıyor ve uygulama kapansa da korunuyor; iOS uygulaması
   yazıldığında Keychain karşılığı `SessionStore` arayüzünün arkasına eklenecek.

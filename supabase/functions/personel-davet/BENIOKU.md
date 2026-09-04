@@ -8,6 +8,13 @@ içindeki "Personele uygulama erişimi verme" bölümünde.
 
 ---
 
+## Durum: yayında
+
+Fonksiyon canlı projede **yayınlanmış** durumda — `ACTIVE`, `verify_jwt` açık.
+Önkoşul olan `0007` migrasyonu da uygulanmış. Yani aşağıdaki kurulum adımlarını
+**yeniden yapmanız gerekmiyor**; bölüm, kod değiştiğinde yeniden yayınlamak ve
+sıfırdan kurulan bir projeyi ayağa kaldırmak için duruyor.
+
 ## Ne kadar sürer
 
 Tek seferlik kurulum ~10 dakika. Sonrasında her davet birkaç saniye.
@@ -15,8 +22,7 @@ Tek seferlik kurulum ~10 dakika. Sonrasında her davet birkaç saniye.
 ## Önkoşul
 
 `migrations/0007_personel_davet.sql` uygulanmış olmalı. Fonksiyon o dosyadaki
-`auth_kullanici_id` yardımcısını ve `service_role` yetkilerini kullanıyor;
-uygulanmadan fonksiyon 500 döner.
+`auth_kullanici_id` yardımcısını kullanıyor; uygulanmadan fonksiyon 500 döner.
 
 ---
 

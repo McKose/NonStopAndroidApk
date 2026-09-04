@@ -35,9 +35,10 @@
 // yöneticiye BİR KEZ gösteriliyor; yönetici şifreyi personele yüz yüze
 // veriyor. Küçük bir salonda bu hem daha hızlı hem de dış bağımlılığı yok.
 //
-// Personel giriş yaptıktan sonra şifresini değiştirebilmeli. O ekran ayrı bir
-// iş ve HENÜZ YOK — bu dosyanın kapsamı değil ama eksikliği burada yazılı
-// duruyor ki gözden kaçmasın.
+// Personel giriş yaptıktan sonra şifresini kendisi değiştiriyor: uygulamada
+// Ayarlar → "Şifre Değiştir", panelde sağ üstteki "Şifre değiştir". İkisi de
+// mevcut şifreyi soruyor. O ekranlar olmadan geçici şifre KALICI hâle
+// geliyordu — yönetici tarafından bilinen bir şifreyle çalışılıyordu.
 //
 // ### Tekrar çalıştırılabilir
 // Yarıda kalan bir davet (ağ hatası, kapanan sekme) aynı verilerle tekrar
