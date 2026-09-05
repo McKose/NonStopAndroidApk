@@ -59,6 +59,15 @@ supabase functions deploy personel-davet
 > çalışır (kendi kontrolleri var) ama kimliği doğrulanmamış istekler doğrudan
 > koda ulaşır ve tek bir hata bütün korumayı kaldırır.
 
+> **Yayınlamanın güvenilir tek yolu bu komut.** Dosyayı bir yere kopyalayıp
+> içeriğini elle aktaran her yol (panelin düzenleyicisi, bir API çağrısına
+> gövde olarak yapıştırmak, bir aracın dosyayı yeniden yazması) 16 KB'lık bir
+> metni birebir taşımak zorunda ve taşımadığında fark SESSİZ oluyor.
+> Bu yaşandı: bir yorum satırı "doğruluyor" yerine "doğrulyor" olarak
+> yayınlandı. Zararsızdı çünkü yoruma denk geldi — ama aynı hatanın bir kod
+> satırına denk gelmemesi için hiçbir sebep yok. CLI dosyayı olduğu gibi
+> gönderiyor; depo ile canlı arasındaki tek kesin bağ o.
+
 ### 4. Ortam değişkenleri
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` ve `SUPABASE_SERVICE_ROLE_KEY` Supabase

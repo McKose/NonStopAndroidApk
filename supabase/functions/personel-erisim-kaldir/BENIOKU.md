@@ -33,6 +33,11 @@ supabase functions deploy personel-erisim-kaldir
 > geçerli: Supabase, geçerli bir jeton taşımayan istekleri fonksiyona hiç
 > ulaştırmıyor ve bu, fonksiyonun kendi yetki kontrolünün önündeki ilk kapı.
 
+> **Yayınlamanın güvenilir tek yolu bu komut.** Gerekçesi
+> [`../personel-davet/BENIOKU.md`](../personel-davet/BENIOKU.md) içinde:
+> dosyanın içeriğini elle aktaran her yol metni birebir taşımak zorunda ve
+> taşımadığında fark sessiz kalıyor. CLI dosyayı olduğu gibi gönderiyor.
+
 ## Ortam değişkenleri
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` ve `SUPABASE_SERVICE_ROLE_KEY` Supabase
