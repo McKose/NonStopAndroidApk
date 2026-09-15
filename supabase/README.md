@@ -412,9 +412,14 @@ görünmeye devam ederdi.
 - **iOS tarafında oturum saklama yok.** Android'de oturum Keystore ile
   şifrelenip saklanıyor ve uygulama kapansa da korunuyor; iOS uygulaması
   yazıldığında Keychain karşılığı `SessionStore` arayüzünün arkasına eklenecek.
-- **Room şema dosyalarının yalnızca bir sürümü depoda.** `shared/schemas`
-  altında `4.json` var; geçiş testi başlangıç tablosunu oradan kuruyor. Yeni
-  sürümlerin dosyaları da eklendiğinde Room'un `MigrationTestHelper` aracı
-  kullanılabilir hâle gelir ve geçişten sonra Room'un **kendi şema
-  doğrulaması** da test kapsamına girer. Dosyalar derleme sırasında üretiliyor
-  ve CI'da `room-schemas` yapıtı olarak indirilebiliyor.
+- **Room'un `MigrationTestHelper` aracı kullanılmıyor.** Bu, eskisi kadar
+  büyük bir eksik değil: `shared/schemas` altında artık `4.json`, `5.json` ve
+  `6.json` üçü birden duruyor, yani her geçiş **hedef** sürümün gerçek
+  şemasıyla karşılaştırılıyor (`MigrationsTest`) ve hiçbir beklenti türetilmiş
+  değil. Dosyanın depoda kalması da CI'da sınanıyor: derleme `@Database`
+  sürümünün JSON'unu üretiyor, işlenmemişse iş düşüyor.
+
+  Geriye kalan tek fark, Room'un kendi `TableInfo` karşılaştırmasından
+  geçmemek. Testteki iddialar aynı soruları (kolonlar, indeksler, veri)
+  doğrudan SQLite'a sorarak yanıtlıyor; gerekçesi `MigrationsTest` dosyasının
+  başında yazılı.

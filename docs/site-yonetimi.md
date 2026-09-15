@@ -45,8 +45,8 @@ henüz hazır olmadığı ve hangi sırayla geleceği var.
 | Üyenin kendi paket/ölçüm görmesi | Üye | `/uye/` | ✅ hazır |
 | Üyenin hesap açması | Üye | `/uye/` → Kayıt olun | ✅ hazır\* |
 
-\* Sunucuda `0006` migrasyonu ve `SUPABASE_TENANT_ID` gizli anahtarı gerekiyor —
-"Sende bekleyenler" bölümüne bakın.
+\* `SUPABASE_TENANT_ID` gizli anahtarı gerekiyor — "Sende bekleyenler"
+bölümüne bakın. (Sunucudaki `0006` migrasyonu **uygulandı**, o adım bitti.)
 
 ---
 
@@ -234,7 +234,6 @@ Sitenin planlanan işleri bitti. Bundan sonrası isteğe bağlı ekler ve aşağ
 | Konu | Ne gerekiyor |
 |---|---|
 | **`SUPABASE_TENANT_ID` gizli anahtarı** | Üye kayıt formunun açılması için. Değeri panelde Üye Hesapları sekmesinin altında yazıyor; Settings → Secrets → Actions'a ekle. |
-| **Supabase'de `0006` migrasyonu** | Kayıt isteği tablosu ve görsel kovası bu dosyada. Supabase panelinde SQL Editor'e `supabase/migrations/0006_member_signup_and_storage.sql` içeriğini yapıştırıp çalıştır. Yapılmazsa kayıt ve görsel yükleme çalışmaz (ekran sebebini söyler). |
 | **E-posta riski** | Aşağıdaki ayrı bölüme bakın — sitede yapılacak bir şey yok, iş Turhost panelinde. |
 | **Yayın anahtarı** | Android uygulamasının mağaza sürümü için. Adımlar `docs/yayin.md` içinde. Anahtarı **yedekle** — kaybı geri dönüşsüz. |
 | **Yatay salon fotoğrafı** | Açılış ekranı için (isteğe bağlı). |
