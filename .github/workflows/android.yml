@@ -32,6 +32,21 @@ jobs:
 
       - name: Android SDK kur
         uses: android-actions/setup-android@v3
+        # `packages` AÇIKÇA veriliyor. Eylemin varsayılanı
+        # `tools platform-tools` ve `tools` ARTIK YOK: Google onu SDK
+        # deposundan kaldırdı, `sdkmanager` "Failed to find package 'tools'"
+        # deyip 1 ile çıkıyor ve iş, deponun tek satırı derlenmeden düşüyor.
+        #
+        # 31.10.2026'da tam bu oldu. Belirtisi yanıltıcıydı: düşen iş
+        # "Derle ve testleri çalıştır" olduğu için hata derlemede sanılıyor,
+        # oysa kurulum adımında ve bu depodaki hiçbir değişiklikle ilgisi yok.
+        # Arada 8 hafta boyunca yalnızca belge PR'ı geçtiği (ve `paths-ignore`
+        # yüzünden bu iş hiç koşmadığı) için kırılma gecikmeli ortaya çıktı.
+        #
+        # `platform-tools` yeterli: Gradle ihtiyaç duyduğu derleme araçlarını
+        # ve platformu zaten kendisi çözüyor.
+        with:
+          packages: platform-tools
 
       - name: Gradle kur (cache dahil)
         uses: gradle/actions/setup-gradle@v4
