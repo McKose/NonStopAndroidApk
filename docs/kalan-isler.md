@@ -22,16 +22,19 @@ Bunlar bende yapılamaz; hiçbiri kod işi değil.
 |---|---|---|---|
 | 1 | **Yayın anahtarı + 4 gizli anahtar** | İmzalı APK'nın **tek** engeli | `docs/yayin.md` |
 | 2 | **KVKK aydınlatma metni için bilgiler** (ticari unvan, adres, saklama süresi) | Sitedeki yasal açığı | `docs/site-plani-kalanlar.md` md. 1 |
-| 3 | **`SUPABASE_TENANT_ID` gizli anahtarı** | Üye kayıt formunu | `docs/site-yonetimi.md` |
-| 4 | **Sızmış şifre koruması** (Supabase panelinden) | Zayıf şifreleri eler | `supabase/README.md` → "Panelden açılabilecek iki ayar" |
-| 5 | **MX kaydı** (Turhost panelinde) | Kurumsal e-postayı | `docs/site-yonetimi.md` → "E-posta" |
-| 6 | **Karşılama videosu** (`kahraman.mp4`) | Banner videosunu (isteğe bağlı) | `web/varliklar/BENIOKU.md` |
+| 3 | **Sızmış şifre koruması** (Supabase panelinden) | Zayıf şifreleri eler | `supabase/README.md` → "Panelden açılabilecek iki ayar" |
+| 4 | **MX kaydı** (Turhost panelinde) | Kurumsal e-postayı | `docs/site-yonetimi.md` → "E-posta" |
+| 5 | **Karşılama videosu** (`kahraman.mp4`) | Banner videosunu (isteğe bağlı) | `web/varliklar/BENIOKU.md` |
 
 1. madde en kritik olanı: uygulama kod olarak hazır ama imzalanamadığı için
 dağıtılamıyor.
 
-4. madde **ücretli plan** gerektiriyor; ücretsiz plandaysan seçenek
+3. madde **ücretli plan** gerektiriyor; ücretsiz plandaysan seçenek
 görünmez ve bu madde şimdilik kapalı sayılır.
+
+`SUPABASE_TENANT_ID` gizli anahtarı bu listeden **çıktı**: yalnızca web'den
+üye kaydı için gerekiyordu ve o akış şimdilik kapatıldı (aşağıya bakın).
+Kayıt yeniden açılacağı gün tekrar gerekecek.
 
 ---
 
@@ -45,6 +48,11 @@ eksik değil, **bilinçli kapsam kararı** — gerekçesi `docs/site-yonetimi.md
 "Faz 5" ve `supabase/README.md`.
 
 ## Web sitesi
+
+**Web'den üye kaydı şimdilik KAPALI** (bilinçli karar). Üye alanına giriş
+çalışıyor; kapanan tek şey ziyaretçinin kendi kendine hesap açması. Geri
+açmak `web/uye/kayit.js` içindeki `KAYIT_ACIK` değerini `true` yapmak;
+ayrıntı `docs/site-yonetimi.md` → "3b. Üye kayıtları".
 
 Dokuz açık madde, öncelik sırasıyla `docs/site-plani-kalanlar.md` içinde.
 İlk üçü:

@@ -61,11 +61,24 @@
     <div class="yol-ayrimi">
       <div class="kart yol-kart">
         <h2 class="yol-baslik">Salonumuzda üyeliğiniz var mı?</h2>
-        <p class="alt">
+        <p class="alt" id="kayit-acik-metin">
           Kayıt olun, ardından salon hesabınızı üyelik kaydınıza bağlasın.
           Bağlandıktan sonra paket durumunuzu ve ölçümlerinizi buradan
           takip edersiniz.
         </p>
+        <!--
+          Kapalıyken metin BURADA, formun içinde değil.
+
+          Aynı dosyadaki kayıt bölümü bunu zaten bir kez öğretti: "Uyarı formun
+          ÜSTÜNDE, altında değil. Formu doldurduktan sonra 'aslında bu size göre
+          değildi' demek, harcanan emeği boşa çıkarmak olurdu." Kapalılık daha
+          da erken söylenmeli — form hiç açılmıyor.
+
+          Metin JS'ten yazılıyor (`kayit.js`), çünkü iki ayrı sebebin iki ayrı
+          karşılığı var ve hangisinin geçerli olduğu çalışma anında belli
+          oluyor.
+        -->
+        <p class="alt" id="kayit-kapali-metin" hidden></p>
         <a href="#" id="kayda-git" class="dugme dugme-birincil">Kayıt olun</a>
       </div>
 

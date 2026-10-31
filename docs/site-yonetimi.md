@@ -43,10 +43,11 @@ henüz hazır olmadığı ve hangi sırayla geleceği var.
 | Etkinlik görseli | **Sen** | Panelden yükle (5 MB'a kadar) | ✅ hazır |
 | Üye kaydını onaylama, hesaba bağlama | **Sen** | Panel → Üye Hesapları | ✅ hazır |
 | Üyenin kendi paket/ölçüm görmesi | Üye | `/uye/` | ✅ hazır |
-| Üyenin hesap açması | Üye | `/uye/` → Kayıt olun | ✅ hazır\* |
+| Üyenin hesap açması | — | **Şu anda kapalı** | ⏸ kapalı\* |
 
-\* `SUPABASE_TENANT_ID` gizli anahtarı gerekiyor — "Sende bekleyenler"
-bölümüne bakın. (Sunucudaki `0006` migrasyonu **uygulandı**, o adım bitti.)
+\* Web'den üye kaydı **şu anda alınmıyor** (bilinçli karar). Üye alanına
+giriş çalışmaya devam ediyor; kapanan tek şey yeni hesap açma yolu. Nasıl
+geri açılacağı "3b. Üye kayıtları" bölümünde.
 
 ---
 
@@ -160,9 +161,25 @@ olur: kart görselsiz düzgün görünüyor, kırık resim simgesi çıkmıyor.
 
 ## 3b. Üye kayıtları — bekleyen istekleri onaylamak
 
-Üye `nonstopstudio.tr/uye/` adresinden **kendisi kayıt oluyor**: e-posta, şifre,
-ad ve telefon bırakıyor. Kayıt olması tek başına ona **hiçbir şey açmıyor** —
-hesabını üyelik kaydına bağlayana kadar kendi verisi dahil hiçbir şey göremiyor.
+> ### ⏸ Web'den üye kaydı şu anda KAPALI
+>
+> Bu bilinçli bir karar, arıza değil. Üye alanına **giriş çalışmaya devam
+> ediyor**: hesabı olan üye girip paketini ve ölçümlerini görüyor. Kapanan
+> tek şey ziyaretçinin kendi kendine hesap açması.
+>
+> Giriş ekranı bunu söylüyor ve kişiyi salona yönlendiriyor; form hiç
+> açılmıyor, dolayısıyla kimse doldurup boşa uğraşmıyor.
+>
+> **Geri açmak için** `web/uye/kayit.js` içindeki `KAYIT_ACIK` değerini
+> `true` yapın. Akış silinmedi, kapatıldı — aşağıdaki onay adımları
+> olduğu gibi duruyor. Açmadan önce `SUPABASE_TENANT_ID` gizli anahtarının
+> tanımlı olduğundan emin olun (aşağıda); tanımsızsa kayıt yine açılmaz ama
+> ekran bu sefer **ayrı bir mesajla** eksik ayarı söyler.
+
+Kayıt açıkken üye `nonstopstudio.tr/uye/` adresinden **kendisi kayıt oluyor**:
+e-posta, şifre, ad ve telefon bırakıyor. Kayıt olması tek başına ona **hiçbir
+şey açmıyor** — hesabını üyelik kaydına bağlayana kadar kendi verisi dahil
+hiçbir şey göremiyor.
 
 Panelde **Üye Hesapları** sekmesinde "Bekleyen kayıt istekleri" listesi var:
 
@@ -178,12 +195,12 @@ Panelde **Üye Hesapları** sekmesinde "Bekleyen kayıt istekleri" listesi var:
 > bir yazım hatası, birinin sağlık verisini başka birine açardı. Bu bir erişim
 > kararı ve kararı insan veriyor.
 
-**Bunun çalışması için bir ayar gerekiyor** (bir kerelik): deponun
+**Kayıt yeniden açıldığında bir ayar gerekiyor** (bir kerelik): deponun
 Settings → Secrets and variables → Actions bölümüne `SUPABASE_TENANT_ID`
 adıyla salon kimliğini eklemen lazım. Değeri panelde **Üye Hesapları →
 "Site kayıt ayarı (salon kimliği)"** başlığının altında yazıyor; oradan
-kopyalayabilirsin. Eklemezsen site açılır, giriş çalışır, yalnızca **kayıt
-formu** kapalı kalır ve ekranda bunu söyler.
+kopyalayabilirsin. Kayıt kapalıyken bu anahtara gerek yok — eklenmemiş
+olması bugün hiçbir şeyi bozmuyor.
 
 ---
 
@@ -236,7 +253,6 @@ Aşağıdakiler yalnızca **site** tarafını ilgilendirenler.
 
 | Konu | Ne gerekiyor |
 |---|---|
-| **`SUPABASE_TENANT_ID` gizli anahtarı** | Üye kayıt formunun açılması için. Değeri panelde Üye Hesapları sekmesinin altında yazıyor; Settings → Secrets → Actions'a ekle. |
 | **E-posta riski** | Aşağıdaki ayrı bölüme bakın — sitede yapılacak bir şey yok, iş Turhost panelinde. |
 | **Yayın anahtarı** | Android uygulamasının mağaza sürümü için. Adımlar `docs/yayin.md` içinde. Anahtarı **yedekle** — kaybı geri dönüşsüz. |
 
