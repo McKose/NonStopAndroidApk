@@ -10,7 +10,12 @@ olurdu — bu depoda tam olarak o yaşandı: üç ayrı madde kapandığı hâld
 belgelerde "yapılacak" görünmeye devam etti (`0006` migrasyonu, Room şema
 dosyaları, salon fotoğrafı).
 
-Son gözden geçirme: 31 Ekim 2026, `master` (`8a464d7`).
+Sapma ters yönde de oldu: `SUPABASE_TENANT_ID` "bekliyor" diye listeleniyordu
+ama **tanımlıymış**. Bu daha sinsi bir hata — eksik sanılan bir ayar, aslında
+çalışan bir akışı "zaten bozuk" sandırıyor. Bir maddenin durumu belgeden
+değil, kaynağından doğrulanmalı.
+
+Son gözden geçirme: 31 Ekim 2026, `master` (`e6a0d8d`).
 
 ---
 
@@ -32,9 +37,10 @@ dağıtılamıyor.
 3. madde **ücretli plan** gerektiriyor; ücretsiz plandaysan seçenek
 görünmez ve bu madde şimdilik kapalı sayılır.
 
-`SUPABASE_TENANT_ID` gizli anahtarı bu listeden **çıktı**: yalnızca web'den
-üye kaydı için gerekiyordu ve o akış şimdilik kapatıldı (aşağıya bakın).
-Kayıt yeniden açılacağı gün tekrar gerekecek.
+`SUPABASE_TENANT_ID` gizli anahtarı bu listeden **çıktı** ve iki sebebi var:
+web'den üye kaydı şimdilik kapatıldı (aşağıya bakın) ve anahtar **zaten
+tanımlı** — yayın günlüğünden doğrulandı. Önceden "sende bekliyor" diye
+listeleniyordu; yanlıştı.
 
 ---
 
@@ -49,7 +55,8 @@ eksik değil, **bilinçli kapsam kararı** — gerekçesi `docs/site-yonetimi.md
 
 ## Web sitesi
 
-**Web'den üye kaydı şimdilik KAPALI** (bilinçli karar). Üye alanına giriş
+**Web'den üye kaydı KAPALI** (bilinçli karar) ve bu **canlıda yayında**:
+`nonstopstudio.tr` 31.10.2026'da `e6a0d8d` ile güncellendi. Üye alanına giriş
 çalışıyor; kapanan tek şey ziyaretçinin kendi kendine hesap açması. Geri
 açmak `web/uye/kayit.js` içindeki `KAYIT_ACIK` değerini `true` yapmak;
 ayrıntı `docs/site-yonetimi.md` → "3b. Üye kayıtları".
@@ -57,9 +64,10 @@ ayrıntı `docs/site-yonetimi.md` → "3b. Üye kayıtları".
 Dokuz açık madde, öncelik sırasıyla `docs/site-plani-kalanlar.md` içinde.
 İlk üçü:
 
-1. **KVKK aydınlatma metni** — yasal. Üye kaydı sağlık verisi topluyor;
-   formda açık rıza var ama aydınlatma metni yok ve açık rıza onun yerini
-   tutmuyor.
+1. **KVKK aydınlatma metni** — yasal ve **kaydın kapatılması bunu
+   etkilemiyor**: sağlık verisini toplayan yer kayıt formu değil, giriş
+   yapmış üyenin panosundaki beyan formu ve orası açık. Formda açık rıza
+   var ama aydınlatma metni yok; açık rıza onun yerini tutmuyor.
 2. **WhatsApp ile temas** — planda birincil eylemdi, sitede yok.
 3. **İletişim / deneme dersi formu** — planın ana dönüşüm noktasıydı.
 
