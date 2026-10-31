@@ -405,6 +405,9 @@ görünmeye devam ederdi.
 
 ## Henüz yapılmadı
 
+Bütün yüzeylerin açık işleri için: [`../docs/kalan-isler.md`](../docs/kalan-isler.md).
+Aşağıdakiler yalnızca **sunucu** tarafını ilgilendirenler.
+
 - **Personel kaydını tamamen silme yolu yok.** Erişimi kaldırmak var (aşağıya
   bakın) ama `staff` satırının kendisi duruyor ve durması gerekiyor: geçmiş
   satışlar, randevular ve hakedişler ona bağlı. Gerçekten silinmesi gereken

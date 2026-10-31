@@ -30,6 +30,9 @@ Karşılaştırma tarihi: 31 Ekim 2026, `master` (`89ec450`).
 
 ## Hâlâ açık olan maddeler
 
+Bütün yüzeylerin açık işleri için: [`kalan-isler.md`](kalan-isler.md).
+Aşağısı **site** tarafının ayrıntısı.
+
 Öncelik sırasıyla. Birincisi yasal, ikinci ve üçüncüsü planın ana hedefi
 olan "ziyaretçiyi temasa geçirme" ile ilgili.
 
