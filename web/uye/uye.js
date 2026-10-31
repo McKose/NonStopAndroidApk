@@ -16,6 +16,7 @@
 // kopyası olsaydı aynı veri iki yüzeyde farklı görünürdü.
 
 import { tutarYaz, tarihYaz, uyelikDurumu, durumEtiketi } from "../admin/domain.js";
+import { kayitDurumu, kayitKapaliMesaji } from "./kayit.js";
 
 const $ = (id) => document.getElementById(id);
 const ayar = window.NONSTOP_CONFIG;
@@ -153,8 +154,49 @@ $("cikis").addEventListener("click", () => {
 
 // ─── Kayıt ──────────────────────────────────────────────────────────────────
 
+/**
+ * Kaydın bu açılıştaki durumu.
+ *
+ * Bir kez hesaplanıp saklanıyor: `ayar` sayfa ömrü boyunca değişmiyor ve
+ * karar her tıklamada yeniden türetilseydi, üç ayrı yerde üç ayrı sonuç
+ * çıkma ihtimali doğardı.
+ */
+const KAYIT = kayitDurumu({ tenantId: ayar?.tenantId ?? null });
+
+/**
+ * Kayıt AÇIKSA giriş ekranındaki kayıt yolunu açar.
+ *
+ * Yön bilinçli: işaretleme kapalı başlıyor (bkz. `index.html`), JS yalnızca
+ * açıyor. Bugün pratik bir farkı yok — bölümlerin hepsi `hidden` başladığı
+ * için JS çalışmazsa zaten hiçbir şey görünmüyor. Fark, bölümlerin o
+ * varsayılanı bir gün değişirse ortaya çıkıyor: kapalı başlayan bir düğme
+ * o değişiklikten etkilenmiyor.
+ *
+ * Giriş formuna DOKUNULMUYOR — hesabı zaten olan üye girmeye devam ediyor.
+ * Açılan ya da kapanan tek şey yeni hesap açma yolu.
+ */
+function kayitYolunuAc() {
+  if (!KAYIT.acik) {
+    // Kapalı metin işaretlemede zaten duruyor ve "bilinçli kapatma" hâlini
+    // anlatıyor. Değiştirilecek tek durum eksik ayar: o, çözümü farklı olan
+    // bir KURULUM sorunu ve aynı metinle geçiştirilmemeli.
+    if (KAYIT.sebep === "ayar_eksik") {
+      $("kayit-kapali-metin").textContent = kayitKapaliMesaji(KAYIT.sebep);
+    }
+    return;
+  }
+
+  $("kayda-git").hidden = false;
+  $("kayit-acik-metin").hidden = false;
+  $("kayit-kapali-metin").hidden = true;
+}
+kayitYolunuAc();
+
 $("kayda-git").addEventListener("click", (olay) => {
   olay.preventDefault();
+  // Düğme kapalıyken zaten gizli; bu kontrol onu elle görünür kılan ya da
+  // adrese `#kayit` yazan birine karşı. Tek satır ve bedeli yok.
+  if (!KAYIT.acik) return;
   goster("kayit");
 });
 $("girise-git").addEventListener("click", (olay) => {
@@ -191,13 +233,16 @@ $("kayit-formu").addEventListener("submit", async (olay) => {
   hataYaz("kayit-hata", null);
   hataYaz("kayit-bilgi", null);
 
-  if (!ayar.tenantId) {
-    // Kayıt isteği bir salona ait olmak zorunda (`tenant_id not null`). Ayar
-    // eksikse kaydı sessizce yarım bırakmak yerine hiç başlatmıyoruz:
-    // hesap açılıp istek yazılamasaydı kullanıcı "kayıt oldum" sanırdı ve
-    // salonun listesinde hiç görünmezdi.
-    return hataYaz("kayit-hata",
-      "Kayıt şu anda kapalı (salon ayarı eksik). Lütfen salonla iletişime geçin.");
+  if (!KAYIT.acik) {
+    // Buraya normalde gelinmiyor: kapalıyken forma giden yol kapalı. Yine de
+    // duruyor, çünkü atlanabilir — bölümü elle görünür kılmak yetiyor. Hesap
+    // açıldıktan SONRA durmak en kötüsü olurdu: kişinin Auth hesabı açılır,
+    // bağlanma isteği yazılmaz ve salonun listesinde hiç görünmez. Yani
+    // "kayıt oldum" sanan ama sistemde var olmayan bir kullanıcı.
+    //
+    // İki sebep ayrı mesaj veriyor (bkz. `kayit.js`): biri bilinçli kapatma,
+    // diğeri eksik kurulum ve yapılacak şey farklı.
+    return hataYaz("kayit-hata", kayitKapaliMesaji(KAYIT.sebep));
   }
 
   dugme.disabled = true;

@@ -80,6 +80,15 @@ jobs:
 
       - name: Android SDK kur
         uses: android-actions/setup-android@v3
+        # Gerekçe `android.yml` içinde aynı adımda yazılı: eylemin varsayılan
+        # paket listesindeki `tools` artık SDK deposunda yok ve `sdkmanager`
+        # hata verip işi düşürüyor.
+        #
+        # BURADA AYRICA ÖNEMLİ: bu iş yalnızca sürüm etiketiyle koşuyor, yani
+        # kırıklığı ancak gerçek bir yayın denenirken görülürdü — anahtarlar
+        # hazırlanıp etiket atıldığı an. Düzeltme oraya bırakılmadı.
+        with:
+          packages: platform-tools
 
       - name: Gradle kur (cache dahil)
         uses: gradle/actions/setup-gradle@v4

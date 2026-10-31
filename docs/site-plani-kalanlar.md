@@ -36,12 +36,19 @@ Aşağısı **site** tarafının ayrıntısı.
 Öncelik sırasıyla. Birincisi yasal, ikinci ve üçüncüsü planın ana hedefi
 olan "ziyaretçiyi temasa geçirme" ile ilgili.
 
-1. **KVKK aydınlatma metni.** Üye kayıt formu (`web/uye/`) ad, telefon,
-   e-posta ve sağlık bilgisi topluyor. Formda açık rıza kutusu var, ama
-   **aydınlatma metni** yok (KVKK md. 10: veri sorumlusunun kimliği, işleme
-   amacı, aktarım, haklar). Açık rıza aydınlatmanın yerini tutmuyor. Bir
-   `kvkk` sayfası ve formdan ona bağlantı gerekiyor. Metnin içeriği
-   (unvan, adres, saklama süresi) salondan gelmeli.
+1. **KVKK aydınlatma metni.** Sağlık verisi **özel nitelikli kişisel veri**
+   ve üye panosundaki sağlık beyanı formu (`web/uye/`, giriş yapıldıktan
+   sonra) onu topluyor. Formda açık rıza kutusu var ve rıza zamanı kayda
+   yazılıyor (`consent_at_ms`), ama **aydınlatma metni** yok (KVKK md. 10:
+   veri sorumlusunun kimliği, işleme amacı, aktarım, haklar). Açık rıza
+   aydınlatmanın yerini tutmuyor. Bir `kvkk` sayfası ve formdan ona
+   bağlantı gerekiyor. Metnin içeriği (unvan, adres, saklama süresi)
+   salondan gelmeli.
+
+   **Üye kaydının kapatılması bu maddeyi etkilemiyor.** Kayıt formu sağlık
+   verisi toplamıyordu (ad, telefon, e-posta, şifre, not); sağlık verisini
+   toplayan yer giriş yapmış üyenin panosu ve orası açık. İlk yazımda bu
+   iki form birbirine karışmıştı.
 2. **WhatsApp ile temas.** Planda birincil eylemdi (`wa.me` bağlantısı, sabit
    buton). Sitede yok; temas yalnızca telefon ve Instagram üzerinden.
 3. **İletişim / deneme dersi formu.** Planda ana dönüşüm noktasıydı. Sitede
