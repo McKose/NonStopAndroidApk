@@ -61,25 +61,40 @@
     <div class="yol-ayrimi">
       <div class="kart yol-kart">
         <h2 class="yol-baslik">Salonumuzda üyeliğiniz var mı?</h2>
-        <p class="alt" id="kayit-acik-metin">
+        <!--
+          VARSAYILAN KAPALI: düğme ile "kayıt açık" metni `hidden` başlıyor,
+          kapalı metni görünür. Açan taraf JS (`kayitYolunuAc`), kapatan
+          taraf değil.
+
+          GEREKÇE DAR, abartmamak gerekiyor. Bugün bu bölüm (`#giris`) zaten
+          `hidden` başlıyor ve hangi bölümün açılacağına JS karar veriyor;
+          dolayısıyla JS hiç çalışmazsa sayfada zaten hiçbir şey görünmüyor
+          ve düğme de görünmüyor. Yani "JS'siz düğme sızar" diye bir sorun
+          BUGÜN YOK.
+
+          Sebep ileriye dönük: bölümlerin `hidden` başlaması bir düzenleme
+          kararı ve değişebilir — ör. giriş ekranı varsayılan olarak çizilen
+          bölüm hâline getirilebilir. O gün bu düğme, kapalı olmasına rağmen
+          JS'ten bağımsız olarak görünür hâle gelirdi. Varsayılanı kapalı
+          tutmak o değişikliğe dayanıklı ve bedeli üç öznitelik.
+        -->
+        <p class="alt" id="kayit-acik-metin" hidden>
           Kayıt olun, ardından salon hesabınızı üyelik kaydınıza bağlasın.
           Bağlandıktan sonra paket durumunuzu ve ölçümlerinizi buradan
           takip edersiniz.
         </p>
         <!--
-          Kapalıyken metin BURADA, formun içinde değil.
-
-          Aynı dosyadaki kayıt bölümü bunu zaten bir kez öğretti: "Uyarı formun
-          ÜSTÜNDE, altında değil. Formu doldurduktan sonra 'aslında bu size göre
-          değildi' demek, harcanan emeği boşa çıkarmak olurdu." Kapalılık daha
-          da erken söylenmeli — form hiç açılmıyor.
-
-          Metin JS'ten yazılıyor (`kayit.js`), çünkü iki ayrı sebebin iki ayrı
-          karşılığı var ve hangisinin geçerli olduğu çalışma anında belli
-          oluyor.
+          Metin BURADA yazılı, JS'ten doldurulmuyor. Sebebi yukarıdakiyle
+          aynı yöne bakıyor: işaretleme tek başına doğru hâli anlatsın,
+          JS yalnızca değiştirsin. JS'in dokunduğu tek durum "ayar eksik" —
+          o ayrımı ancak çalışma anında öğrenebiliyor (bkz. `kayit.js`).
         -->
-        <p class="alt" id="kayit-kapali-metin" hidden></p>
-        <a href="#" id="kayda-git" class="dugme dugme-birincil">Kayıt olun</a>
+        <p class="alt" id="kayit-kapali-metin">
+          Web üzerinden üye kaydı şu anda alınmıyor. Salonumuzda üyeliğiniz
+          varsa hesabınızın açılması için salona başvurun; hesabınız
+          açıldıktan sonra yukarıdan giriş yapabilirsiniz.
+        </p>
+        <a href="#" id="kayda-git" class="dugme dugme-birincil" hidden>Kayıt olun</a>
       </div>
 
       <div class="kart yol-kart">

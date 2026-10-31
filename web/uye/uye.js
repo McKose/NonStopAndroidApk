@@ -164,26 +164,33 @@ $("cikis").addEventListener("click", () => {
 const KAYIT = kayitDurumu({ tenantId: ayar?.tenantId ?? null });
 
 /**
- * Kapalıysa giriş ekranındaki kayıt yolunu kapatır.
+ * Kayıt AÇIKSA giriş ekranındaki kayıt yolunu açar.
  *
- * Düğme GİZLENİYOR, "pasif" bırakılmıyor: pasif bir düğme "birazdan açılır"
- * izlenimi verir, oysa burada beklenecek bir şey yok. Yerine ne yapılacağını
- * söyleyen metin geçiyor.
+ * Yön bilinçli: işaretleme kapalı başlıyor (bkz. `index.html`), JS yalnızca
+ * açıyor. Bugün pratik bir farkı yok — bölümlerin hepsi `hidden` başladığı
+ * için JS çalışmazsa zaten hiçbir şey görünmüyor. Fark, bölümlerin o
+ * varsayılanı bir gün değişirse ortaya çıkıyor: kapalı başlayan bir düğme
+ * o değişiklikten etkilenmiyor.
  *
  * Giriş formuna DOKUNULMUYOR — hesabı zaten olan üye girmeye devam ediyor.
- * Kapanan tek şey yeni hesap açma yolu.
+ * Açılan ya da kapanan tek şey yeni hesap açma yolu.
  */
-function kayitYolunuHazirla() {
-  if (KAYIT.acik) return;
+function kayitYolunuAc() {
+  if (!KAYIT.acik) {
+    // Kapalı metin işaretlemede zaten duruyor ve "bilinçli kapatma" hâlini
+    // anlatıyor. Değiştirilecek tek durum eksik ayar: o, çözümü farklı olan
+    // bir KURULUM sorunu ve aynı metinle geçiştirilmemeli.
+    if (KAYIT.sebep === "ayar_eksik") {
+      $("kayit-kapali-metin").textContent = kayitKapaliMesaji(KAYIT.sebep);
+    }
+    return;
+  }
 
-  $("kayda-git").hidden = true;
-  $("kayit-acik-metin").hidden = true;
-
-  const not = $("kayit-kapali-metin");
-  not.textContent = kayitKapaliMesaji(KAYIT.sebep);
-  not.hidden = false;
+  $("kayda-git").hidden = false;
+  $("kayit-acik-metin").hidden = false;
+  $("kayit-kapali-metin").hidden = true;
 }
-kayitYolunuHazirla();
+kayitYolunuAc();
 
 $("kayda-git").addEventListener("click", (olay) => {
   olay.preventDefault();
