@@ -231,12 +231,14 @@ Sitenin planlanan işleri bitti. Bundan sonrası isteğe bağlı ekler ve aşağ
 
 ### 📌 Sende bekleyenler
 
+Bütün yüzeylerin açık işleri için: [`kalan-isler.md`](kalan-isler.md).
+Aşağıdakiler yalnızca **site** tarafını ilgilendirenler.
+
 | Konu | Ne gerekiyor |
 |---|---|
 | **`SUPABASE_TENANT_ID` gizli anahtarı** | Üye kayıt formunun açılması için. Değeri panelde Üye Hesapları sekmesinin altında yazıyor; Settings → Secrets → Actions'a ekle. |
 | **E-posta riski** | Aşağıdaki ayrı bölüme bakın — sitede yapılacak bir şey yok, iş Turhost panelinde. |
 | **Yayın anahtarı** | Android uygulamasının mağaza sürümü için. Adımlar `docs/yayin.md` içinde. Anahtarı **yedekle** — kaybı geri dönüşsüz. |
-| **Yatay salon fotoğrafı** | Açılış ekranı için (isteğe bağlı). |
 
 ---
 
