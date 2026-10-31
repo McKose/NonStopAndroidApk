@@ -195,12 +195,15 @@ Panelde **Üye Hesapları** sekmesinde "Bekleyen kayıt istekleri" listesi var:
 > bir yazım hatası, birinin sağlık verisini başka birine açardı. Bu bir erişim
 > kararı ve kararı insan veriyor.
 
-**Kayıt yeniden açıldığında bir ayar gerekiyor** (bir kerelik): deponun
-Settings → Secrets and variables → Actions bölümüne `SUPABASE_TENANT_ID`
-adıyla salon kimliğini eklemen lazım. Değeri panelde **Üye Hesapları →
-"Site kayıt ayarı (salon kimliği)"** başlığının altında yazıyor; oradan
-kopyalayabilirsin. Kayıt kapalıyken bu anahtara gerek yok — eklenmemiş
-olması bugün hiçbir şeyi bozmuyor.
+**`SUPABASE_TENANT_ID` gizli anahtarı ZATEN TANIMLI** — kayıt yeniden
+açıldığında ayrıca bir şey yapmana gerek yok. Yayın günlüğünden doğrulandı
+(31.10.2026): iş akışının "tanımlı değil" uyarısı basılmıyor ve `config.js`
+üç yüzeye de yazılıyor.
+
+Bir gün yeniden kurman gerekirse: deponun Settings → Secrets and variables →
+Actions bölümüne `SUPABASE_TENANT_ID` adıyla salon kimliği ekleniyor. Değeri
+panelde **Üye Hesapları → "Site kayıt ayarı (salon kimliği)"** başlığının
+altında yazıyor.
 
 ---
 
