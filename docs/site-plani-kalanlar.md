@@ -62,8 +62,19 @@ olan "ziyaretçiyi temasa geçirme" ile ilgili.
 6. **Karşılama videosu.** Zaten izleniyor: `web/varliklar/BENIOKU.md`.
 7. **Ölçüm.** Analytics yok. Bu bilinçli olabilir: analytics yokken çerez
    izni penceresi de gerekmiyor. Eklenirse ikisi birlikte eklenmeli.
-8. **Performans hedefi.** Planın hedefi mobil Lighthouse performans ≥ 90,
-   SEO ≥ 95, erişilebilirlik ≥ 90 idi. Ölçülmedi.
+8. **Görsel ağırlığı.** `reformer.jpg` 1200×1600 ve 359 KiB, ama sayfada
+   çok daha küçük duruyor: Lighthouse **%70'inin boşa gittiğini** söylüyor.
+   Mobil veriyle açan ziyaretçi için gerçek bir maliyet. Doğru çözüm
+   `<picture>` ile WebP ve küçültülmüş `srcset`.
+
+   `salon-ic.jpg` için **ana dosya küçültülmemeli**: yalnız %34 fazla ve
+   aynı zamanda `og:image`, yapısal veri görseli ve video afişi. Ona
+   dokunmak sosyal paylaşım kartını ve arama sonucunu bozar; ek WebP
+   türevi verilebilir, aslı kalmalı.
+
+   Eklenen her türev `panel-yayin.yml`deki yayın listesine de girmeli:
+   `<picture>` içindeki bir `<source>` 404 verirse tarayıcı `<img>`e
+   DÖNMÜYOR, kırık görsel gösteriyor.
 
 ## Kapanan
 
@@ -83,3 +94,33 @@ Canlıda yayında: `cea85a6` ile `https://nonstopstudio.tr/`. Bu oturumdan
 siteye doğrudan istek atılamıyor (alan adı ağ izin listesinde değil), o
 yüzden doğrulama yayın günlüğünden yapıldı: değişen iki dosya pakete girdi
 ve dağıtım `Özel alan adı etkin` ile tamamlandı.
+
+**Performans hedefi** (02.11.2026): plan mobil Lighthouse performans ≥ 90,
+SEO ≥ 95, erişilebilirlik ≥ 90 istiyordu. Ölçüldü ve **üçü de karşılandı**.
+
+| Kategori | Puan | Hedef |
+|---|---|---|
+| Performans | 91–92 | ≥ 90 ✔ |
+| Erişilebilirlik | 100 | ≥ 90 ✔ |
+| İyi uygulamalar | 100 | — |
+| SEO | 100 | ≥ 95 ✔ |
+
+Ölçüm Lighthouse 12.8.2, mobil kip (412×823 @1.75), üç koşu. Erişilebilirlik
+ilk koşuda 95'ti; düşüren tek şey altbilgideki yapımcı satırının kontrastıydı
+(4.44:1, gereken 4.5:1) ve düzeltildi → 100.
+
+**Ölçümün nasıl yineleneceği önemli, çünkü yanlış kurulum sahte bulgu
+üretiyor.** Yerel sunucu GitHub Pages'i taklit etmeli:
+
+- **gzip** ve **`Cache-Control: max-age=600`** göndermeli. Python'un
+  `http.server`ı ikisini de yapmıyor ve bu, "metin sıkıştırması kapalı"
+  ile "önbellek ömrü kısa" diye İKİ SAHTE bulgu üretiyordu.
+- **`web/config.js` yerinde olmalı.** Dosya `.gitignore`da ve canlıda yayın
+  adımı gizli anahtarlardan yazıyor; yerelde yokken 404 veriyor ve "iyi
+  uygulamalar" puanını konsol hatası yüzünden 96'ya düşürüyordu. Yerel
+  ölçüm için boş değerli bir taslak yeterli — **gerçek anahtar konmamalı**.
+
+Bu iki kurulum hatasıyla alınan ilk ölçüm 90 / 95 / 96 / 100 diyordu; ikisi
+de düzeltilince 91 / 100 / 100 / 100. Yani puanların üçü ölçüm hatasıydı.
+
+Geriye kalan gerçek zayıflık **LCP 3.4–3.5 s** ve sebebi aşağıdaki 8. madde.

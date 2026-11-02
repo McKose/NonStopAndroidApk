@@ -15,7 +15,7 @@ ama **tanımlıymış**. Bu daha sinsi bir hata — eksik sanılan bir ayar, asl
 çalışan bir akışı "zaten bozuk" sandırıyor. Bir maddenin durumu belgeden
 değil, kaynağından doğrulanmalı.
 
-Son gözden geçirme: 2 Kasım 2026, `master` (`cea85a6`).
+Son gözden geçirme: 2 Kasım 2026, `master` (`502c7d8`).
 
 ---
 
@@ -76,8 +76,14 @@ deneme dersini soruyor. `nonstopstudio.tr` `cea85a6` ile güncellendi —
 yayın günlüğünden doğrulandı (`index.html` ve `site.css` paketlendi,
 `Özel alan adı etkin`).
 
+**Lighthouse hedefi kapandı** (02.11.2026): plan mobil performans ≥ 90,
+SEO ≥ 95, erişilebilirlik ≥ 90 istiyordu; ölçüldü ve üçü de karşılandı
+(91–92 / 100 / 100 / 100). Erişilebilirliği 95'te tutan kontrast ihlali de
+düzeltildi. Yerine daha dar bir madde girdi: **görsel ağırlığı** —
+`reformer.jpg`ın %70'i boşa gidiyor ve LCP 3.5 s'nin sebebi o.
+
 Kalan altı madde (künye, arama motoru kayıtları, içerik bölümleri, video,
-ölçüm, Lighthouse hedefi) daha düşük öncelikli.
+ölçüm, görsel ağırlığı) daha düşük öncelikli.
 
 ## Sunucu
 

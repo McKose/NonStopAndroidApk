@@ -426,11 +426,24 @@ a.iletisim-kutu:hover { border-color: var(--altin); }
 
   `flex-basis: 100%` ile kendi satırına iniyor — telif ve bağlantıların
   yanına sıkıştığında üçü de aynı ağırlıkta görünüyordu.
+
+  ORAN %70 DEĞİL %78, ÇÜNKÜ %70 WCAG AA'yı GEÇMİYORDU. `color-mix`
+  saydamlık üretiyor ve tarayıcı onu zeminle harmanlıyor, yani görünen renk
+  `--soluk` ile `--zemin`in karışımı: %70'te `#75787f` çıkıyor ve bu
+  `#0b0b0d` üzerinde 4.45:1, gereken 4.5:1'in hemen altı. Lighthouse de
+  tam bunu bildirdi (4.44). %78 ise `#81858c` ve 5.31:1 — payla geçiyor.
+  En küçük geçen değer %72 (4.64) ama o kadar ince bir pay, palette
+  yapılacak ufak bir değişiklikte sessizce yeniden düşer.
+
+  Renk PALETE BAĞLI kalsın diye sabit koda çevrilmedi; onun bedeli,
+  kontrastın yazıdan OKUNAMAMASI. `web/kontrast.test.js` o yüzden var:
+  oranı hesaplayıp sınıyor, böylece `--soluk` ya da `--zemin` değişirse
+  CI kırmızı döner.
 */
 .yapimci {
   flex-basis: 100%;
   font-size: 12px;
-  color: color-mix(in srgb, var(--soluk) 70%, transparent);
+  color: color-mix(in srgb, var(--soluk) 78%, transparent);
 }
 .yapimci a {
   color: inherit;
