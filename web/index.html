@@ -118,18 +118,21 @@
     <a href="#iletisim">İletişim</a>
   </nav>
 
-  <!-- Panel bağlantısı BİLEREK yok. Panel `nonstopstudio.tr/admin/`
-       adresinde duruyor (`web/admin/`), yalnızca herkese açık sayfada
-       tanıtılmıyor: ziyaretçinin işine yaramıyor ve personel adresi
-       biliyor. Aynı sebeple alt bilgideki "Personel paneli" bağlantısı da
-       kaldırıldı.
+  <!-- Panel ve üye girişi bağlantıları BİLEREK yok. Panel
+       `nonstopstudio.tr/admin/` adresinde duruyor (`web/admin/`); personel
+       adresi biliyor. Aynı sebeple alt bilgideki "Personel paneli"
+       bağlantısı da kaldırıldı.
+
+       Üye girişi bağlantıları (üstteki düğme, iletişimdeki "Üyelerimize"
+       kutusu ve alt bilgi) 2 Kasım 2026'da salon sahibinin kararıyla
+       kaldırıldı. Web'den yeni üye kaydı zaten kapalıydı
+       (`web/uye/kayit.js`, `KAYIT_ACIK`). Üye alanı silinmedi:
+       `nonstopstudio.tr/uye/` çalışmaya devam ediyor, yalnızca
+       tanıtılmıyor. Geri açmak bu bağlantıları geri koymak demek.
 
        Bağlantı vermemek bir GÜVENLİK önlemi değil — koruma girişte ve
        Supabase erişim kurallarında. Yalnızca ziyaretçiye ait olmayan bir
        şeyi ziyaretçiye göstermemek. -->
-  <div class="ust-girisler">
-    <a class="dugme dugme-birincil" href="uye/">Üye Girişi</a>
-  </div>
 </header>
 
 <main>
@@ -318,23 +321,12 @@
         <span class="iletisim-deger">@nonstopkartepe</span>
         <span class="iletisim-not">Takip edin →</span>
       </a>
-
-      <div class="iletisim-kutu">
-        <span class="iletisim-etiket">Üyelerimize</span>
-        <span class="iletisim-deger">Üye Girişi</span>
-        <span class="iletisim-not">
-          <a href="uye/">Paket durumunuzu ve ölçümlerinizi görün →</a>
-        </span>
-      </div>
     </div>
   </section>
 </main>
 
 <footer class="alt-bilgi">
   <p>© <span id="yil">2026</span> Non Stop Studio — Kartepe</p>
-  <p class="alt-bilgi-baglantilar">
-    <a href="uye/">Üye girişi</a>
-  </p>
   <p class="yapimci">
     Tasarım ve yazılım
     <a href="https://syntrixcode.com/tr" target="_blank" rel="noopener noreferrer">Syntrixcode</a>

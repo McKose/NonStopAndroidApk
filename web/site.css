@@ -89,13 +89,11 @@ a { color: var(--altin); }
 }
 .ust-baglantilar a:hover { color: var(--metin); }
 
-.ust-girisler { display: flex; gap: 10px; }
-
-/* Dar ekranda bölüm bağlantıları düşüyor, GİRİŞ DÜĞMELERİ kalıyor: sayfanın
-   asıl işi onlar. Hepsini gizlemek telefonda üye girişini erişilemez yapardı. */
+/* Dar ekranda bölüm bağlantıları ve marka adı düşüyor, yalnızca logo
+   kalıyor. Üstteki üye girişi düğmesi 2 Kasım 2026'da kaldırıldı
+   (`index.html` başlığındaki not). */
 @media (max-width: 860px) {
   .ust-baglantilar { display: none; }
-  .ust-girisler { margin-inline-start: auto; }
   .marka-ad { display: none; }
 }
 
@@ -383,9 +381,12 @@ a { color: var(--altin); }
 .genis-foto figcaption { margin-top: 10px; color: var(--soluk); font-size: 14px; }
 
 /* ─── İletişim ──────────────────────────────────────────────────────────── */
+/* Beş kutu var. En küçük genişlik 300px olunca masaüstünde 3 + 2
+   diziliyor; 240px'te 4 + 1 diziliyor ve son kutu tek başına kalıyordu.
+   Kutu sayısı değişirse bu değer yeniden gözden geçirilmeli. */
 .iletisim-kutular {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 16px;
 }
 .iletisim-kutu {
