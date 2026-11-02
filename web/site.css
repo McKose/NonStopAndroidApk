@@ -439,6 +439,64 @@ a.iletisim-kutu:hover { border-color: var(--altin); }
 }
 .yapimci a:hover { color: var(--altin); }
 
+/* ─── Sabit WhatsApp düğmesi ────────────────────────────────────────────── */
+/*
+  Sayfanın her yerinden erişilebilir temas noktası.
+
+  RENK WHATSAPP'IN YEŞİLİ, sitenin altını değil. Sitedeki her düğme altın ve
+  bu bilinçli bir istisna: ziyaretçi WhatsApp'ı renginden tanıyor, altın bir
+  kutu ise sitenin başka bir bölümü gibi görünürdü. Marka rengini kullanmak
+  burada süs değil, "bu düğme seni WhatsApp'a götürür" demenin en kısa yolu.
+
+  KONUM sağ alt: Türkiye'de bu düğmenin alışılmış yeri orası ve alışkanlığı
+  bozmanın bir karşılığı yok.
+*/
+.wa-dugme {
+  position: fixed;
+  /* `env(...)` iPhone'daki ana sayfa çubuğu için: onsuz düğme o çubuğun
+     altında kalıyor ve dokunulamıyor. İkinci değer çubuk yokken geçerli. */
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  /* Üst çubuk 10'da. Düğme sağ altta, yani çakışma yok; yine de üstte
+     duruyor ki uzun bir bölümün içindeki kart onu örtmesin. */
+  z-index: 20;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: #25d366;
+  color: #0b0b0d;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 45%);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.wa-dugme:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgb(0 0 0 / 55%);
+}
+.wa-dugme:focus-visible {
+  outline: 2px solid var(--altin-parlak);
+  outline-offset: 3px;
+}
+.wa-simge { width: 22px; height: 22px; flex: none; }
+
+/*
+  Dar ekranda yalnızca simge kalıyor.
+
+  Metinli hâli 360px genişlikte sayfanın görünür alanını daraltıyordu ve
+  altbilgideki bağlantıların üstüne biniyordu. Simge tek başına da tanınıyor;
+  `aria-label` zaten işaretlemede, yani metnin gizlenmesi ekran okuyucuyu
+  etkilemiyor.
+*/
+@media (max-width: 480px) {
+  .wa-metin { display: none; }
+  .wa-dugme { padding: 14px; }
+  .wa-simge { width: 24px; height: 24px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   * { transition: none !important; animation: none !important; }

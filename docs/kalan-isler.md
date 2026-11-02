@@ -61,15 +61,17 @@ eksik değil, **bilinçli kapsam kararı** — gerekçesi `docs/site-yonetimi.md
 açmak `web/uye/kayit.js` içindeki `KAYIT_ACIK` değerini `true` yapmak;
 ayrıntı `docs/site-yonetimi.md` → "3b. Üye kayıtları".
 
-Dokuz açık madde, öncelik sırasıyla `docs/site-plani-kalanlar.md` içinde.
-İlk üçü:
+Sekiz açık madde, öncelik sırasıyla `docs/site-plani-kalanlar.md` içinde.
+İlk ikisi:
 
 1. **KVKK aydınlatma metni** — yasal ve **kaydın kapatılması bunu
    etkilemiyor**: sağlık verisini toplayan yer kayıt formu değil, giriş
    yapmış üyenin panosundaki beyan formu ve orası açık. Formda açık rıza
    var ama aydınlatma metni yok; açık rıza onun yerini tutmuyor.
-2. **WhatsApp ile temas** — planda birincil eylemdi, sitede yok.
-3. **İletişim / deneme dersi formu** — planın ana dönüşüm noktasıydı.
+2. **İletişim / deneme dersi formu** — planın ana dönüşüm noktasıydı.
+
+**WhatsApp ile temas kapandı** (02.11.2026): iletişim bölümünde kutu,
+sayfanın her yerinde sabit düğme, hazır mesajı deneme dersini soruyor.
 
 Kalan altı madde (künye, arama motoru kayıtları, içerik bölümleri, video,
 ölçüm, Lighthouse hedefi) daha düşük öncelikli.

@@ -138,3 +138,49 @@ test("kapalı günler yapısal veride açıkça belirtilmiş", () => {
     `haftanın yedi günü de belirtilmeli, belirtilen: ${[...new Set(gunler)].join(", ")}`,
   );
 });
+
+/**
+ * WhatsApp numarası `tel:` ve yapısal veriyle AYNI.
+ *
+ * Numara artık ÜÇ yerde: iletişim kutusundaki `tel:` bağlantısı, yapısal
+ * veri ve `wa.me` adresleri. Üçüncüsünü eklemek bu dosyanın var oluş
+ * sebebini büyüttü — biri güncellenip diğeri unutulduğunda hiçbir belirti
+ * yok ve yanlış numaraya yazan ziyaretçi sessizce kayboluyor.
+ */
+test("WhatsApp numarası tel: ve yapısal veriyle aynı", () => {
+  const adresler = [...SAYFA.matchAll(/href="https:\/\/wa\.me\/(\d+)/g)];
+  assert.ok(adresler.length > 0, "sayfada wa.me bağlantısı yok");
+
+  const beklenen = rakamlar(yapisalVeri.telephone).slice(-10);
+  for (const [, numara] of adresler) {
+    assert.equal(
+      rakamlar(numara).slice(-10),
+      beklenen,
+      `wa.me bağlantısındaki numara (${numara}) yapısal veridekinden farklı`,
+    );
+  }
+});
+
+/**
+ * `wa.me` numarası ULUSLARARASI biçimde ve baştaki sıfır OLMADAN.
+ *
+ * `wa.me/0541...` sessizce yanlış çalışıyor: WhatsApp bunu ülke kodu sanıp
+ * başka bir numaraya götürüyor ya da "geçersiz" diyor. Hata sayfada
+ * görünmüyor — yalnızca kimse cevap vermiyor. Bu yüzden biçim ayrıca
+ * sınanıyor, eşitlik tek başına yetmiyor (son 10 hane ikisinde de aynı).
+ */
+test("wa.me numarası ülke koduyla, baştaki sıfırsız", () => {
+  const adresler = [...SAYFA.matchAll(/href="https:\/\/wa\.me\/(\d+)/g)];
+  for (const [, numara] of adresler) {
+    assert.doesNotMatch(numara, /^0/, `wa.me numarası sıfırla başlıyor: ${numara}`);
+    assert.match(numara, /^90/, `wa.me numarası ülke koduyla başlamıyor: ${numara}`);
+    assert.equal(numara.length, 12, `wa.me numarası 12 hane olmalı: ${numara}`);
+  }
+});
+
+/** Sabit düğme erişilebilir bir adla verilmeli — simge tek başına ne olduğunu söylemiyor. */
+test("sabit WhatsApp düğmesinin erişilebilir adı var", () => {
+  const m = SAYFA.match(/<a class="wa-dugme"[\s\S]*?>/);
+  assert.ok(m, "sabit WhatsApp düğmesi bulunamadı");
+  assert.match(m[0], /aria-label="[^"]+"/, "wa-dugme aria-label taşımıyor");
+});

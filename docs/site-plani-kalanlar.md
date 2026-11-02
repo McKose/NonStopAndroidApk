@@ -49,22 +49,20 @@ olan "ziyaretçiyi temasa geçirme" ile ilgili.
    verisi toplamıyordu (ad, telefon, e-posta, şifre, not); sağlık verisini
    toplayan yer giriş yapmış üyenin panosu ve orası açık. İlk yazımda bu
    iki form birbirine karışmıştı.
-2. **WhatsApp ile temas.** Planda birincil eylemdi (`wa.me` bağlantısı, sabit
-   buton). Sitede yok; temas yalnızca telefon ve Instagram üzerinden.
-3. **İletişim / deneme dersi formu.** Planda ana dönüşüm noktasıydı. Sitede
+2. **İletişim / deneme dersi formu.** Planda ana dönüşüm noktasıydı. Sitede
    "Bize ulaşın" düğmesi yalnızca iletişim bilgilerine kaydırıyor. Form
    eklenirse 1. madde onun için de geçerli olur ve spam koruması gerekir.
-4. **İşletme künyesi.** Alt bilgide ticari unvan yok (plan §9). Aydınlatma
+3. **İşletme künyesi.** Alt bilgide ticari unvan yok (plan §9). Aydınlatma
    metniyle aynı bilgi, birlikte eklenebilir.
-5. **Arama motoru kayıtları.** Google Search Console ve Google İşletme
+4. **Arama motoru kayıtları.** Google Search Console ve Google İşletme
    Profili. Depoda doğrulama izi yok; yapıldıysa bu madde kapanır.
    `sitemap.xml` ve yapısal veri hazır.
-6. **İçerik bölümleri.** Haftalık ders programı, eğitmen kadrosu, galeri ve
+5. **İçerik bölümleri.** Haftalık ders programı, eğitmen kadrosu, galeri ve
    üye yorumları. Hepsi salondan içerik gerektiriyor; kod tarafı küçük.
-7. **Karşılama videosu.** Zaten izleniyor: `web/varliklar/BENIOKU.md`.
-8. **Ölçüm.** Analytics yok. Bu bilinçli olabilir: analytics yokken çerez
+6. **Karşılama videosu.** Zaten izleniyor: `web/varliklar/BENIOKU.md`.
+7. **Ölçüm.** Analytics yok. Bu bilinçli olabilir: analytics yokken çerez
    izni penceresi de gerekmiyor. Eklenirse ikisi birlikte eklenmeli.
-9. **Performans hedefi.** Planın hedefi mobil Lighthouse performans ≥ 90,
+8. **Performans hedefi.** Planın hedefi mobil Lighthouse performans ≥ 90,
    SEO ≥ 95, erişilebilirlik ≥ 90 idi. Ölçülmedi.
 
 ## Kapanan
@@ -74,3 +72,9 @@ adres, karşılama bölümü, branşlar, tıkla-ara telefon, harita bağlantıs�
 çalışma saatleri, Instagram, Open Graph ve X kartları, `HealthClub`
 yapısal verisi, `sitemap.xml`, `robots.txt`, 404 sayfası,
 `prefers-reduced-motion` desteği.
+
+**WhatsApp ile temas** (02.11.2026): planın birincil eylemiydi ve iki yerde
+birden eklendi — iletişim bölümünde kutu, sayfanın her yerinde sabit düğme.
+Hazır mesaj deneme dersini soruyor, yani planın dönüşüm hedefini taşıyor.
+Numara artık üç yerde (`tel:`, yapısal veri, `wa.me`) ve üçünün eşitliği
+`web/iletisim.test.js` ile sınanıyor.
