@@ -15,7 +15,7 @@ ama **tanımlıymış**. Bu daha sinsi bir hata — eksik sanılan bir ayar, asl
 çalışan bir akışı "zaten bozuk" sandırıyor. Bir maddenin durumu belgeden
 değil, kaynağından doğrulanmalı.
 
-Son gözden geçirme: 31 Ekim 2026, `master` (`e6a0d8d`).
+Son gözden geçirme: 2 Kasım 2026, `master` (`cea85a6`).
 
 ---
 
@@ -70,8 +70,11 @@ Sekiz açık madde, öncelik sırasıyla `docs/site-plani-kalanlar.md` içinde.
    var ama aydınlatma metni yok; açık rıza onun yerini tutmuyor.
 2. **İletişim / deneme dersi formu** — planın ana dönüşüm noktasıydı.
 
-**WhatsApp ile temas kapandı** (02.11.2026): iletişim bölümünde kutu,
-sayfanın her yerinde sabit düğme, hazır mesajı deneme dersini soruyor.
+**WhatsApp ile temas kapandı** (02.11.2026) ve **canlıda yayında**:
+iletişim bölümünde kutu, sayfanın her yerinde sabit düğme, hazır mesajı
+deneme dersini soruyor. `nonstopstudio.tr` `cea85a6` ile güncellendi —
+yayın günlüğünden doğrulandı (`index.html` ve `site.css` paketlendi,
+`Özel alan adı etkin`).
 
 Kalan altı madde (künye, arama motoru kayıtları, içerik bölümleri, video,
 ölçüm, Lighthouse hedefi) daha düşük öncelikli.
