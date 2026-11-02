@@ -6,7 +6,7 @@ bu depoda, `web/` altında yapıldı ve plan oradan hiç güncellenmedi. Bu belg
 planı buraya taşıyor: neyin yapıldığını, neyin bilerek farklı yapıldığını ve
 neyin hâlâ açık olduğunu tek yerde tutmak için. Eski plan artık kaynak değil.
 
-Karşılaştırma tarihi: 31 Ekim 2026, `master` (`89ec450`).
+Karşılaştırma tarihi: 2 Kasım 2026, `master` (`cea85a6`).
 
 ## Plandan farklı yapılanlar (bilinçli)
 
@@ -78,3 +78,8 @@ birden eklendi — iletişim bölümünde kutu, sayfanın her yerinde sabit dü�
 Hazır mesaj deneme dersini soruyor, yani planın dönüşüm hedefini taşıyor.
 Numara artık üç yerde (`tel:`, yapısal veri, `wa.me`) ve üçünün eşitliği
 `web/iletisim.test.js` ile sınanıyor.
+
+Canlıda yayında: `cea85a6` ile `https://nonstopstudio.tr/`. Bu oturumdan
+siteye doğrudan istek atılamıyor (alan adı ağ izin listesinde değil), o
+yüzden doğrulama yayın günlüğünden yapıldı: değişen iki dosya pakete girdi
+ve dağıtım `Özel alan adı etkin` ile tamamlandı.
