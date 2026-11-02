@@ -41,9 +41,19 @@
 .uye-form button { justify-self: start; }
 
 /* Açık rıza onayı: yatay ve okunur. Diğer etiketler ızgara olduğu için
-   varsayılan düzen onay kutusunu metnin üstüne atardı. */
-.riza {
-  display: flex !important;
+   varsayılan düzen onay kutusunu metnin üstüne atardı.
+ *
+ * SEÇİCİ `!important` YERİNE ÖZGÜLLÜKLE KAZANIYOR. Yenmesi gereken kural
+ * `.uye-form label` (0,1,1); yalnız `.riza` (0,1,0) ona yetişmiyor, ilk
+ * yazımda bu yüzden `!important` konmuştu. Ama `site.css` gizlemeyi
+ * `[hidden] { display: none !important }` ile koruyor ve `uye.css` ondan
+ * SONRA yükleniyor: eşit özgüllükte iki `!important` çarpıştığında sıra
+ * kazanıyor, yani `hidden` verilmiş bir `.riza` gizlenmiyordu. Chromium'da
+ * ölçüldü — düz bir `hidden` etiket `none` olurken `.riza` `flex`
+ * kalıyordu. `.uye-form label.riza` (0,2,1) hedefi `!important`sız yeniyor
+ * ve gizleme koruması yeniden en üstte kalıyor. */
+.uye-form label.riza {
+  display: flex;
   gap: 10px;
   align-items: flex-start;
   line-height: 1.5;
