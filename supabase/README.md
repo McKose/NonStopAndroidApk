@@ -408,6 +408,34 @@ görünmeye devam ederdi.
 Bütün yüzeylerin açık işleri için: [`../docs/kalan-isler.md`](../docs/kalan-isler.md).
 Aşağıdakiler yalnızca **sunucu** tarafını ilgilendirenler.
 
+- **`anon` rolünün tablo yetkileri hâlâ belgelenen niyetten geniş.** `0005`
+  şöyle diyor: "`anon` YALNIZCA duyuruları okuyor. Başka hiçbir tabloya,
+  hiçbir yetki." Canlıda ölçülen durum farklı — `anon` **15 tablonun
+  hepsinde** `select`, `insert` ve `update` yetkisine sahip. (`delete` kapalı;
+  onu `0008` kapattı.)
+
+  Sebep `0008`in ve `0009`un sebebiyle aynı: Supabase her yeni tabloyu
+  `anon`, `authenticated` ve `service_role`a bütün ayrıcalıklarla açıyor, ve
+  bir migrasyonda yazılan `grant` listesi "geri kalanı kapalı" anlamına
+  GELMİYOR.
+
+  **Veri sızmıyor:** erişim kurallarının neredeyse tamamı `{authenticated}`
+  kapsamlı, yani `anon` için uygulanabilir kural yok ve okuma 0 satır
+  dönüyor; yazma da kural olmadığı için reddediliyor. Yani koruma RLS'te
+  duruyor, yetki katmanında değil — tek katman.
+
+  **Neden hemen yapılmadı:** bu değişiklik 14 tablonun yetki yüzeyini
+  değiştiriyor ve **bu depodaki testlerle doğrulanamıyor**. Testler boş bir
+  PostgreSQL'de koşuyor ve orada `anon` o yetkilere hiç sahip değil (çünkü
+  `0005` yalnızca `announcements` veriyor). Yani revoke'ları eklemek testleri
+  hiç değiştirmez: yeşil kalırlar ve canlıda bir şeyin kırılıp kırılmadığı
+  hakkında HİÇBİR ŞEY söylemezler. `60_silme_yetkisi_test.sql`in başında
+  yazılı asimetrinin aynısı.
+
+  Doğru sıra: önce `anon` kapsamlı kuralların hangi tabloları gerçekten
+  gerektirdiğini çıkar (üye kayıt akışı kapatıldığı için liste kısalmış
+  olabilir), sonra katalog temelli revoke + açık grant, sonra canlıda
+  rol taklidiyle her akışı tek tek ölç.
 - **Personel kaydını tamamen silme yolu yok.** Erişimi kaldırmak var (aşağıya
   bakın) ama `staff` satırının kendisi duruyor ve durması gerekiyor: geçmiş
   satışlar, randevular ve hakedişler ona bağlı. Gerçekten silinmesi gereken
