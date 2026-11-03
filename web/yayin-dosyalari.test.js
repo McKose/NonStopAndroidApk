@@ -11,8 +11,9 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { yayinDosyalari, girisNoktalari, YAPILANDIRMA } from "./yayin-dosyalari.mjs";
@@ -334,4 +335,115 @@ test("yönlendirme sayfası sunucu ayarı yüklemiyor", () => {
     !uretilen.includes("panel/config.js"),
     `yönlendirme sayfası config.js istiyor: ${uretilen.join(", ")}`,
   );
+});
+
+// ─── srcset ve poster ───────────────────────────────────────────────────────
+//
+// Türetici uzun süre yalnızca `src`, `href` ve `data-kaynak` izliyordu.
+// İkisi eksikti:
+//
+//   - `poster` (video afişi). Bugün YALNIZCA TESADÜFEN çalışıyor: afiş olarak
+//     verilen `varliklar/salon-ic.jpg`e aynı sayfadaki `<img src>` de referans
+//     veriyor. Afişe ayrı bir dosya verilse yayın listesine girmez ve sitede
+//     404 olurdu. Bu dosya 404 sayfası için aynı gerekçeyi açıkça reddediyor:
+//     "Tesadüfe bağlı çalışan bir kurulum, ilk düzenlemede bozulur."
+//
+//   - `srcset`. `HTML_DESENI` bunu hiç GÖRMÜYORDU — `src`tan sonra `=`
+//     beklediği için `srcset=` ile eşleşmiyor bile. Görseller `<picture>` ile
+//     servis edilmeye başlandığında sessiz bir yayın hatasına dönüşürdü ve
+//     kaçışı yok: bir `<source>` 404 verdiğinde tarayıcı `<img>`e DÖNMÜYOR,
+//     kırık görsel gösteriyor.
+//
+// Bu testler geçici bir ağaç kuruyor, çünkü gerçek site henüz `srcset`
+// kullanmıyor; gerçek ağaç üzerinde sınanırsa test bugün de yarın da hiçbir
+// şey söylemez.
+
+/** Geçici bir site ağacı kurar; `dosyalar` = { "yol": "içerik" }. */
+function geciciAgac(dosyalar) {
+  const kok = mkdtempSync(join(tmpdir(), "yayin-testi-"));
+  for (const [yol, icerik] of Object.entries(dosyalar)) {
+    const tam = join(kok, yol);
+    mkdirSync(dirname(tam), { recursive: true });
+    writeFileSync(tam, icerik);
+  }
+  return kok;
+}
+
+test("srcset'teki bütün adaylar yayın listesine giriyor", () => {
+  const kok = geciciAgac({
+    "index.html": `<picture>
+      <source type="image/webp" srcset="g/a-800.webp 800w, g/a-1200.webp 1200w">
+      <img src="g/a.jpg" alt="">
+    </picture>`,
+    "g/a-800.webp": "x",
+    "g/a-1200.webp": "x",
+    "g/a.jpg": "x",
+  });
+  const { dosyalar, eksik } = yayinDosyalari(kok);
+  assert.deepEqual(eksik, []);
+  for (const beklenen of ["g/a-800.webp", "g/a-1200.webp", "g/a.jpg"]) {
+    assert.ok(dosyalar.includes(beklenen), `${beklenen} listede yok: ${dosyalar.join(", ")}`);
+  }
+});
+
+test("srcset tanımlayıcıları dosya adı sayılmıyor", () => {
+  // `800w` ve `2x` yol değil. Ayrılmasaydı bunlar eksik dosya olarak
+  // raporlanır ve yayın her seferinde düşerdi.
+  const kok = geciciAgac({
+    "index.html": `<img srcset="k.webp 1x, b.webp 2x" src="k.webp" alt="">`,
+    "k.webp": "x",
+    "b.webp": "x",
+  });
+  const { dosyalar, eksik } = yayinDosyalari(kok);
+  assert.deepEqual(eksik, []);
+  assert.deepEqual(dosyalar.sort(), ["b.webp", "index.html", "k.webp"]);
+});
+
+test("srcset'teki dış adresler listeye girmiyor", () => {
+  const kok = geciciAgac({
+    "index.html": `<img srcset="https://cdn.example/a.webp 800w, y.webp 400w" src="y.webp" alt="">`,
+    "y.webp": "x",
+  });
+  const { dosyalar, eksik } = yayinDosyalari(kok);
+  assert.deepEqual(eksik, []);
+  assert.deepEqual(dosyalar.sort(), ["index.html", "y.webp"]);
+});
+
+test("eksik bir srcset dosyası yayını DÜŞÜRÜYOR", () => {
+  // Bu testin asıl değeri burada: `<source>` 404'ünün sessiz kalmaması.
+  const kok = geciciAgac({
+    "index.html": `<picture>
+      <source srcset="yok.webp 800w">
+      <img src="var.jpg" alt="">
+    </picture>`,
+    "var.jpg": "x",
+  });
+  const { eksik } = yayinDosyalari(kok);
+  assert.deepEqual(eksik, ["yok.webp"]);
+});
+
+test("poster izleniyor", () => {
+  const kok = geciciAgac({
+    "index.html": `<video poster="g/afis.jpg" data-kaynak=""></video>`,
+    "g/afis.jpg": "x",
+  });
+  const { dosyalar, eksik } = yayinDosyalari(kok);
+  assert.deepEqual(eksik, []);
+  assert.ok(dosyalar.includes("g/afis.jpg"), dosyalar.join(", "));
+});
+
+test("eksik bir poster yayını DÜŞÜRÜYOR", () => {
+  const kok = geciciAgac({
+    "index.html": `<video poster="g/yok.jpg"></video>`,
+  });
+  const { eksik } = yayinDosyalari(kok);
+  assert.deepEqual(eksik, ["g/yok.jpg"]);
+});
+
+test("gerçek sitenin afişi listede (bugün tesadüfen, artık bilerek)", () => {
+  // `salon-ic.jpg` hem `<img src>` hem `<video poster>` ile veriliyor. Tek
+  // kez listelenmeli — iki referans iki kopya üretmemeli.
+  const { dosyalar } = yayinDosyalari();
+  const kac = dosyalar.filter((d) => d === "varliklar/salon-ic.jpg").length;
+  assert.equal(kac, 1, `salon-ic.jpg ${kac} kez listelendi`);
 });

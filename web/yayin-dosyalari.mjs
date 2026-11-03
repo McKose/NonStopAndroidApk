@@ -69,7 +69,47 @@ const IMPORT_DESENI = /(?:from|import)\s+["'](\.\/[^"']+)["']/g;
  * yani "video henüz eklenmedi" hâli listeye hiç girmiyor.
  */
 const HTML_DESENI =
-  /(?:src|href|data-kaynak)\s*=\s*["'](?!https?:|\/\/|#)([^"']+)["']/g;
+  /(?:src|href|data-kaynak|poster)\s*=\s*["'](?!https?:|\/\/|#)([^"']+)["']/g;
+
+/**
+ * `<source srcset="a.webp 800w, b.webp 1200w">` — VİRGÜLLE AYRILMIŞ liste.
+ *
+ * Ayrı bir desen gerekiyor çünkü değeri tek bir yol değil: her aday bir
+ * yol ve bir tanımlayıcıdan (`800w`, `2x`) oluşuyor. `HTML_DESENI` bunu
+ * hiç görmüyor — `src`tan sonra `=` beklediği için `srcset=` ile
+ * EŞLEŞMİYOR bile.
+ *
+ * Bu, `<picture>` kullanılmaya başlandığında sessiz bir yayın hatasına
+ * dönüşürdü ve kaçışı yok: bir `<source>` 404 verdiğinde tarayıcı `<img>`e
+ * DÖNMÜYOR, kırık görsel gösteriyor.
+ */
+const SRCSET_DESENI = /srcset\s*=\s*["']([^"']+)["']/g;
+
+/** `srcset` değerinden yolları ayırır; tanımlayıcılar ve dış adresler düşer. */
+function srcsetYollari(deger) {
+  return deger
+    .split(",")
+    .map((aday) => aday.trim().split(/\s+/)[0])
+    .filter((yol) => yol && !/^(?:https?:|\/\/|#)/.test(yol));
+}
+
+/**
+ * Bir HTML dosyasındaki bütün göreli referanslar, ham hâlleriyle.
+ *
+ * İki desen birden taranıyor ve sonuç tek listede birleşiyor: çözümleme
+ * mantığı (kökten yollar, `#` parçası, dizin bağlantıları) iki kez
+ * yazılmasın. İki kopya olsaydı biri düzeltilip diğeri unutulurdu.
+ */
+function htmlReferanslari(icerik) {
+  const ham = [];
+  HTML_DESENI.lastIndex = 0;
+  for (const m of icerik.matchAll(HTML_DESENI)) ham.push(m[1]);
+  SRCSET_DESENI.lastIndex = 0;
+  for (const m of icerik.matchAll(SRCSET_DESENI)) {
+    ham.push(...srcsetYollari(m[1]));
+  }
+  return ham;
+}
 
 /**
  * Giriş noktalarını bulur: kökteki ve bir alt dizindeki her `index.html`.
@@ -154,12 +194,17 @@ export function yayinDosyalari(kok = BURADA, girisler = girisNoktalari(kok)) {
       ? hamIcerik.replace(/<!--[\s\S]*?-->/g, "")
       : hamIcerik;
 
-    const desen = ad.endsWith(".html") ? HTML_DESENI : IMPORT_DESENI;
-    desen.lastIndex = 0;
     const dizin = posix.dirname(ad);
 
-    for (const m of icerik.matchAll(desen)) {
-      const ham = m[1];
+    let hamlar;
+    if (ad.endsWith(".html")) {
+      hamlar = htmlReferanslari(icerik);
+    } else {
+      IMPORT_DESENI.lastIndex = 0;
+      hamlar = [...icerik.matchAll(IMPORT_DESENI)].map((m) => m[1]);
+    }
+
+    for (const ham of hamlar) {
 
       // Sayfa içi çapa, e-posta ve telefon bağlantıları dosya değil.
       if (ham.startsWith("#") || ham.startsWith("mailto:") || ham.startsWith("tel:")) continue;
