@@ -251,11 +251,33 @@ jobs:
             printf 'supabase.url=%s\nsupabase.anonKey=%s\n' \
               "$SUPABASE_URL" "$SUPABASE_ANON_KEY" >> local.properties
             echo "Sunucu ayarları yazıldı ve adres biçimi doğrulandı."
+            # Durum KOŞU ÖZETİNE de yazılıyor; gerekçe aşağıda.
+            echo "✅ **Sunucu ayarları APK'ya gömüldü** — uygulama girişe hazır." \
+              >> "$GITHUB_STEP_SUMMARY"
           else
             echo "UYARI: SUPABASE_URL / SUPABASE_ANON_KEY tanımlı değil."
             echo "APK derlenecek ama giriş ekranında 'sunucu ayarları eksik' diyecek."
             echo "Eklemek için: depo Settings -> Secrets and variables -> Actions."
+            {
+              echo "⚠️ **Sunucu ayarları YOK** — APK kurulur ama giriş ekranında"
+              echo "\"sunucu ayarları eksik\" der."
+              echo ""
+              echo "Eklemek için: Settings → Secrets and variables → Actions →"
+              echo "\`SUPABASE_URL\` ve \`SUPABASE_ANON_KEY\`."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
+
+          # ─── Neden koşu özetine yazılıyor ─────────────────────────────────
+          # "Bu APK kullanılabilir mi" sorusunun yanıtı yalnızca günlüğün
+          # ortasındaki bir satırdaydı. Günlük 2300 satır ve bu adım ortalarda
+          # bir yerde; soruyu yanıtlamak için günlüğü indirip aramak
+          # gerekiyordu. Üstelik adım İKİ DURUMDA DA başarılı dönüyor (yazdı
+          # ya da uyardı), yani yeşil tik hiçbir şey söylemiyor.
+          #
+          # 04.11.2026'da tam bu yaşandı: salon sahibi APK istedi, APK hazırdı
+          # ama "giriş yapabilir mi" sorusunu yanıtlamak için günlüğü üç kez
+          # çekmek yetmedi. Artık koşu sayfasının başında tek satır olarak
+          # duruyor.
 
       - name: Debug APK derle
         run: |
@@ -267,6 +289,7 @@ jobs:
       # Kurulabilir APK. Android Studio kurmadan denemenin tek yolu bu: Actions
       # sekmesinden koşuyu açıp aşağıdaki dosyayı indirmek yeterli.
       - name: Debug APK'yı yayınla
+        id: apk
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -274,6 +297,31 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 14
           if-no-files-found: warn
+
+      # APK'nın nerede olduğunu KOŞU ÖZETİNE yazar.
+      #
+      # Yapıt zaten koşu sayfasının altındaki "Artifacts" bölümünde duruyor
+      # ama orayı bilmeyen biri bulamıyor — ve APK'yı isteyen kişi genelde
+      # tam olarak GitHub'ı günlük kullanmayan kişi. Özet sayfanın EN
+      # BAŞINDA görünüyor.
+      #
+      # Boyut da yazılıyor: 25 MB'lık bir indirmeyi mobil veriyle başlatmak
+      # ile Wi-Fi'de başlatmak farklı kararlar.
+      - name: APK'yı özete yaz
+        if: always() && steps.apk.outputs.artifact-url != ''
+        run: |
+          boyut=$(du -m app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1 | cut -f1)
+          {
+            echo "## Kurulabilir APK"
+            echo ""
+            echo "[nonstop-debug-apk indir](${{ steps.apk.outputs.artifact-url }})"
+            echo " — ${boyut:-?} MB, 14 gün saklanıyor."
+            echo ""
+            echo "İndirilen dosya bir **zip**; içinden \`.apk\` çıkarılıp"
+            echo "telefona atılıyor. Android \"bilinmeyen kaynak\" onayı"
+            echo "isteyecek — bu APK hata ayıklama anahtarıyla imzalı,"
+            echo "mağaza sürümü değil."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # APK'yı tarayıcıda çalıştırılabilir hâle getirir.
       #
