@@ -288,6 +288,19 @@ jobs:
 
       # Kurulabilir APK. Android Studio kurmadan denemenin tek yolu bu: Actions
       # sekmesinden koşuyu açıp aşağıdaki dosyayı indirmek yeterli.
+      #
+      # ### Saklama süresi 14 değil 90 gün (04.11.2026)
+      #
+      # Bu yapıt artık "derleme geçti mi" çıktısı değil, uygulamanın TEK
+      # DAĞITIM YOLU: salon sahibi mağazada yayınlamayacağına karar verdi
+      # (`docs/kararlar.md` → "Mağazada yayınlanmayacak"), yani telefona
+      # kurulan APK bu.
+      #
+      # 14 gün o iş için kısaydı ve sessizce kısaydı: geliştirme iki hafta
+      # durduğunda elde kurulabilir APK kalmıyor, koşu yeşil göründüğü hâlde
+      # indirme bağlantısı ölüyor. 90 gün GitHub'ın üst sınırı; depo ayarı
+      # daha düşük bir sınır koyarsa `upload-artifact` sessizce kırpıyor, o
+      # yüzden gerçek son gün yapıt satırından doğrulandı.
       - name: Debug APK'yı yayınla
         id: apk
         if: always()
@@ -295,7 +308,7 @@ jobs:
         with:
           name: nonstop-debug-apk
           path: app/build/outputs/apk/debug/*.apk
-          retention-days: 14
+          retention-days: 90
           if-no-files-found: warn
 
       # APK'nın nerede olduğunu KOŞU ÖZETİNE yazar.
@@ -315,12 +328,16 @@ jobs:
             echo "## Kurulabilir APK"
             echo ""
             echo "[nonstop-debug-apk indir](${{ steps.apk.outputs.artifact-url }})"
-            echo " — ${boyut:-?} MB, 14 gün saklanıyor."
+            echo " — ${boyut:-?} MB, 90 gün saklanıyor."
             echo ""
             echo "İndirilen dosya bir **zip**; içinden \`.apk\` çıkarılıp"
             echo "telefona atılıyor. Android \"bilinmeyen kaynak\" onayı"
-            echo "isteyecek — bu APK hata ayıklama anahtarıyla imzalı,"
-            echo "mağaza sürümü değil."
+            echo "isteyecek."
+            echo ""
+            echo "Bu APK **hata ayıklama anahtarıyla imzalı** ve dağıtım yolu"
+            echo "bu: mağazada yayınlanmayacak (karar, 04.11.2026). İmza her"
+            echo "koşuda AYNI, yani yeni APK eskisinin üzerine kuruluyor —"
+            echo "önce kaldırmak gerekmiyor."
           } >> "$GITHUB_STEP_SUMMARY"
 
       # APK'yı tarayıcıda çalıştırılabilir hâle getirir.

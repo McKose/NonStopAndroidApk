@@ -507,6 +507,64 @@ yapıyor: günlük CI derlemenin geçtiğini gösteriyor, yayın akışı ise ya
 imzalı bir APK üretmek için var. İkincisinin imzasız bir çıktıyla "başarılı"
 olması, yayınlanamayacak bir şeyi yayınlanmış göstermek olurdu.
 
+## Mağazada yayınlanmayacak; dağıtım kurulabilir APK ile
+
+**Karar (salon sahibi, 04.11.2026):** Uygulama Google Play'de
+yayınlanmayacak. Dağıtım, her CI koşusunda üretilen **hata ayıklama
+anahtarıyla imzalı** APK'nın telefona elden kurulmasıyla olacak.
+
+**Neden kayda geçiyor:** Bu karar, kalan işler listesinin **en kritik
+maddesini gereksizleştirdi.** Yayın anahtarı + 4 gizli anahtar, "imzalı
+APK'nın tek engeli" diye aylarca listenin başında durdu; mağaza yoksa o
+engel de yok. Kaydedilmezse altı ay sonra bu dosyaları okuyan biri onu
+hâlâ yapılacak iş sanır.
+
+**"İmzasız APK" diye bir dağıtım yolu YOK** ve bu, kararın istendiği
+cümlede geçtiği için ayrıca yazılıyor. Android imzası olmayan bir paketi
+kurmuyor — `INSTALL_PARSE_FAILED_NO_CERTIFICATES`, hem `adb install`da hem
+dosyaya dokunarak kurulumda. Yani `:app:assembleRelease`in anahtar yokken
+ürettiği `app-release-unsigned.apk` telefona **kurulamaz**; derlemenin
+geçtiğini gösteren bir çıktıdan fazlası değil. Mağazasız dağıtımın doğru
+karşılığı "imzasız" değil, "kendi anahtarıyla değil, hata ayıklama
+anahtarıyla imzalı".
+
+**Hata ayıklama imzası bu iş için neden yeterli:** Anahtar depoda ve
+**sabit** (`app/debug.keystore`; gerekçesi "Hata ayıklama imzası sabit ve
+depoda"). Sabit olduğu için her koşu AYNI imzayı atıyor ve yeni APK
+eskisinin üzerine kurulabiliyor. Mağazasız dağıtımın asıl riski olan "bir
+daha güncelleyemem" sorunu bu yüzden burada yok — anahtar kaybolmuyor,
+depoda duruyor.
+
+**Yayın akışı ve `yayin` imza yapılandırması SİLİNMEDİ.** `yayin.yml`
+yalnızca `v*` etiketiyle çalışıyor, etiket atılmadıkça bedeli sıfır ve
+karar dönerse yol hazır duruyor. Silmek, geri alınması kararı tersine
+çevirmekten daha pahalı bir işlem olurdu. `docs/yayin.md` duruyor ama
+başına kararın notu düştü, çünkü o belgeyi okuyan biri aksi hâlde
+yapılması gereken bir kurulum sanırdı.
+
+**Yapıtın saklama süresi 14 → 90 gün.** Yapıt artık "derleme geçti mi"
+çıktısı değil, dağıtımın kendisi. 14 gün o iş için sessizce kısaydı:
+geliştirme iki hafta durduğunda koşu yeşil göründüğü hâlde indirme
+bağlantısı ölüyor.
+
+**Açıkta kalan takas — dağıtılan APK `debuggable`.** `debug` yapı tipi
+AGP'nin varsayılanlarını kullanıyor, yani manifestoda
+`android:debuggable="true"`. Sonucu: telefona fiziksel erişimi olan ve USB
+hata ayıklamayı açabilen biri, root olmadan uygulamanın özel verisini
+(Room veritabanı — üye adları, telefonları, sağlık beyanları) okuyabilir.
+Oturum belirteci şifreli saklanıyor ("Oturum cihazda şifreli saklanır") ama
+veritabanı şifreli değil.
+
+Bu karar **imza** ile ilgili, `debuggable` ise ondan ayrı bir özellik:
+hata ayıklama anahtarıyla imzalı ama `debuggable` OLMAYAN bir yapı tipi
+tanımlanabilir. Bugüne kadar yapılmamasının gerekçesi — "debug anahtarıyla
+imzalı bir yayın, gerçek yayın anahtarıyla bir daha güncellenemez" —
+mağaza kararıyla **geçersizleşti**, çünkü gelecek bir yayın anahtarı yok.
+Yani bu artık yapılabilir bir iş; yapılmadı çünkü yeni bir yapı tipi
+tanımlamak salon sahibinin istediği kapsamın dışındaydı ve bedeli
+(fiziksel erişim + USB hata ayıklama gerektiren bir risk) kararı tek
+başına vermeyi gerektirmeyecek kadar sınırlı. Karar sahibine bildirildi.
+
 ## Sürüm numarası etiketten türer
 
 **Karar:** `versionName` yayın etiketinden geliyor (`-PsurumAdi=1.2.0`),
