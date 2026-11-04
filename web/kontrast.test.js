@@ -82,27 +82,57 @@ test("paletin metin renkleri zemin üzerinde AA geçiyor", () => {
   }
 });
 
-test("`.yapimci` hesaplanan rengi AA geçiyor", () => {
-  // Kural `color-mix` ile yazıldığı için oran dosyadan okunuyor: sabit bir
-  // sayı yazılırsa test asıl kaynakla bağını kaybeder ve oran değişince
-  // sessizce geçmeye devam eder.
-  const m = SITE_CSS.match(
-    /\.yapimci\s*\{[^}]*color\s*:\s*color-mix\(\s*in\s+srgb\s*,\s*var\(--soluk\)\s*(\d+)%\s*,\s*transparent\s*\)/,
-  );
-  assert.ok(
-    m,
-    "`.yapimci` içindeki `color-mix(... var(--soluk) N%, transparent)` " +
-      "kuralı bulunamadı — kural değiştiyse bu test de gözden geçirilmeli",
-  );
+/**
+ * `color-mix(in srgb, var(--soluk) N%, transparent)` yazan BÜTÜN kurallar.
+ *
+ * Tek bir seçici (`.yapimci`) sınanmıyor, DESEN sınanıyor. Gerekçesi yaşanmış:
+ * test ilk yazıldığında yalnız `.yapimci`ya bakıyordu, sonra deneme dersi
+ * formuna aynı biçimde iki renk daha eklendi (`.deneme-istege-bagli`,
+ * `.deneme-kvkk`) ve test onları GÖRMÜYORDU. Oranı dosyadan okumak bağı
+ * koruyor ama yalnız bir kuralı izlemek, korunan şeyi tek satıra indiriyordu.
+ */
+function solukKarisimlari(metin) {
+  const bulunan = [];
+  const desen =
+    /([^{}]+)\{[^}]*?color\s*:\s*color-mix\(\s*in\s+srgb\s*,\s*var\(--soluk\)\s+(\d+)%\s*,\s*transparent\s*\)/g;
+  for (const m of metin.matchAll(desen)) {
+    bulunan.push({
+      secici: m[1].trim().split("\n").pop().trim(),
+      oran: Number(m[2]),
+    });
+  }
+  return bulunan;
+}
 
-  const oran = Number(m[1]) / 100;
-  const gorunen = saydamKarisim(paletten("soluk"), ZEMIN, oran);
-  const o = kontrast(gorunen, ZEMIN);
-
+test("`--soluk` karışımı yazan her kural bulunabiliyor (tripwire)", () => {
+  // Desen bozulursa aşağıdaki test boş listeyle geçer ve hiçbir şey sınamaz.
+  const k = solukKarisimlari(SITE_CSS);
   assert.ok(
-    o >= AA_NORMAL,
-    `.yapimci %${m[1]} oranında ${gorunen} olarak görünüyor ve zemin ` +
-      `(${ZEMIN}) üzerinde ${o.toFixed(2)}:1 — AA için ${AA_NORMAL}:1 ` +
-      "gerekiyor. Oranı yükseltin ya da paleti gözden geçirin.",
+    k.length >= 3,
+    `yalnızca ${k.length} \`color-mix(var(--soluk) …)\` kuralı bulundu; ` +
+      "beklenen en az 3 — desen ya da stil dosyası değişmiş olabilir",
+  );
+});
+
+test("`--soluk` karışımıyla hesaplanan her renk AA geçiyor", () => {
+  const soluk = paletten("soluk");
+  const dusenler = [];
+
+  for (const { secici, oran } of solukKarisimlari(SITE_CSS)) {
+    const gorunen = saydamKarisim(soluk, ZEMIN, oran / 100);
+    const o = kontrast(gorunen, ZEMIN);
+    if (o < AA_NORMAL) {
+      dusenler.push(
+        `${secici} (%${oran} → ${gorunen}, ${o.toFixed(2)}:1)`,
+      );
+    }
+  }
+
+  assert.deepEqual(
+    dusenler,
+    [],
+    `Bu kurallar zemin (${ZEMIN}) üzerinde AA'yı (${AA_NORMAL}:1) ` +
+      "geçmiyor; oranı yükseltin ya da paleti gözden geçirin:\n  " +
+      dusenler.join("\n  "),
   );
 });

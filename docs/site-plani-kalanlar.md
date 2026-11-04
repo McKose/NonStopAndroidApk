@@ -49,9 +49,29 @@ olan "ziyaretçiyi temasa geçirme" ile ilgili.
    verisi toplamıyordu (ad, telefon, e-posta, şifre, not); sağlık verisini
    toplayan yer giriş yapmış üyenin panosu ve orası açık. İlk yazımda bu
    iki form birbirine karışmıştı.
-2. **İletişim / deneme dersi formu.** Planda ana dönüşüm noktasıydı. Sitede
-   "Bize ulaşın" düğmesi yalnızca iletişim bilgilerine kaydırıyor. Form
-   eklenirse 1. madde onun için de geçerli olur ve spam koruması gerekir.
+2. **İletişim / deneme dersi formu — YAPILDI, canlıya açılması 1. maddeye
+   bağlı.** Planın ana dönüşüm noktasıydı. Form iletişim bölümünde,
+   `contact_requests` tablosuna `iletisim-istegi` Edge Function'ı üzerinden
+   yazıyor.
+
+   Tabloya doğrudan `anon` yazma yetkisi **verilmedi**: `anon` yayınlanmış
+   anahtarla çalışıyor ve tabloya `insert` açmak "internetteki herkes
+   istediği hızda satır yazabilir" demekti. Uç ayrıca doğrulama, mükerrer
+   bastırma (aynı numara, 10 dk) ve hız sınırı (salon başına saatte 20)
+   yapıyor — tablo kuralının yapamadığı şeyler. Spam koruması bu üçü artı
+   tuzak alanı.
+
+   **Form şu anda KAPALI** (`FORM_ACIK = false`, `web/iletisim-formu.js`).
+   Sebebi teknik değil, sıralama — aşağıdaki iki madde. Açmak tek satır;
+   işletme tarafı `docs/site-yonetimi.md` → "3a. Deneme dersi formu".
+
+   **Açılmadan önce kalan iki şey:**
+   - **Panel ekranı.** Talepleri personel göremiyor; bugün yalnızca Supabase
+     panelinden görülebiliyor. Okunmayan bir form, hiç olmayan bir formdan
+     kötü — yani isteğe bağlı değil.
+   - **KVKK.** Form ad, telefon ve e-posta topluyor. Form içinde kısa bir
+     satır var (amaç ve paylaşılmama) ama md. 10'un tamamı değil; 1. madde
+     bu yüzden formu da kapsıyor.
 3. **İşletme künyesi.** Alt bilgide ticari unvan yok (plan §9). Aydınlatma
    metniyle aynı bilgi, birlikte eklenebilir.
 4. **Arama motoru kayıtları.** Google Search Console ve Google İşletme

@@ -15,7 +15,7 @@ ama **tanımlıymış**. Bu daha sinsi bir hata — eksik sanılan bir ayar, asl
 çalışan bir akışı "zaten bozuk" sandırıyor. Bir maddenin durumu belgeden
 değil, kaynağından doğrulanmalı.
 
-Son gözden geçirme: 2 Kasım 2026, `master` (`502c7d8`).
+Son gözden geçirme: 4 Kasım 2026, `master` (`08bb178`) + bu dalda bekleyen işler.
 
 ---
 
@@ -27,14 +27,21 @@ Bunlar bende yapılamaz; hiçbiri kod işi değil.
 |---|---|---|---|
 | 1 | **Yayın anahtarı + 4 gizli anahtar** | İmzalı APK'nın **tek** engeli | `docs/yayin.md` |
 | 2 | **KVKK aydınlatma metni için bilgiler** (ticari unvan, adres, saklama süresi) | Sitedeki yasal açığı | `docs/site-plani-kalanlar.md` md. 1 |
-| 3 | **Sızmış şifre koruması** (Supabase panelinden) | Zayıf şifreleri eler | `supabase/README.md` → "Panelden açılabilecek iki ayar" |
-| 4 | **MX kaydı** (Turhost panelinde) | Kurumsal e-postayı | `docs/site-yonetimi.md` → "E-posta" |
-| 5 | **Karşılama videosu** (`kahraman.mp4`) | Banner videosunu (isteğe bağlı) | `web/varliklar/BENIOKU.md` |
+| 3 | **En az şifre uzunluğu 6 → 8** (Supabase panelinden) | Sunucuyu istemciyle aynı kurala getirir | `supabase/README.md` → "Panelden açılabilecek iki ayar" |
+| 4 | **Sızmış şifre koruması** (Supabase panelinden) | Zayıf şifreleri eler | aynı bölüm |
+| 5 | **MX kaydı** (Turhost panelinde) | Kurumsal e-postayı | `docs/site-yonetimi.md` → "E-posta" |
+| 6 | **Karşılama videosu** (`kahraman.mp4`) | Banner videosunu (isteğe bağlı) | `web/varliklar/BENIOKU.md` |
 
 1. madde en kritik olanı: uygulama kod olarak hazır ama imzalanamadığı için
 dağıtılamıyor.
 
-3. madde **ücretli plan** gerektiriyor; ücretsiz plandaysan seçenek
+3. madde **en ucuz olanı ve bu listeye sonradan eklendi** — önce yalnızca
+4. madde yazılıydı ve ikisi aynı panel bölümünde olduğu için gözden
+kaçmıştı. Uygulama ve panel 8 karakter dayatıyor, sunucu 6'da duruyor; yani
+istemci kontrolü atlanırsa 7 karakterli bir şifre geçiyor. **Ücretsiz planda
+da yapılabiliyor**, 1 dakika.
+
+4. madde **ücretli plan** gerektiriyor; ücretsiz plandaysan seçenek
 görünmez ve bu madde şimdilik kapalı sayılır.
 
 `SUPABASE_TENANT_ID` gizli anahtarı bu listeden **çıktı** ve iki sebebi var:
@@ -68,7 +75,13 @@ Sekiz açık madde, öncelik sırasıyla `docs/site-plani-kalanlar.md` içinde.
    etkilemiyor**: sağlık verisini toplayan yer kayıt formu değil, giriş
    yapmış üyenin panosundaki beyan formu ve orası açık. Formda açık rıza
    var ama aydınlatma metni yok; açık rıza onun yerini tutmuyor.
-2. **İletişim / deneme dersi formu** — planın ana dönüşüm noktasıydı.
+2. **İletişim / deneme dersi formu** — **yapıldı**, ama canlıya açılması
+   1. maddeye bağlı. Form `contact_requests` tablosuna `iletisim-istegi`
+   Edge Function'ı üzerinden yazıyor; tabloya doğrudan `anon` yazma yetkisi
+   verilmedi (gerekçe `0010`da). **Form şu anda KAPALI** (`FORM_ACIK`);
+   açılmadan önce kalan iki şey: **panel ekranı** (talepleri personel
+   göremiyor — okunmayan bir form, hiç olmayan bir formdan kötü) ve
+   **KVKK metni** (ticari unvan + saklama süresi sende).
 
 **WhatsApp ile temas kapandı** (02.11.2026) ve **canlıda yayında**:
 iletişim bölümünde kutu, sayfanın her yerinde sabit düğme, hazır mesajı
@@ -87,9 +100,16 @@ Kalan altı madde (künye, arama motoru kayıtları, içerik bölümleri, video,
 
 ## Sunucu
 
-Üç madde, hepsi `supabase/README.md` → "Henüz yapılmadı" içinde ve hiçbiri
+Dört madde, hepsi `supabase/README.md` → "Henüz yapılmadı" içinde ve hiçbiri
 acil değil:
 
+- **`anon` rolünün tablo yetkileri belgelenen niyetten geniş.** `0005`
+  "yalnızca duyurular" diyor, canlıda ise `anon` 15 tablonun hepsinde
+  `select`/`insert`/`update` yetkisine sahip (`delete` kapalı — `0008`).
+  Veri sızmıyor: kurallar `{authenticated}` kapsamlı, `anon` 0 satır alıyor.
+  Hemen yapılmadı çünkü **bu depodaki testlerle doğrulanamıyor** — testler
+  boş PostgreSQL'de koşuyor ve orada o yetkiler hiç yok, yani revoke
+  eklemek testleri hiç değiştirmez. Gerekçe ve doğru sıra README'de.
 - Personel kaydını **tamamen silme** yolu yok (erişimi kaldırma var). Bilinçli:
   geçmiş satışlar ve hakedişler o satıra bağlı.
 - iOS tarafında oturum saklama yok — iOS uygulaması yazılmadığı için sırası
