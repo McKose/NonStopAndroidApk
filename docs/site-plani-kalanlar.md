@@ -49,6 +49,22 @@ olan "ziyaretçiyi temasa geçirme" ile ilgili.
    verisi toplamıyordu (ad, telefon, e-posta, şifre, not); sağlık verisini
    toplayan yer giriş yapmış üyenin panosu ve orası açık. İlk yazımda bu
    iki form birbirine karışmıştı.
+
+   **ERTELENDİ — salon sahibinin kararı (04.11.2026).** Gerekçe "web'den
+   üyelik almayacağız" idi. O gerekçe kayıt formu için doğru ama **bu madde
+   kayıt formuyla ilgili değil**; aynı karışıklık burada ikinci kez yaşandı,
+   o yüzden ayrıca yazılıyor.
+
+   Maddenin kapsamı ölçüldü (04.11.2026, canlı veritabanı): 2 bağlı üye
+   hesabı ve **girilmiş 1 sağlık beyanı** var. Yani veri toplanması teorik
+   değil, bir kez olmuş. Beyan formunda açık rıza kutusu var ve rıza zamanı
+   kayda yazılıyor; eksik olan **aydınlatma**.
+
+   Madde listede kalıyor çünkü kapanmadı — yalnızca sırası geriye alındı.
+   Yeniden ele alınırsa bilinmesi gereken: ticari unvan ve saklama süresi
+   olmadan md. 10'un tamamı yazılamaz, ama veri sorumlusu / amaç /
+   paylaşılmama söyleyen kısa bir bilgilendirme o iki bilgi olmadan da
+   eklenebilir ve bugünkü hâlden iyidir.
 2. **İletişim / deneme dersi formu — YAPILDI, canlıya açılması 1. maddeye
    bağlı.** Planın ana dönüşüm noktasıydı. Form iletişim bölümünde,
    `contact_requests` tablosuna `iletisim-istegi` Edge Function'ı üzerinden
@@ -61,17 +77,18 @@ olan "ziyaretçiyi temasa geçirme" ile ilgili.
    yapıyor — tablo kuralının yapamadığı şeyler. Spam koruması bu üçü artı
    tuzak alanı.
 
-   **Form şu anda KAPALI** (`FORM_ACIK = false`, `web/iletisim-formu.js`).
-   Sebebi teknik değil, sıralama — aşağıdaki iki madde. Açmak tek satır;
-   işletme tarafı `docs/site-yonetimi.md` → "3a. Deneme dersi formu".
+   **Form KAPALI KALACAK — salon sahibinin kararı (04.11.2026).**
+   (`FORM_ACIK = false`, `web/iletisim-formu.js`.) Bekleyen bir iş değil:
+   "metin gelince açılacak" diye kuyrukta durmuyor, açılması yeni bir karar
+   gerektiriyor. Açmak tek satır; işletme tarafı
+   `docs/site-yonetimi.md` → "3a. Deneme dersi formu".
 
-   **Açılmadan önce kalan iki şey:**
-   - **Panel ekranı.** Talepleri personel göremiyor; bugün yalnızca Supabase
-     panelinden görülebiliyor. Okunmayan bir form, hiç olmayan bir formdan
-     kötü — yani isteğe bağlı değil.
-   - **KVKK.** Form ad, telefon ve e-posta topluyor. Form içinde kısa bir
-     satır var (amaç ve paylaşılmama) ama md. 10'un tamamı değil; 1. madde
-     bu yüzden formu da kapsıyor.
+   Kapalı kaldıkça ziyaretçi çıkışsız değil: telefon, WhatsApp ve Instagram
+   formun hemen üstünde ve WhatsApp'ın hazır mesajı deneme dersini soruyor.
+
+   **Panel ekranı YAPILDI** (Talepler sekmesi): liste, tıkla-ara ve durum
+   değiştirme (arandı/kapandı) çalışıyor. Yani form açıldığı gün zincirin
+   tamamı hazır — talep panelde görünür ve işaretlenebilir.
 3. **İşletme künyesi.** Alt bilgide ticari unvan yok (plan §9). Aydınlatma
    metniyle aynı bilgi, birlikte eklenebilir.
 4. **Arama motoru kayıtları.** Google Search Console ve Google İşletme

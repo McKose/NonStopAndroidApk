@@ -161,17 +161,20 @@ olur: kart görselsiz düzgün görünüyor, kırık resim simgesi çıkmıyor.
 
 ## 3a. Deneme dersi formu — şu anda KAPALI
 
-> ### ⏸ Form ziyaretçiye gösterilmiyor
+> ### ⏸ Form ziyaretçiye gösterilmiyor — senin kararın (04.11.2026)
 >
-> **Sebebi teknik değil, KVKK sıralaması.** Form ad, telefon ve e-posta
-> topluyor; bunlar kişisel veri ve KVKK md. 10 bir aydınlatma metni
-> istiyor. Formun içinde amacı ve paylaşılmamayı söyleyen kısa bir satır
-> var ama metnin tamamı değil — eksik kalan iki bilgi **senden** gelmeli:
-> **ticari unvan** ve **saklama süresi**.
+> Form hazır ve çalışıyor; **kapalı kalmasını sen istedin**, KVKK işi
+> şimdilik öncelik olmadığı için. Yani bekleyen bir iş değil: açılması yeni
+> bir karar gerektiriyor.
 >
-> Yani form hazır ve çalışıyor; beklenen şey yalnızca o metin. Bu arada
-> ziyaretçi çıkışsız değil: telefon, WhatsApp ve Instagram formun hemen
-> üstünde duruyor.
+> Kapalı kaldıkça ziyaretçi çıkışsız değil: telefon, WhatsApp ve Instagram
+> formun hemen üstünde ve WhatsApp'ın hazır mesajı deneme dersini soruyor.
+>
+> **Açmaya karar verirsen bilmen gereken:** form ad, telefon ve e-posta
+> topluyor. Bunlar kişisel veri ve KVKK md. 10 bir aydınlatma metni istiyor.
+> Form içinde amacı ve paylaşılmamayı söyleyen kısa bir satır var ama metnin
+> tamamı değil; tamamı için iki bilgi gerekiyor — **ticari unvan** ve
+> **saklama süresi**.
 >
 > **Açmak için** `web/iletisim-formu.js` içindeki `FORM_ACIK` değerini
 > `true` yapın. Başka hiçbir şey gerekmiyor — tablo, uç ve hız sınırı
@@ -193,10 +196,14 @@ açılsaydı internetteki herkes istediği hızda satır yazabilirdi. Uç ayrıc
 - **Hız sınırı**: salon başına saatte 20 istek. Aşılırsa ziyaretçiye
   WhatsApp ve telefonla ulaşması söyleniyor.
 
-> **Talepleri görmek için panel ekranı HENÜZ YOK.** Bugün talepler yalnızca
-> Supabase panelinden (`contact_requests` tablosu) görülebiliyor. Form
-> açılmadan önce o ekranın yapılması gerekiyor — okunmayan bir form, hiç
-> olmayan bir formdan kötü.
+**Talepleri görmek için panel ekranı HAZIR:** panelde **Talepler** sekmesi.
+Liste en yeni üstte, telefona tıklayınca arama başlıyor ve durumu
+işaretleyebiliyorsun (Arandı / Kapat / Yeniden aç). Eğitmen de listeyi
+görüyor ve arayabiliyor ama durumu değiştiremiyor — o yetki yönetici ve
+müdürde.
+
+Yani form açıldığı gün zincirin tamamı çalışıyor: talep gelir, panelde
+görünür, aranır, işaretlenir.
 
 ---
 
