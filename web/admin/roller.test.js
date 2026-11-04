@@ -143,7 +143,7 @@ test("panele özgü bölümler sınırlı ve gerekçeli", () => {
 
   assert.deepEqual(
     ozel,
-    ["duyurular", "personel-erisim", "uye-hesaplari"],
+    ["duyurular", "personel-erisim", "talepler", "uye-hesaplari"],
     "Panele özgü bölümlerin listesi değişmiş. Yeni bir bölüm gerçekten " +
       "uygulamada karşılığı olmayan bir bölüm mü, yoksa eşleşme mi unutuldu?",
   );
@@ -193,6 +193,64 @@ test("panele özgü bölümlerin rolleri sunucudaki kuralla aynı", () => {
       `\`${sekme}\` sekmesinin rolleri sunucudaki \`${kuralAdi}\` ile aynı değil.`,
     );
   }
+});
+
+/**
+ * `talepler` sekmesi ÜÇ ROLE de açık ve bunun dayanağı yazma değil OKUMA
+ * kuralı.
+ *
+ * Yukarıdaki parity testi yazma kurallarını karşılaştırıyor ve `talepler` ona
+ * BİLEREK eklenmedi: bölüm şu an salt okunur, yani karşılaştırılacak bir
+ * yazma düğmesi yok. Dayanak `0010`daki okuma kuralı ve o kural role hiç
+ * bakmıyor — yalnız salona (`user_gym_ids()`). Eğitmenin görmesi de bu
+ * yüzden doğru: talebi arayacak kişi o olabilir.
+ */
+test("talepler okuma kuralı role değil salona bakıyor", () => {
+  const sql = readFileSync(
+    join(buradan, "..", "..", "supabase", "migrations", "0010_iletisim_istekleri.sql"),
+    "utf8",
+  );
+  const bas = sql.indexOf("create policy contact_requests_staff_select");
+  assert.ok(bas > 0, "okuma kuralı 0010'da bulunamadı");
+  const govde = sql.slice(bas, sql.indexOf(";", bas));
+
+  assert.match(govde, /user_gym_ids\(\)/, "kural salon kapsamlı değil");
+  assert.equal(
+    [...govde.matchAll(/'(ADMIN|MANAGER|TRAINER)'/g)].length,
+    0,
+    "okuma kuralına rol kısıtı girmiş — o hâlde sekmenin rolleri de " +
+      "daraltılmalı, yoksa panel sunucudan geniş bir kapı açar",
+  );
+  assert.deepEqual(
+    [...SEKME_ROLLERI.talepler].sort(),
+    ["ADMIN", "MANAGER", "TRAINER"],
+  );
+});
+
+/**
+ * `talepler` bugün SALT OKUNUR ve bu, rol listesinin dayanağı.
+ *
+ * Bu panelde yazma yapan bölümler `ozel` olarak kaydediliyor (`duyurular`,
+ * `uye-hesaplari`); salt okunur olanlar `ciz`. Yani `talepler`in `ozel`e
+ * dönmesi "artık yazıyor" demek — ve o anda rol listesi daralmak zorunda,
+ * çünkü sunucudaki yazma kuralı yalnız ADMIN + MANAGER'a açık (`0010`).
+ *
+ * Test tam o geçişi yakalıyor. Olmasa, durum değiştirme düğmesi eklenen gün
+ * eğitmene de görünür, eğitmen basar ve sunucudan SESSİZCE reddedilirdi —
+ * `roller.js`in başındaki uyarının birebir aynısı.
+ */
+test("talepler salt okunur kayıtlı (yazma eklenirse roller daralmalı)", () => {
+  const appJs = readFileSync(join(buradan, "app.js"), "utf8");
+  const kayit = appJs.match(/\n\s*talepler:\s*\{([^}]*)\}/);
+  assert.ok(kayit, "app.js içinde `talepler` çizim kaydı bulunamadı");
+  assert.match(kayit[1], /\bciz\b/, "`talepler` `ciz` ile kayıtlı değil");
+  assert.doesNotMatch(
+    kayit[1],
+    /\bozel\b/,
+    "`talepler` artık `ozel` — yazma eklendi demek. Sunucudaki yazma kuralı " +
+      "yalnız ADMIN + MANAGER'a açık (0010), o yüzden SEKME_ROLLERI.talepler " +
+      "daraltılmalı ve denetimler role göre gösterilmeli.",
+  );
 });
 
 test("finans eğitmene kapalı, geri kalanı açık", () => {

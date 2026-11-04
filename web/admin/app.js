@@ -278,6 +278,7 @@ const CIZIMLER = {
   satislar: { ciz: satislariCiz },
   personel: { ciz: personeliCiz },
   finans: { ciz: finansiCiz },
+  talepler: { ciz: talepleriCiz },
   duyurular: { ozel: duyurulariYukle },
   "uye-hesaplari": { ozel: uyeHesaplariYukle },
   "personel-erisim": { ozel: personelErisimYukle },
@@ -669,6 +670,56 @@ function personeliCiz(satirlar) {
       tutarYaz(p.monthly_salary_minor),
       p.phone,
     ]),
+  );
+}
+
+// ─── Talepler ───────────────────────────────────────────────────────────────
+
+/** Talep durumu → rozet. */
+const TALEP_DURUMLARI = {
+  NEW:       { rozet: "talep-yeni",    metin: "Yeni" },
+  CONTACTED: { rozet: "talep-arandi",  metin: "Arandı" },
+  CLOSED:    { rozet: "talep-kapandi", metin: "Kapandı" },
+};
+
+/**
+ * Siteden gelen deneme dersi talepleri.
+ *
+ * ### Telefon `tel:` bağlantısı — bu bölümün asıl işi
+ * Listedeki tek eylem bu ve bilinçli: talep gelince yapılacak şey kişiyi
+ * ARAMAK. Düz metin olsaydı numarayı seçip kopyalamak gerekirdi; panel de
+ * telefondan açılıyor ve orada `tel:` doğrudan aramayı başlatıyor.
+ *
+ * Numara veritabanında KANONİK duruyor (`+90` + 10 hane, bkz. `0010` ve
+ * `web/iletisim-formu.js`), yani `tel:` için ayrıca biçimlendirme gerekmiyor —
+ * ve zaten yapılmamalı: ekranda okunur hâle getirmek için araya boşluk koyan
+ * bir dönüşüm, bağlantının kendisini bozma riski taşır.
+ *
+ * ### Bölüm şu an SALT OKUNUR
+ * Durum değiştirme (arandı/kapandı) ve personel notu HENÜZ YOK. Tablo ve
+ * sunucu kuralları hazır (`0010`: `ADMIN` + `MANAGER` güncelleyebiliyor), ama
+ * denetimlerin role göre gösterilmesi ayrı bir iş: eğitmen de bu listeyi
+ * görüyor ve ona "arandı" düğmesi gösterilse sunucudan sessizce reddedilirdi.
+ * Gerekçe `roller.js` içinde de yazılı.
+ *
+ * Bu hâliyle bile kara deliği kapatıyor: talepler görünüyor ve aranabiliyor.
+ */
+function talepleriCiz(satirlar) {
+  return tabloYap(
+    ["Tarih", "Ad Soyad", "Telefon", "E-posta", "Mesaj", "Durum"],
+    satirlar.map((t) => {
+      const tel = document.createElement("a");
+      tel.href = `tel:${t.phone}`;
+      tel.textContent = t.phone;
+      return [
+        tarihYaz(t.created_at_ms),
+        t.full_name,
+        tel,
+        t.email ?? "—",
+        t.message ?? "—",
+        TALEP_DURUMLARI[t.state] ?? { rozet: "talep-yeni", metin: t.state },
+      ];
+    }),
   );
 }
 
