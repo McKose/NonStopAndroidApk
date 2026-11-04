@@ -29,3 +29,7 @@ keystore.properties
 *.jks
 release.keystore
 app/release.keystore
+
+# Supabase CLI'nin çalışma dizini (`npx supabase ...` bunu oluşturuyor).
+# İçinde sürüm önbelleği gibi yerel şeyler var; depoya ait değil.
+supabase/.temp/
