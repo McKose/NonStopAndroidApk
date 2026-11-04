@@ -78,8 +78,10 @@ Sekiz açık madde, öncelik sırasıyla `docs/site-plani-kalanlar.md` içinde.
 2. **İletişim / deneme dersi formu** — **yapıldı**, ama canlıya açılması
    1. maddeye bağlı. Form `contact_requests` tablosuna `iletisim-istegi`
    Edge Function'ı üzerinden yazıyor; tabloya doğrudan `anon` yazma yetkisi
-   verilmedi (gerekçe `0010`da). Kalan iki şey: **panel ekranı** (talepleri
-   personel göremiyor — bu olmadan form bir kara delik) ve **KVKK metni**.
+   verilmedi (gerekçe `0010`da). **Form şu anda KAPALI** (`FORM_ACIK`);
+   açılmadan önce kalan iki şey: **panel ekranı** (talepleri personel
+   göremiyor — okunmayan bir form, hiç olmayan bir formdan kötü) ve
+   **KVKK metni** (ticari unvan + saklama süresi sende).
 
 **WhatsApp ile temas kapandı** (02.11.2026) ve **canlıda yayında**:
 iletişim bölümünde kutu, sayfanın her yerinde sabit düğme, hazır mesajı

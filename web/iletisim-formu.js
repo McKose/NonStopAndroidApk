@@ -27,6 +27,52 @@
 // sınanıyor — son 10 hane eşitliği bu hatayı YAKALAMIYOR, sıfırlı hâlde de
 // son 10 hane aynı.
 
+/**
+ * Form ziyaretçiye gösterilsin mi.
+ *
+ * **ŞU AN KAPALI ve sebebi teknik değil, KVKK.** Form ad, telefon ve
+ * e-posta topluyor; bunlar kişisel veri ve KVKK md. 10 bir aydınlatma metni
+ * istiyor (veri sorumlusunun kimliği, işleme amacı, aktarım, haklar,
+ * saklama süresi). Formun içinde amacı ve paylaşılmamayı söyleyen kısa bir
+ * satır var ama metnin tamamı değil, ve eksik kalan iki bilgi salondan
+ * gelmeli: **ticari unvan** ve **saklama süresi**.
+ *
+ * Yani kapalı olması bir arıza değil, sıralama: metin hazır olmadan kişisel
+ * veri toplamaya başlamamak için. Sunucu tarafı (tablo, uç, hız sınırı)
+ * tamamen hazır ve çalışıyor.
+ *
+ * **Açmak:** bu değeri `true` yapmak. Başka hiçbir şey gerekmiyor —
+ * `docs/site-plani-kalanlar.md` md. 1 ve 2.
+ *
+ * Desen `web/uye/kayit.js` içindeki `KAYIT_ACIK`ın aynısı ve bilinçli: aynı
+ * soruyu ("bu akış ziyaretçiye açık mı") iki farklı biçimde yanıtlamak,
+ * ikisinden birinin gözden kaçması demekti.
+ */
+export const FORM_ACIK = false;
+
+/**
+ * Formun gerçek durumu.
+ *
+ * İki sebep var ve BİRLEŞTİRİLMEMELİ, çünkü yapılacak şey farklı:
+ *
+ *  - `kapali`     — bilinçli karar (yukarıdaki KVKK sıralaması). Ziyaretçi
+ *                   telefon ve WhatsApp'tan ulaşıyor; ortada arıza yok.
+ *  - `ayar_eksik` — `SUPABASE_TENANT_ID` tanımsız. Bu bir KURULUM eksiği ve
+ *                   düzeltmesi salonun elinde.
+ *
+ * İkisini tek "kapalı" hâlinde toplamak, form açıldığı gün gerçek bir
+ * yapılandırma eksiğini görünmez kılardı.
+ *
+ * @param acik ürün kararı; varsayılanı [FORM_ACIK]
+ * @param tenantId `window.NONSTOP_CONFIG.tenantId`
+ * @returns `{ acik: true }` ya da `{ acik: false, sebep }`
+ */
+export function formDurumu({ acik = FORM_ACIK, tenantId = null } = {}) {
+  if (!acik) return { acik: false, sebep: "kapali" };
+  if (!tenantId) return { acik: false, sebep: "ayar_eksik" };
+  return { acik: true };
+}
+
 /** Sunucunun kabul ettiği tek biçim. */
 export const KANONIK_TELEFON = /^\+90[0-9]{10}$/;
 

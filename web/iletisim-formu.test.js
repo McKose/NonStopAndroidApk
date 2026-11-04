@@ -16,7 +16,9 @@ import assert from "node:assert/strict";
 import {
   telefonuNormalle,
   formuDogrula,
+  formDurumu,
   tuzagaDustu,
+  FORM_ACIK,
   KANONIK_TELEFON,
   SINIRLAR,
 } from "./iletisim-formu.js";
@@ -314,5 +316,37 @@ test("`site.js` modülü içe alıyor (yoksa yayın listesine girmiyor)", () => 
     SITE_JS,
     /import\s*\{[^}]*\}\s*from\s*["']\.\/iletisim-formu\.js["']/,
     "site.js `./iletisim-formu.js`i içe almıyor",
+  );
+});
+
+// ─── Anahtar ────────────────────────────────────────────────────────────────
+//
+// Form şu an KAPALI ve sebebi teknik değil, KVKK sıralaması: kişisel veri
+// topluyor ve aydınlatma metni henüz tamam değil (eksik iki bilgi salondan
+// gelmeli). Sunucu tarafı tamamen hazır; açmak tek satır.
+
+test("form varsayılan olarak KAPALI", () => {
+  // Varsayılanın yanlış tarafa kaymasını yakalayan test bu. Açık olsaydı
+  // metin hazır olmadan kişisel veri toplanmaya başlardı.
+  assert.equal(FORM_ACIK, false);
+  assert.deepEqual(formDurumu(), { acik: false, sebep: "kapali" });
+});
+
+test("kapalı ve ayar eksik sebepleri AYRI", () => {
+  // Birleştirilseler, form açıldığı gün gerçek bir yapılandırma eksiği
+  // görünmez kalırdı: ekran "kapalı" der, kimse anahtarın eksik olduğunu
+  // anlamazdı.
+  assert.equal(formDurumu({ acik: false, tenantId: "x" }).sebep, "kapali");
+  assert.equal(formDurumu({ acik: true, tenantId: null }).sebep, "ayar_eksik");
+  assert.deepEqual(formDurumu({ acik: true, tenantId: "x" }), { acik: true });
+});
+
+test("`site.js` formu anahtara bağlıyor", () => {
+  // Anahtar dosyada dursun ama `site.js` ona bakmasın — o hâlde anahtar
+  // hiçbir şey yapmaz ve form açık kalır. Sessiz ve tam yanlış yönde.
+  assert.match(
+    SITE_JS,
+    /formDurumu\(/,
+    "site.js `formDurumu()` çağırmıyor — anahtar hiçbir şeyi kapatmaz",
   );
 });

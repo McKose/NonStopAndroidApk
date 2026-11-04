@@ -61,13 +61,17 @@ olan "ziyaretçiyi temasa geçirme" ile ilgili.
    yapıyor — tablo kuralının yapamadığı şeyler. Spam koruması bu üçü artı
    tuzak alanı.
 
-   **Kalan iki şey:**
-   - **Panel ekranı.** Talepleri personel göremiyor. Bu olmadan form bir
-     kara delik, yani isteğe bağlı değil.
+   **Form şu anda KAPALI** (`FORM_ACIK = false`, `web/iletisim-formu.js`).
+   Sebebi teknik değil, sıralama — aşağıdaki iki madde. Açmak tek satır;
+   işletme tarafı `docs/site-yonetimi.md` → "3a. Deneme dersi formu".
+
+   **Açılmadan önce kalan iki şey:**
+   - **Panel ekranı.** Talepleri personel göremiyor; bugün yalnızca Supabase
+     panelinden görülebiliyor. Okunmayan bir form, hiç olmayan bir formdan
+     kötü — yani isteğe bağlı değil.
    - **KVKK.** Form ad, telefon ve e-posta topluyor. Form içinde kısa bir
      satır var (amaç ve paylaşılmama) ama md. 10'un tamamı değil; 1. madde
-     bu yüzden formu da kapsıyor. Metin hazır olmadan formun canlıya
-     açılmaması öneriliyor.
+     bu yüzden formu da kapsıyor.
 3. **İşletme künyesi.** Alt bilgide ticari unvan yok (plan §9). Aydınlatma
    metniyle aynı bilgi, birlikte eklenebilir.
 4. **Arama motoru kayıtları.** Google Search Console ve Google İşletme

@@ -10,7 +10,7 @@
 // süresi geçmiş bir duyuru istemciye hiç gelmiyor. Yalnızca burada süzülseydi
 // adresi bilen biri yayınlanmamış kampanyayı API'den okuyabilirdi.
 
-import { formuDogrula, tuzagaDustu } from "./iletisim-formu.js";
+import { formDurumu, formuDogrula, tuzagaDustu } from "./iletisim-formu.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -243,10 +243,19 @@ function denemeFormu() {
   const form = $("deneme-form");
   if (!sarmal || !form) return;
 
-  // AYAR YOKSA FORM HİÇ AÇILMIYOR. Gönderilemeyen bir form tuzaktır:
-  // ziyaretçi doldurur, düğmeye basar, hiçbir şey olmaz ve salona
-  // ulaştığını sanır. Telefon ve WhatsApp hemen yukarıda duruyor.
-  if (!ayar?.url || !ayar?.anonKey || !ayar?.tenantId) return;
+  // FORM İKİ KOŞULDAN BİRİ SAĞLANMAZSA HİÇ AÇILMIYOR.
+  //
+  //  1. Ürün kararı (`FORM_ACIK`). Şu an kapalı ve sebebi KVKK sıralaması:
+  //     form kişisel veri topluyor ve aydınlatma metni henüz tamam değil.
+  //     Ayrıntı `iletisim-formu.js`te.
+  //  2. Sunucu ayarı. Yoksa form GÖNDERİLEMEZ, ve gönderilemeyen bir form
+  //     tuzaktır: ziyaretçi doldurur, düğmeye basar, hiçbir şey olmaz ve
+  //     salona ulaştığını sanır.
+  //
+  // İki hâlde de telefon ve WhatsApp hemen yukarıda duruyor, yani kapalı
+  // kalmak ziyaretçiyi çıkışsız bırakmıyor.
+  if (!formDurumu({ tenantId: ayar?.tenantId ?? null }).acik) return;
+  if (!ayar?.url || !ayar?.anonKey) return;
   sarmal.hidden = false;
 
   const dugme = $("deneme-gonder");

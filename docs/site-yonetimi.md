@@ -159,6 +159,47 @@ olur: kart görselsiz düzgün görünüyor, kırık resim simgesi çıkmıyor.
 
 ---
 
+## 3a. Deneme dersi formu — şu anda KAPALI
+
+> ### ⏸ Form ziyaretçiye gösterilmiyor
+>
+> **Sebebi teknik değil, KVKK sıralaması.** Form ad, telefon ve e-posta
+> topluyor; bunlar kişisel veri ve KVKK md. 10 bir aydınlatma metni
+> istiyor. Formun içinde amacı ve paylaşılmamayı söyleyen kısa bir satır
+> var ama metnin tamamı değil — eksik kalan iki bilgi **senden** gelmeli:
+> **ticari unvan** ve **saklama süresi**.
+>
+> Yani form hazır ve çalışıyor; beklenen şey yalnızca o metin. Bu arada
+> ziyaretçi çıkışsız değil: telefon, WhatsApp ve Instagram formun hemen
+> üstünde duruyor.
+>
+> **Açmak için** `web/iletisim-formu.js` içindeki `FORM_ACIK` değerini
+> `true` yapın. Başka hiçbir şey gerekmiyor — tablo, uç ve hız sınırı
+> canlıda hazır. `SUPABASE_TENANT_ID` tanımsızsa form yine açılmaz (ayar
+> eksikliği ayrı bir sebep olarak tutuluyor), ama o anahtar **tanımlı**.
+
+Form açıkken ziyaretçi ad, telefon ve isterse e-posta ile mesaj bırakıyor.
+Talep `contact_requests` tablosuna düşüyor.
+
+**Yazma doğrudan tablodan değil**, `iletisim-istegi` adlı sunucu ucundan
+geçiyor. Gerekçesi: siteye gömülü anahtar herkesin elinde ve tabloya yazma
+açılsaydı internetteki herkes istediği hızda satır yazabilirdi. Uç ayrıca
+üç şey yapıyor:
+
+- Numarayı ve alanları **doğruluyor**
+- **Mükerrer bastırıyor**: aynı numaradan 10 dakika içinde ikinci istek yeni
+  satır açmıyor (gönder düğmesine iki kez basmak panelde iki kopya
+  oluşturmasın)
+- **Hız sınırı**: salon başına saatte 20 istek. Aşılırsa ziyaretçiye
+  WhatsApp ve telefonla ulaşması söyleniyor.
+
+> **Talepleri görmek için panel ekranı HENÜZ YOK.** Bugün talepler yalnızca
+> Supabase panelinden (`contact_requests` tablosu) görülebiliyor. Form
+> açılmadan önce o ekranın yapılması gerekiyor — okunmayan bir form, hiç
+> olmayan bir formdan kötü.
+
+---
+
 ## 3b. Üye kayıtları — bekleyen istekleri onaylamak
 
 > ### ⏸ Web'den üye kaydı şu anda KAPALI
