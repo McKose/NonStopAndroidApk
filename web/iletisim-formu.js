@@ -41,6 +41,16 @@
  * veri toplamaya başlamamak için. Sunucu tarafı (tablo, uç, hız sınırı)
  * tamamen hazır ve çalışıyor.
  *
+ * **SALON SAHİBİNİN KARARI (04.11.2026): kapalı kalacak.** KVKK işi şimdilik
+ * öncelik değil ve bu, formu bekleyen bir iş olmaktan çıkarıyor — yani
+ * "metin gelince açılacak" diye bir kuyrukta durmuyor. Açılması yeni bir
+ * karar gerektiriyor.
+ *
+ * Kararın gerekçesi "web'den üyelik almayacağız" idi. Bu form ÜYELİK KAYDI
+ * DEĞİL (o `web/uye/kayit.js`te ve ayrıca kapalı), bir "beni arayın" formu —
+ * ama sonuç aynı yöne çıktığı için karar geçerli. Kapalı kaldıkça ziyaretçi
+ * çıkışsız değil: telefon, WhatsApp ve Instagram formun hemen üstünde.
+ *
  * **Açmak:** bu değeri `true` yapmak. Başka hiçbir şey gerekmiyor —
  * `docs/site-plani-kalanlar.md` md. 1 ve 2.
  *

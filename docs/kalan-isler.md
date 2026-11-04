@@ -15,7 +15,7 @@ ama **tanımlıymış**. Bu daha sinsi bir hata — eksik sanılan bir ayar, asl
 çalışan bir akışı "zaten bozuk" sandırıyor. Bir maddenin durumu belgeden
 değil, kaynağından doğrulanmalı.
 
-Son gözden geçirme: 4 Kasım 2026, `master` (`08bb178`) + bu dalda bekleyen işler.
+Son gözden geçirme: 4 Kasım 2026, `master` (`b232b97`).
 
 ---
 
@@ -71,17 +71,22 @@ ayrıntı `docs/site-yonetimi.md` → "3b. Üye kayıtları".
 Sekiz açık madde, öncelik sırasıyla `docs/site-plani-kalanlar.md` içinde.
 İlk ikisi:
 
-1. **KVKK aydınlatma metni** — yasal ve **kaydın kapatılması bunu
-   etkilemiyor**: sağlık verisini toplayan yer kayıt formu değil, giriş
-   yapmış üyenin panosundaki beyan formu ve orası açık. Formda açık rıza
-   var ama aydınlatma metni yok; açık rıza onun yerini tutmuyor.
+1. **KVKK aydınlatma metni** — **ertelendi** (salon sahibinin kararı,
+   04.11.2026) ama **kapanmadı**. Gerekçe "web'den üyelik almayacağız" idi;
+   o gerekçe kayıt formu için doğru, bu madde için değil. Sağlık verisini
+   toplayan yer kayıt formu DEĞİL, giriş yapmış üyenin panosundaki beyan
+   formu — ve orası açık. Canlıda ölçüldü (04.11.2026): 2 bağlı hesap ve
+   **girilmiş 1 sağlık beyanı**. Formda açık rıza var ama aydınlatma yok;
+   açık rıza onun yerini tutmuyor.
 2. **İletişim / deneme dersi formu** — **yapıldı**, ama canlıya açılması
    1. maddeye bağlı. Form `contact_requests` tablosuna `iletisim-istegi`
    Edge Function'ı üzerinden yazıyor; tabloya doğrudan `anon` yazma yetkisi
-   verilmedi (gerekçe `0010`da). **Form şu anda KAPALI** (`FORM_ACIK`);
-   açılmadan önce kalan iki şey: **panel ekranı** (talepleri personel
-   göremiyor — okunmayan bir form, hiç olmayan bir formdan kötü) ve
-   **KVKK metni** (ticari unvan + saklama süresi sende).
+   verilmedi (gerekçe `0010`da). Panel ekranı da **yapıldı** (Talepler
+   sekmesi: liste, tıkla-ara, durum değiştirme).
+
+   **Form KAPALI KALACAK — salon sahibinin kararı (04.11.2026).** Bekleyen
+   bir iş değil; açılması yeni bir karar gerektiriyor. Açmak tek satır
+   (`FORM_ACIK`) ve o gün zincirin tamamı hazır.
 
 **WhatsApp ile temas kapandı** (02.11.2026) ve **canlıda yayında**:
 iletişim bölümünde kutu, sayfanın her yerinde sabit düğme, hazır mesajı
