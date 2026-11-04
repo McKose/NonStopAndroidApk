@@ -18,6 +18,8 @@ import { dirname, join } from "node:path";
 import {
   SEKME_ROLLERI, SEKME_HEDEFI, PANEL_OZEL, PANEL_OZEL_GEREKCE,
   sekmeGorunur, gorunurSekmeler,
+  TALEP_YAZMA_ROLLERI,
+  talepYazabilir,
 } from "./roller.js";
 
 const buradan = dirname(fileURLToPath(import.meta.url));
@@ -228,28 +230,66 @@ test("talepler okuma kuralı role değil salona bakıyor", () => {
 });
 
 /**
- * `talepler` bugün SALT OKUNUR ve bu, rol listesinin dayanağı.
+ * `talepler` YAZIYOR ve yazma denetimi role bağlı — ama sekme üç role açık.
  *
- * Bu panelde yazma yapan bölümler `ozel` olarak kaydediliyor (`duyurular`,
- * `uye-hesaplari`); salt okunur olanlar `ciz`. Yani `talepler`in `ozel`e
- * dönmesi "artık yazıyor" demek — ve o anda rol listesi daralmak zorunda,
- * çünkü sunucudaki yazma kuralı yalnız ADMIN + MANAGER'a açık (`0010`).
+ * ### Bu test bir önceki hâlinin YERİNE geçti ve sebebi yazılmaya değer
  *
- * Test tam o geçişi yakalıyor. Olmasa, durum değiştirme düğmesi eklenen gün
- * eğitmene de görünür, eğitmen basar ve sunucudan SESSİZCE reddedilirdi —
- * `roller.js`in başındaki uyarının birebir aynısı.
+ * İlk yazımda buradaki test şunu söylüyordu: "`talepler` `ciz` ile kayıtlı
+ * olmalı; `ozel`e dönerse yazma eklendi demek ve o anda rol listesi
+ * DARALTILMALI." Tripwire görevini yaptı — durum değiştirme eklenince
+ * düştü — ama kodladığı kural YANLIŞTI.
+ *
+ * Rolleri daraltmak, eğitmenin listeyi tamamen kaybetmesi demekti; oysa
+ * talebi arayacak kişi eğitmen olabilir ve okuma kuralı (`0010`) ona zaten
+ * açık. Doğru değişmez "roller daralsın" değil, "YAZMA DENETİMİ role
+ * bağlansın": sekme üç role açık kalıyor, düğme iki role gösteriliyor.
+ *
+ * Test o yüzden değiştirildi, kural ona uydurulmadı.
  */
-test("talepler salt okunur kayıtlı (yazma eklenirse roller daralmalı)", () => {
+test("talep yazma rolleri sunucudaki yazma kuralıyla aynı", () => {
+  // Parity MAKİNEYLE kuruluyor: beklenen roller migrasyondan okunuyor, elle
+  // yazılmıyor. Elle yazılsa sunucu kuralı değiştiğinde test yine geçerdi.
+  const sql = readFileSync(
+    join(buradan, "..", "..", "supabase", "migrations", "0010_iletisim_istekleri.sql"),
+    "utf8",
+  );
+  const bas = sql.indexOf("create policy contact_requests_staff_update");
+  assert.ok(bas > 0, "yazma kuralı 0010'da bulunamadı");
+  const govde = sql.slice(bas, sql.indexOf(";", bas));
+
+  const sunucuRolleri = [...new Set(
+    [...govde.matchAll(/'(ADMIN|MANAGER|TRAINER)'/g)].map((x) => x[1]),
+  )].sort();
+  assert.ok(sunucuRolleri.length > 0, "kuraldaki roller okunamadı");
+
+  assert.deepEqual(
+    [...TALEP_YAZMA_ROLLERI].sort(),
+    sunucuRolleri,
+    "Panelin yazma rolleri sunucudaki `contact_requests_staff_update` ile " +
+      "aynı değil. Panel geniş olursa kullanıcı düğmeye basar ve sunucudan " +
+      "SESSİZCE reddedilir.",
+  );
+});
+
+test("eğitmen listeyi görüyor ama durumu değiştiremiyor", () => {
+  // Bölümün bütün tasarımı bu iki satırda: görünürlük ve yazma AYRI.
+  assert.equal(sekmeGorunur("talepler", "TRAINER"), true, "eğitmen listeyi görmeli");
+  assert.equal(talepYazabilir("TRAINER"), false, "eğitmen durumu değiştirmemeli");
+  assert.equal(talepYazabilir("MANAGER"), true);
+  assert.equal(talepYazabilir("ADMIN"), true);
+  assert.equal(talepYazabilir(undefined), false, "rol bilinmiyorsa yazma kapalı");
+  assert.equal(talepYazabilir("BASKA_ROL"), false);
+});
+
+test("durum düğmesi role göre gösteriliyor", () => {
+  // `talepYazabilir` dosyada dursun ama `app.js` ona bakmasın — o hâlde
+  // karar hiçbir şey yapmaz ve düğme herkese görünür. Sessiz ve tam yanlış
+  // yönde, `FORM_ACIK` anahtarındaki aynı tuzak.
   const appJs = readFileSync(join(buradan, "app.js"), "utf8");
-  const kayit = appJs.match(/\n\s*talepler:\s*\{([^}]*)\}/);
-  assert.ok(kayit, "app.js içinde `talepler` çizim kaydı bulunamadı");
-  assert.match(kayit[1], /\bciz\b/, "`talepler` `ciz` ile kayıtlı değil");
-  assert.doesNotMatch(
-    kayit[1],
-    /\bozel\b/,
-    "`talepler` artık `ozel` — yazma eklendi demek. Sunucudaki yazma kuralı " +
-      "yalnız ADMIN + MANAGER'a açık (0010), o yüzden SEKME_ROLLERI.talepler " +
-      "daraltılmalı ve denetimler role göre gösterilmeli.",
+  assert.match(
+    appJs,
+    /talepYazabilir\(aktifRol\)/,
+    "app.js `talepYazabilir(aktifRol)` çağırmıyor — düğme role bağlanmamış",
   );
 });
 

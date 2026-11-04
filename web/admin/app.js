@@ -28,7 +28,7 @@ import {
 import { demoIstemcisi, demoMu } from "./demo.js";
 import { suz } from "./suzme.js";
 import { stokHaritasi, stokYaz, stokUyarilari, stokDurumu } from "./stok.js";
-import { sekmeGorunur } from "./roller.js";
+import { sekmeGorunur, talepYazabilir } from "./roller.js";
 // Adların `domain.js` ile ÇAKIŞMAMASI gerekiyor; `import ... as` yetmiyor.
 // Önizleme üreticisi modülleri tek kapsamda birleştiriyor ve orada takma ad
 // diye bir şey kalmıyor — çakışan iki tanım panelin tamamını düşürüyor.
@@ -278,7 +278,7 @@ const CIZIMLER = {
   satislar: { ciz: satislariCiz },
   personel: { ciz: personeliCiz },
   finans: { ciz: finansiCiz },
-  talepler: { ciz: talepleriCiz },
+  talepler: { ozel: talepleriYukle },
   duyurular: { ozel: duyurulariYukle },
   "uye-hesaplari": { ozel: uyeHesaplariYukle },
   "personel-erisim": { ozel: personelErisimYukle },
@@ -704,14 +704,91 @@ const TALEP_DURUMLARI = {
  *
  * Bu hâliyle bile kara deliği kapatıyor: talepler görünüyor ve aranabiliyor.
  */
+/**
+ * Talepler bölümü.
+ *
+ * `ozel` oldu çünkü artık YAZIYOR (durum değiştirme). Okuma tarafı
+ * değişmedi; eklenen tek şey satır başına bir düğme ve o düğme **role
+ * bağlı**.
+ *
+ * ### Sekme üç role açık, düğme iki role
+ * Bu ayrım bilinçli ve `roller.js`teki `talepYazabilir` ile taşınıyor.
+ * Sunucuda okuma kuralı role bakmıyor (`0010`), yazma kuralı yalnız
+ * ADMIN + MANAGER'a açık. Eğitmen listeyi görüyor ve arayabiliyor —
+ * arayacak kişi o olabilir — ama durumu değiştiremiyor. Düğme ona hiç
+ * gösterilmiyor; gösterilse basar ve sunucudan sessizce reddedilirdi.
+ */
+async function talepleriYukle(ad) {
+  const tanim = SEKMELER[ad];
+  const sonuc = await istemci.oku(tanim.tablo, { order: tanim.order });
+  if (sonuc.tur === "oturumsuz") {
+    hataYaz("giris-hata", "Oturumunuzun süresi doldu, tekrar giriş yapın.");
+    return goster("giris");
+  }
+  if (sonuc.tur !== "tamam") return hataYaz("panel-hata", sonuc.mesaj);
+  if (ad !== aktifSekme) return;
+
+  const satirlar = sonuc.satirlar;
+  if (satirlar.length === 0) {
+    const bos = document.createElement("p");
+    bos.className = "alt";
+    bos.textContent = "Henüz talep yok. Siteden gelen istekler burada görünür.";
+    $("icerik").appendChild(bos);
+    return;
+  }
+
+  $("icerik").appendChild(talepleriCiz(satirlar));
+}
+
+/**
+ * Durumu bir sonraki adıma taşıyan düğme.
+ *
+ * Akış tek yönlü değil: kapanmış bir talep YENİDEN AÇILABİLİYOR. Gerekçe
+ * somut — "düşünüyorum" diyen biri iki hafta sonra geri dönebilir ve o
+ * talebi yeniden açmak, aynı kişiyi ikinci kez kaydetmekten iyi.
+ */
+const SONRAKI_DURUM = {
+  NEW:       { durum: "CONTACTED", etiket: "Arandı" },
+  CONTACTED: { durum: "CLOSED",    etiket: "Kapat" },
+  CLOSED:    { durum: "NEW",       etiket: "Yeniden aç" },
+};
+
+function talepDurumDugmesi(talep) {
+  const sonraki = SONRAKI_DURUM[talep.state];
+  if (!sonraki) return document.createTextNode("");
+
+  const dugme = document.createElement("button");
+  dugme.className = "ikincil";
+  dugme.textContent = sonraki.etiket;
+  dugme.addEventListener("click", async () => {
+    dugme.disabled = true;
+    const sonuc = await istemci.yaz(
+      "contact_requests",
+      { state: sonraki.durum, updated_at_ms: Date.now() },
+      `id=eq.${encodeURIComponent(talep.id)}`,
+    );
+    if (sonuc.tur === "tamam") return sekmeYukle(aktifSekme);
+    dugme.disabled = false;
+    hataYaz("panel-hata", sonuc.mesaj ?? "Durum değiştirilemedi.");
+  });
+  return dugme;
+}
+
 function talepleriCiz(satirlar) {
+  // Son kolon YALNIZCA yazabilen rollerde var. Boş bir kolon bırakmak
+  // yerine kolonun kendisi düşüyor: eğitmen "neden bu sütun boş" diye
+  // sormasın.
+  const yazabilir = talepYazabilir(aktifRol);
+  const basliklar = ["Tarih", "Ad Soyad", "Telefon", "E-posta", "Mesaj", "Durum"];
+  if (yazabilir) basliklar.push("");
+
   return tabloYap(
-    ["Tarih", "Ad Soyad", "Telefon", "E-posta", "Mesaj", "Durum"],
+    basliklar,
     satirlar.map((t) => {
       const tel = document.createElement("a");
       tel.href = `tel:${t.phone}`;
       tel.textContent = t.phone;
-      return [
+      const hucreler = [
         tarihYaz(t.created_at_ms),
         t.full_name,
         tel,
@@ -719,6 +796,8 @@ function talepleriCiz(satirlar) {
         t.message ?? "—",
         TALEP_DURUMLARI[t.state] ?? { rozet: "talep-yeni", metin: t.state },
       ];
+      if (yazabilir) hucreler.push(talepDurumDugmesi(t));
+      return hucreler;
     }),
   );
 }

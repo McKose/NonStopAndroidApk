@@ -125,6 +125,30 @@ export const SEKME_HEDEFI = {
   talepler: PANEL_OZEL,
 };
 
+/**
+ * `contact_requests` üzerinde DURUM DEĞİŞTİREBİLEN roller.
+ *
+ * Sekme görünürlüğünden AYRI tutuluyor ve bu ayrım bu dosyada ilk kez
+ * gerekiyor. Sebebi somut: `talepler` sekmesini üç rol de görüyor (okuma
+ * kuralı role bakmıyor, `0010`) ama YAZMA kuralı yalnız ADMIN + MANAGER'a
+ * açık. İkisi tek listeye sıkıştırılamaz:
+ *
+ *   - Rolleri daraltmak eğitmenin listeyi TAMAMEN kaybetmesi demek, oysa
+ *     talebi arayacak kişi eğitmen olabilir.
+ *   - Daraltmamak ve düğmeyi herkese göstermek ise eğitmenin "Arandı"ya
+ *     basıp sunucudan SESSİZCE reddedilmesi demek.
+ *
+ * Doğru olan üçüncü yol: sekme açık, düğme role bağlı. `talepYazabilir`
+ * tam o kararı taşıyor ve `0010`daki yazma kuralıyla makineyle
+ * karşılaştırılıyor (`roller.test.js`).
+ */
+export const TALEP_YAZMA_ROLLERI = ["ADMIN", "MANAGER"];
+
+/** Bu rol talebin durumunu değiştirebilir mi? */
+export function talepYazabilir(rol) {
+  return TALEP_YAZMA_ROLLERI.includes(rol);
+}
+
 /** Bu rol bu sekmeyi görebilir mi? */
 export function sekmeGorunur(sekme, rol) {
   const roller = SEKME_ROLLERI[sekme];
