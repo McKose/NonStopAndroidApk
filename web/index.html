@@ -322,6 +322,118 @@
         <span class="iletisim-not">Takip edin →</span>
       </a>
     </div>
+
+    <!--
+      ─── Deneme dersi formu ───────────────────────────────────────────────
+
+      Yukarıdaki kutular "şimdi ulaş" kanalları; bu form tersi: "siz beni
+      arayın". İkisi birlikte duruyor çünkü ziyaretçilerin bir kısmı
+      aramaktan çekiniyor, bir kısmı da mesajını yazıp geçmek istiyor.
+
+      FORM `hidden` BAŞLIYOR ve JavaScript ancak sunucu ayarı varsa açıyor.
+      Gerekçe: ayar yoksa (`config.js` yazılmamışsa) ya da JavaScript
+      düşerse form GÖNDERİLEMEZ, ve gönderilemeyen bir form bir tuzaktır —
+      ziyaretçi doldurur, düğmeye basar, hiçbir şey olmaz ve salona
+      ulaştığını sanır. Gizli kalması dürüst olanı: telefon ve WhatsApp
+      hemen yukarıda duruyor.
+
+      Bu, `web/uye/` tarafındaki üye kaydı deseninin aynısı (`kayit.js`):
+      varsayılan KAPALI, açan şey açık bir koşul.
+    -->
+    <div class="deneme-sarmal" id="deneme-sarmal" hidden>
+      <h3 class="deneme-baslik">Deneme dersi isteyin</h3>
+      <p class="deneme-giris">
+        Bilgilerinizi bırakın, size dönelim. Telefon ve WhatsApp yukarıda —
+        acelesi olan oradan yazabilir.
+      </p>
+
+      <form class="deneme-form" id="deneme-form" novalidate>
+        <label>
+          Adınız <span aria-hidden="true">*</span>
+          <input id="deneme-ad" name="ad" type="text" autocomplete="name"
+                 maxlength="80" required>
+          <span class="deneme-hata" id="deneme-ad-hata" hidden></span>
+        </label>
+
+        <label>
+          Telefon <span aria-hidden="true">*</span>
+          <!-- `type="tel"` mobilde sayı tuş takımını açıyor. `inputmode` de
+               yazılı çünkü bazı tarayıcılar `type="tel"`i yalnızca
+               doğrulama ipucu sayıp klavyeyi değiştirmiyor. -->
+          <input id="deneme-telefon" name="telefon" type="tel"
+                 inputmode="tel" autocomplete="tel"
+                 placeholder="0541 971 50 95" maxlength="20" required>
+          <span class="deneme-hata" id="deneme-telefon-hata" hidden></span>
+        </label>
+
+        <label>
+          E-posta <span class="deneme-istege-bagli">(isteğe bağlı)</span>
+          <input id="deneme-eposta" name="eposta" type="email"
+                 autocomplete="email" maxlength="120">
+          <span class="deneme-hata" id="deneme-eposta-hata" hidden></span>
+        </label>
+
+        <label>
+          Mesajınız <span class="deneme-istege-bagli">(isteğe bağlı)</span>
+          <textarea id="deneme-mesaj" name="mesaj" rows="3"
+                    maxlength="500"
+                    placeholder="Hangi branşla ilgileniyorsunuz?"></textarea>
+          <span class="deneme-hata" id="deneme-mesaj-hata" hidden></span>
+        </label>
+
+        <!--
+          TUZAK ALANI. Ekranda görünmüyor ve ekran okuyucudan da gizli, yani
+          insan onu dolduramıyor; dolduran şey formdaki bütün girdileri
+          tarayıp yazan bir bot.
+
+          `hidden` niteliği kullanılıyor, CSS'te `display: none` DEĞİL:
+          `site.css` gizlemeyi `[hidden] { display: none !important }` ile
+          koruyor ve o korumayı yenebilecek bir kural yazmamak için
+          (`web/gizleme-korumasi.test.js` bunu sınıyor).
+
+          `autocomplete="off"` şart: tarayıcının otomatik doldurması alanı
+          dolduramamalı, yoksa gerçek bir ziyaretçi bota benzerdi.
+        -->
+        <div class="deneme-tuzak" hidden aria-hidden="true">
+          <label>Bu alanı boş bırakın
+            <input id="deneme-tuzak" name="website" type="text"
+                   tabindex="-1" autocomplete="off">
+          </label>
+        </div>
+
+        <!-- `dugme-buyuk`: sitenin standart düğmesi 40px yüksekliğinde ve bu
+             WCAG 2.2 AA eşiğini (24px) rahat geçiyor, ama bu düğme sayfanın
+             DÖNÜŞÜM NOKTASI ve çoğunlukla telefonda basılıyor. Karşılama
+             bölümündeki birincil düğme de aynı rolde ve o da `dugme-buyuk`;
+             büyük hâli 49px, yani 44px'lik dokunma hedefi önerisinin de
+             üstünde. Ölçüldü. -->
+        <button class="dugme dugme-birincil dugme-buyuk" id="deneme-gonder"
+                type="submit">
+          Gönder
+        </button>
+
+        <!-- `aria-live`: gönderim sonucunu ekran okuyucu da duyurmalı.
+             Olmadan görme engelli bir ziyaretçi formun gönderilip
+             gönderilmediğini anlayamaz. -->
+        <p class="deneme-durum" id="deneme-durum" role="status"
+           aria-live="polite"></p>
+
+        <!--
+          KVKK: ad, telefon ve e-posta kişisel veri. Buradaki satır
+          aydınlatmanın ÖZÜ (veri sorumlusu, amaç, kapsam) ama TAMAMI DEĞİL —
+          KVKK md. 10 ayrıca aktarım, haklar ve saklama süresini istiyor ve
+          o metin için salondan iki bilgi gerekiyor (ticari unvan, saklama
+          süresi). Ayrıntı: `docs/site-plani-kalanlar.md` md. 1.
+
+          Bağlantı henüz YOK ve bilinçli: ölü bir bağlantı, metnin hiç
+          olmamasından kötü.
+        -->
+        <p class="deneme-kvkk">
+          Bıraktığınız bilgiler yalnızca size dönüş yapmak için kullanılır,
+          üçüncü kişilerle paylaşılmaz.
+        </p>
+      </form>
+    </div>
   </section>
 </main>
 

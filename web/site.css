@@ -515,3 +515,97 @@ a.iletisim-kutu:hover { border-color: var(--altin); }
   html { scroll-behavior: auto; }
   * { transition: none !important; animation: none !important; }
 }
+
+/* ─── Deneme dersi formu ─────────────────────────────────────────────────── */
+/*
+  İletişim kutularının ALTINDA duruyor: kutular "şimdi ulaş" kanalları, form
+  tersi ("siz beni arayın"). Acelesi olan yukarıdan geçiyor, mesajını yazıp
+  gitmek isteyen buraya iniyor.
+
+  Form `hidden` başlıyor ve JavaScript ancak sunucu ayarı varsa açıyor;
+  gerekçe `index.html`de yazılı. Burada gizlemeyi yeniden tanımlayan bir
+  kural YOK — `[hidden]` koruması en üstte kalmalı.
+*/
+.deneme-sarmal {
+  max-width: 560px;
+  margin: 40px auto 0;
+  padding: 26px;
+  background: var(--yuzey);
+  border: 1px solid var(--kenar);
+  border-radius: var(--yuvarlak);
+}
+.deneme-baslik {
+  margin: 0 0 8px;
+  font-size: 20px;
+  letter-spacing: -.01em;
+}
+.deneme-giris {
+  margin: 0 0 20px;
+  color: var(--soluk);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.deneme-form {
+  display: grid;
+  gap: 16px;
+}
+.deneme-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--soluk);
+}
+.deneme-form input,
+.deneme-form textarea {
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--metin);
+  background: var(--zemin);
+  border: 1px solid var(--kenar);
+  border-radius: 8px;
+}
+.deneme-form textarea { resize: vertical; }
+.deneme-form input:focus-visible,
+.deneme-form textarea:focus-visible {
+  outline: 2px solid var(--altin);
+  outline-offset: 2px;
+}
+.deneme-form button { justify-self: start; }
+
+.deneme-istege-bagli {
+  /* Zorunlu olmayanı söylemek, zorunluyu yıldızla işaretlemekten daha
+     okunur: ziyaretçi yıldızın ne anlama geldiğini aramak zorunda kalmıyor. */
+  color: color-mix(in srgb, var(--soluk) 85%, transparent);
+  font-size: 13px;
+}
+
+/*
+  Hata metni. Rengi uyarı kırmızısı DEĞİL, altın: sitenin paletinde kırmızı
+  yok ve tek bir yerde kırmızı kullanmak formu sitenin parçası gibi değil,
+  bir sistem uyarısı gibi gösterirdi. Metin zaten ne yapılacağını söylüyor.
+*/
+.deneme-hata {
+  color: var(--altin);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.deneme-durum {
+  margin: 0;
+  color: var(--soluk);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.deneme-kvkk {
+  margin: 0;
+  color: color-mix(in srgb, var(--soluk) 80%, transparent);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 560px) {
+  .deneme-sarmal { padding: 20px; margin-top: 28px; }
+}

@@ -15,7 +15,7 @@ ama **tanımlıymış**. Bu daha sinsi bir hata — eksik sanılan bir ayar, asl
 çalışan bir akışı "zaten bozuk" sandırıyor. Bir maddenin durumu belgeden
 değil, kaynağından doğrulanmalı.
 
-Son gözden geçirme: 3 Kasım 2026, `master` (`08bb178`).
+Son gözden geçirme: 4 Kasım 2026, `master` (`08bb178`) + bu dalda bekleyen işler.
 
 ---
 
@@ -75,7 +75,11 @@ Sekiz açık madde, öncelik sırasıyla `docs/site-plani-kalanlar.md` içinde.
    etkilemiyor**: sağlık verisini toplayan yer kayıt formu değil, giriş
    yapmış üyenin panosundaki beyan formu ve orası açık. Formda açık rıza
    var ama aydınlatma metni yok; açık rıza onun yerini tutmuyor.
-2. **İletişim / deneme dersi formu** — planın ana dönüşüm noktasıydı.
+2. **İletişim / deneme dersi formu** — **yapıldı**, ama canlıya açılması
+   1. maddeye bağlı. Form `contact_requests` tablosuna `iletisim-istegi`
+   Edge Function'ı üzerinden yazıyor; tabloya doğrudan `anon` yazma yetkisi
+   verilmedi (gerekçe `0010`da). Kalan iki şey: **panel ekranı** (talepleri
+   personel göremiyor — bu olmadan form bir kara delik) ve **KVKK metni**.
 
 **WhatsApp ile temas kapandı** (02.11.2026) ve **canlıda yayında**:
 iletişim bölümünde kutu, sayfanın her yerinde sabit düğme, hazır mesajı

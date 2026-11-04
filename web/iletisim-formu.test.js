@@ -207,3 +207,112 @@ test("tuzak alanı yalnız doluyken tetikleniyor", () => {
   assert.equal(tuzagaDustu("bot"), true);
   assert.equal(tuzagaDustu("  x  "), true);
 });
+
+// ─── İşaretleme varsayılanları ve iki dosyanın anlaşması ────────────────────
+//
+// Buradan aşağısı `index.html`i ve `site.js`i OKUYOR. Gerekçe, bu depoda
+// yaşanmış iki hata sınıfı:
+//
+//   1. Varsayılanın yanlış tarafta olması. Form `hidden` BAŞLAMALI ve onu
+//      yalnızca JavaScript, yalnızca sunucu ayarı varken açmalı. Görünür
+//      başlasa ve ayar eksik olsa, ziyaretçi dolduramadığı bir formu
+//      doldurup düğmeye basar, hiçbir şey olmaz ve salona ULAŞTIĞINI SANIR.
+//      Telefon ve WhatsApp hemen yukarıda duruyor, yani gizli kalmak dürüst
+//      olanı.
+//
+//   2. İki dosyanın sessizce ayrışması. `site.js` alanları kimlikle buluyor
+//      (`$("deneme-ad")`); işaretlemede bir kimlik değişirse `$()` `null`
+//      dönüyor, gönderme işleyicisi istisna atıyor ve form HİÇBİR ŞEY
+//      SÖYLEMEDEN ölüyor. Konsola bakmayan kimse farkı göremez.
+
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const BURADA = dirname(fileURLToPath(import.meta.url));
+const INDEX = readFileSync(join(BURADA, "index.html"), "utf8");
+const SITE_JS = readFileSync(join(BURADA, "site.js"), "utf8");
+
+test("form sarmalı işaretlemede `hidden` başlıyor", () => {
+  const m = INDEX.match(/<div class="deneme-sarmal"[^>]*>/);
+  assert.ok(m, "`.deneme-sarmal` sarmalı bulunamadı");
+  assert.match(
+    m[0],
+    /\shidden[\s>]/,
+    "form sarmalı `hidden` olmadan başlıyor — ayar eksikken gönderilemeyen " +
+      "bir form görünür kalır",
+  );
+});
+
+test("tuzak alanı hem gözden hem ekran okuyucudan gizli", () => {
+  const m = INDEX.match(/<div class="deneme-tuzak"[^>]*>/);
+  assert.ok(m, "tuzak sarmalı bulunamadı");
+  assert.match(m[0], /\shidden[\s>]/, "tuzak `hidden` değil");
+  assert.match(
+    m[0],
+    /aria-hidden="true"/,
+    "tuzak `aria-hidden` değil — ekran okuyucu kullanan ziyaretçi onu " +
+      "doldurabilir ve bot sayılırdı",
+  );
+
+  const girdi = INDEX.match(/<input id="deneme-tuzak"[\s\S]*?>/);
+  assert.ok(girdi, "tuzak girdisi bulunamadı");
+  assert.match(
+    girdi[0],
+    /autocomplete="off"/,
+    "tuzak girdisinde `autocomplete=\"off\"` yok — tarayıcı onu otomatik " +
+      "doldurursa gerçek ziyaretçi bot sayılır",
+  );
+  assert.match(
+    girdi[0],
+    /tabindex="-1"/,
+    "tuzak girdisi klavye sırasında — sekme ile gezinen biri ona düşerdi",
+  );
+});
+
+test("`site.js`in aradığı her kimlik işaretlemede var", () => {
+  // Asıl korunan şey bu: iki dosya kimlikler üzerinden anlaşıyor ve
+  // ayrıştıklarında form sessizce ölüyor.
+  const kimlikler = [...SITE_JS.matchAll(/\$\(\s*["'`](deneme-[a-z-]+)["'`]\s*\)/g)]
+    .map((m) => m[1]);
+  // Şablonla kurulan hata kimlikleri (`deneme-${ad}-hata`) ayrıca ekleniyor.
+  const hataKimlikleri = ["ad", "telefon", "eposta", "mesaj"]
+    .map((a) => `deneme-${a}-hata`);
+
+  const hepsi = [...new Set([...kimlikler, ...hataKimlikleri])];
+  assert.ok(hepsi.length >= 7, `yalnızca ${hepsi.length} kimlik bulundu`);
+
+  const eksik = hepsi.filter((k) => !INDEX.includes(`id="${k}"`));
+  assert.deepEqual(
+    eksik,
+    [],
+    `site.js bu kimlikleri arıyor ama index.html'de yok: ${eksik.join(", ")}`,
+  );
+});
+
+test("`maxlength` değerleri sınırlarla aynı", () => {
+  // İşaretleme sınırı daha gevşek olsaydı ziyaretçi kabul edilmeyecek bir
+  // metni yazabilir ve ancak gönderince öğrenirdi.
+  const al = (id) => {
+    const m = INDEX.match(new RegExp(`<(?:input|textarea) id="${id}"[\\s\\S]*?>`));
+    assert.ok(m, `${id} bulunamadı`);
+    const ml = m[0].match(/maxlength="(\d+)"/);
+    assert.ok(ml, `${id} içinde maxlength yok`);
+    return Number(ml[1]);
+  };
+  assert.equal(al("deneme-ad"), SINIRLAR.adSoyad.enCok);
+  assert.equal(al("deneme-eposta"), SINIRLAR.eposta.enCok);
+  assert.equal(al("deneme-mesaj"), SINIRLAR.mesaj.enCok);
+});
+
+test("`site.js` modülü içe alıyor (yoksa yayın listesine girmiyor)", () => {
+  // `yayin-dosyalari.mjs` yayın listesini importları izleyerek türetiyor.
+  // İçe alma kaldırılsa `iletisim-formu.js` sitede 404 olur ve bir ES modülü
+  // importu 404 alırsa onu içe alan dosya TAMAMEN yüklenmiyor — yani
+  // `site.js`in tamamı, karşılama videosu ve duyurular dahil, ölürdü.
+  assert.match(
+    SITE_JS,
+    /import\s*\{[^}]*\}\s*from\s*["']\.\/iletisim-formu\.js["']/,
+    "site.js `./iletisim-formu.js`i içe almıyor",
+  );
+});

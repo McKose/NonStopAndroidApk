@@ -10,6 +10,8 @@
 // süresi geçmiş bir duyuru istemciye hiç gelmiyor. Yalnızca burada süzülseydi
 // adresi bilen biri yayınlanmamış kampanyayı API'den okuyabilirdi.
 
+import { formuDogrula, tuzagaDustu } from "./iletisim-formu.js";
+
 const $ = (id) => document.getElementById(id);
 
 const ayar = window.NONSTOP_CONFIG;
@@ -214,5 +216,114 @@ function kahramanKaydirma() {
   gozlemci.observe(icerik);
 }
 
+// ─── Deneme dersi formu ───────────────────────────────────────────────────
+/*
+  Formun tek işi yükü üretip uca göndermek. Doğrulama ve normalleştirme
+  `iletisim-formu.js`te ve orada Node testleriyle sınanıyor; buradaki kod
+  DOM'a bağlı olduğu için Chromium'da sürülüyor.
+
+  Yazma doğrudan tabloya DEĞİL, `iletisim-istegi` Edge Function'ına gidiyor.
+  Gerekçe `0010`un başında: `anon` yayınlanmış anahtarla çalışıyor ve tabloya
+  `insert` açmak "internetteki herkes istediği hızda satır yazabilir" demek
+  olurdu. Uç ayrıca mükerrer bastırma ve hız sınırı yapıyor.
+*/
+
+/** Alan altındaki hata metnini yazar ya da gizler. */
+function alanHatasi(ad, mesaj) {
+  const kutu = $(`deneme-${ad}-hata`);
+  if (!kutu) return;
+  kutu.textContent = mesaj ?? "";
+  kutu.hidden = !mesaj;
+}
+
+const HATA_ALANLARI = ["ad", "telefon", "eposta", "mesaj"];
+
+function denemeFormu() {
+  const sarmal = $("deneme-sarmal");
+  const form = $("deneme-form");
+  if (!sarmal || !form) return;
+
+  // AYAR YOKSA FORM HİÇ AÇILMIYOR. Gönderilemeyen bir form tuzaktır:
+  // ziyaretçi doldurur, düğmeye basar, hiçbir şey olmaz ve salona
+  // ulaştığını sanır. Telefon ve WhatsApp hemen yukarıda duruyor.
+  if (!ayar?.url || !ayar?.anonKey || !ayar?.tenantId) return;
+  sarmal.hidden = false;
+
+  const dugme = $("deneme-gonder");
+  const durum = $("deneme-durum");
+
+  form.addEventListener("submit", async (olay) => {
+    olay.preventDefault();
+    if (dugme.disabled) return;
+
+    for (const a of HATA_ALANLARI) alanHatasi(a, null);
+    durum.textContent = "";
+
+    // Tuzak EN BAŞTA: dolu geldiğinde hiçbir şey gönderilmiyor ama form
+    // başarılı gibi davranıyor. Bota "başarısız" demek, denemeye devam
+    // etmesi için bilgi vermek olurdu.
+    if (tuzagaDustu($("deneme-tuzak").value)) {
+      form.reset();
+      durum.textContent = "Teşekkürler, en kısa sürede size dönüyoruz.";
+      return;
+    }
+
+    const sonuc = formuDogrula({
+      adSoyad: $("deneme-ad").value,
+      telefon: $("deneme-telefon").value,
+      eposta: $("deneme-eposta").value,
+      mesaj: $("deneme-mesaj").value,
+    });
+
+    if (!sonuc.gecerli) {
+      // Hatalar TOPLUCA gösteriliyor: tek tek gösterilse ziyaretçi formu
+      // üç kez göndermek zorunda kalırdı.
+      alanHatasi("ad", sonuc.hatalar.adSoyad);
+      alanHatasi("telefon", sonuc.hatalar.telefon);
+      alanHatasi("eposta", sonuc.hatalar.eposta);
+      alanHatasi("mesaj", sonuc.hatalar.mesaj);
+      durum.textContent = "Lütfen işaretli alanları kontrol edin.";
+      return;
+    }
+
+    dugme.disabled = true;
+    durum.textContent = "Gönderiliyor…";
+
+    const yanit = await fetch(`${ayar.url}/functions/v1/iletisim-istegi`, {
+      method: "POST",
+      headers: {
+        apikey: ayar.anonKey,
+        Authorization: `Bearer ${ayar.anonKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ tenantId: ayar.tenantId, ...sonuc.yuk }),
+    }).catch(() => null);
+
+    dugme.disabled = false;
+
+    if (!yanit) {
+      // Ağ hatası: ziyaretçinin yapabileceği bir şey var, o yüzden
+      // duyurulardaki "sessiz hata" deseni BURADA GEÇERLİ DEĞİL.
+      durum.textContent =
+        "Bağlantı kurulamadı. Telefonla ya da WhatsApp'tan ulaşabilirsiniz.";
+      return;
+    }
+
+    if (yanit.ok) {
+      form.reset();
+      durum.textContent = "Teşekkürler, en kısa sürede size dönüyoruz.";
+      return;
+    }
+
+    // Ucun mesajı varsa O gösteriliyor: hız sınırı yanıtı ziyaretçiyi
+    // WhatsApp ve telefona yönlendiriyor ve o yönlendirme kaybolmamalı.
+    const govde = await yanit.json().catch(() => null);
+    durum.textContent =
+      govde?.hata ??
+      "Şu anda gönderilemedi. Telefonla ya da WhatsApp'tan ulaşabilirsiniz.";
+  });
+}
+
 kahramanVideosu();
 kahramanKaydirma();
+denemeFormu();
