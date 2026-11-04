@@ -83,6 +83,26 @@ export const SEKME_VERISI = {
   duyurular: { ozel: true, okunanTablolar: ["announcements"] },
   "uye-hesaplari": { ozel: true, okunanTablolar: ["member_accounts", "gym_members"] },
 
+  // Siteden gelen deneme dersi talepleri. TEK TABLOLU ve `ozel` DEĞİL, yani
+  // listeyi genel yol çiziyor; arama, tarih süzgeci ve rol kapısı oradan
+  // bedavaya geliyor.
+  //
+  // `order` EN YENİ ÜSTTE: bu bir iş listesi, arşiv değil. Alfabetik ya da
+  // en eski üstte sıralamak, salonun bugün gelen talebi görmek için aşağı
+  // inmesi demekti.
+  //
+  // `ara` içinde `message` DE var — öteki sekmelerde uzun metin alanları
+  // bilinçli olarak dışarıda bırakılmış (alakasız eşleşme üretiyorlar) ama
+  // burada mesaj kısa (en çok 500 karakter) ve aranacak şeyin kendisi:
+  // "reformer" yazan talepleri bulmak günlük bir iş.
+  talepler: {
+    tablo: "contact_requests",
+    order: "created_at_ms.desc",
+    ara: ["full_name", "phone", "email", "message"],
+    tarihAlani: "created_at_ms",
+    tarihEtiketi: "Talep tarihi",
+  },
+
   // Personel erişimi. Okuduğu iki tablo: kimlere hesap açılabileceği (`staff`)
   // ve kimin hâlihazırda yetkisi olduğu (`gym_users`).
   //

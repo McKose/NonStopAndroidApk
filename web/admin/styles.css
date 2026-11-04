@@ -344,3 +344,22 @@ button.ikincil {
   color: var(--metin);
   border: 1px solid var(--kenar);
 }
+
+/* Talep durumu rozetleri.
+   `rozet-stok-*` kalıbının aynısı: amaç adıyla isimlendirilmiş sınıflar,
+   böylece "aktif/donduruldu" gibi genel adların anlamını bu bağlamda
+   yeniden yorumlamak gerekmiyor.
+   Renk sırası işin akışını anlatıyor: yeni = bekliyor (uyarı), arandı =
+   tamam (iyi), kapandı = nötr. */
+.rozet-talep-yeni {
+  color: var(--uyari);
+  background: color-mix(in srgb, var(--uyari) 15%, transparent);
+}
+.rozet-talep-arandi {
+  color: var(--iyi);
+  background: color-mix(in srgb, var(--iyi) 15%, transparent);
+}
+.rozet-talep-kapandi {
+  color: var(--soluk);
+  background: color-mix(in srgb, var(--soluk) 12%, transparent);
+}

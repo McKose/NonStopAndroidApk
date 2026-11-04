@@ -44,6 +44,18 @@ export const SEKME_ROLLERI = {
   duyurular: ["ADMIN", "MANAGER"],
   "uye-hesaplari": ["ADMIN", "MANAGER"],
 
+  // ÜÇ ROLE DE AÇIK ve bu, sunucudaki OKUMA kuralıyla aynı seviye
+  // (migrasyon `0010`: `tenant_id in (select user_gym_ids())`, yani salona
+  // bağlı her rol). Eğitmene de açık olması bilinçli: talebi arayacak kişi
+  // eğitmen olabilir ve listeyi görmeyen biri arayamaz.
+  //
+  // Bölüm şu an SALT OKUNUR. Durum değiştirme (arandı/kapandı) eklendiğinde
+  // o denetimlerin yalnız ADMIN + MANAGER'a gösterilmesi gerekecek, çünkü
+  // sunucudaki YAZMA kuralı onlara açık. Yukarıdaki not tam bu yüzden var:
+  // panel sunucudan geniş bir kapı açarsa eğitmen "arandı" der ve sessizce
+  // reddedilir.
+  talepler: ["ADMIN", "MANAGER", "TRAINER"],
+
   // YALNIZCA ADMIN — duyurular/üye-hesapları gibi MANAGER'a da açılmadı.
   //
   // Bu bölüm kimin uygulamaya girebileceğine ve hangi yetkiyle gireceğine
@@ -76,6 +88,11 @@ export const PANEL_OZEL_GEREKCE = {
     "Personele Auth hesabı açıp salon yetkisi verme. Uygulamada karşılığı yok " +
     "ve olmamalı: iş sunucudaki `service_role` anahtarıyla yapılıyor ve o " +
     "anahtar hiçbir istemciye — telefona da — konulamaz.",
+  talepler:
+    "Siteden gelen deneme dersi talepleri. Uygulamada karşılığı yok çünkü " +
+    "kaynağı web: formu dolduran kişinin hesabı bile yok. Uygulamaya " +
+    "eklenebilir ama ayrı bir karar; bugün talebi gören ve arayan kişi " +
+    "panelin başında duruyor.",
 };
 
 /**
@@ -105,6 +122,7 @@ export const SEKME_HEDEFI = {
   duyurular: PANEL_OZEL,
   "uye-hesaplari": PANEL_OZEL,
   "personel-erisim": PANEL_OZEL,
+  talepler: PANEL_OZEL,
 };
 
 /** Bu rol bu sekmeyi görebilir mi? */

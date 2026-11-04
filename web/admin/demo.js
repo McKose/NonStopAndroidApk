@@ -14,7 +14,8 @@
 // gerçekte reddedilen (ya da tersi) bir dosya, demonun amacını bozardı.
 import { gorselKontrol } from "./supabase.js";
 
-const GUN = 24 * 60 * 60 * 1000;
+const SAAT = 60 * 60 * 1000;
+const GUN = 24 * SAAT;
 const simdi = Date.now();
 
 /** Tutarlı bir kimlik üreteci; demo verisinin sabit kalması için. */
@@ -313,6 +314,62 @@ const KAYIT_ISTEKLERI = [
   },
 ];
 
+// Siteden gelen deneme dersi talepleri.
+//
+// Üçü birden var çünkü sekmenin anlatacağı şey DURUM AKIŞI: yeni gelen,
+// aranmış ve kapanmış. Yalnız biri konsa önizleme rozetlerin üçünü de
+// göstermez ve renk sırasının (uyarı → iyi → nötr) okunup okunmadığı
+// anlaşılmazdı.
+//
+// Numaralar KANONİK biçimde (`+90` + 10 hane), çünkü gerçekte sunucu başka
+// bir biçimi kabul etmiyor (`0010`, `iletisim-formu.js`). Demo gerçekte hiç
+// görülmeyecek bir biçimi gösterirse, `tel:` bağlantısının doğruluğu
+// önizlemeye bakarak doğrulanamaz.
+//
+// Biri e-postasız ve mesajsız: ikisi de isteğe bağlı ve "—" hâlinin de
+// görünmesi gerekiyor.
+const TALEPLER = [
+  {
+    id: "00000000-0000-0000-0000-0000000000c1",
+    tenant_id: "demo",
+    full_name: "Zeynep Kaya",
+    phone: "+905320000111",
+    email: "zeynep@ornek.test",
+    message: "Reformer pilates denemek istiyorum, hafta içi akşam uygun.",
+    source: "WEB",
+    state: "NEW",
+    staff_note: null,
+    created_at_ms: simdi - 3 * SAAT,
+    updated_at_ms: simdi - 3 * SAAT,
+  },
+  {
+    id: "00000000-0000-0000-0000-0000000000c2",
+    tenant_id: "demo",
+    full_name: "Murat Demir",
+    phone: "+905320000222",
+    email: null,
+    message: null,
+    source: "WEB",
+    state: "CONTACTED",
+    staff_note: "Cumartesi 11.00 deneme dersine geliyor.",
+    created_at_ms: simdi - 2 * GUN,
+    updated_at_ms: simdi - GUN,
+  },
+  {
+    id: "00000000-0000-0000-0000-0000000000c3",
+    tenant_id: "demo",
+    full_name: "Elif Şahin",
+    phone: "+905320000333",
+    email: "elif@ornek.test",
+    message: "Fiyat bilgisi alabilir miyim?",
+    source: "WEB",
+    state: "CLOSED",
+    staff_note: "Arandı, şimdilik düşünecek.",
+    created_at_ms: simdi - 9 * GUN,
+    updated_at_ms: simdi - 7 * GUN,
+  },
+];
+
 const TABLOLAR = {
   gym_members: UYELER,
   gym_packages: PAKETLER,
@@ -323,6 +380,7 @@ const TABLOLAR = {
   orders: SIPARISLER,
   staff: PERSONEL,
   gym_users: YETKILER,
+  contact_requests: TALEPLER,
   announcements: DUYURULAR,
   member_accounts: UYE_HESAPLARI,
   member_link_requests: KAYIT_ISTEKLERI,
