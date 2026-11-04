@@ -15,7 +15,7 @@ ama **tanımlıymış**. Bu daha sinsi bir hata — eksik sanılan bir ayar, asl
 çalışan bir akışı "zaten bozuk" sandırıyor. Bir maddenin durumu belgeden
 değil, kaynağından doğrulanmalı.
 
-Son gözden geçirme: 4 Kasım 2026, `master` (`b232b97`).
+Son gözden geçirme: 4 Kasım 2026, `master` (`17f0e42`).
 
 ---
 
@@ -25,24 +25,28 @@ Bunlar bende yapılamaz; hiçbiri kod işi değil.
 
 | # | Ne | Neyi açar | Ayrıntı |
 |---|---|---|---|
-| 1 | **Yayın anahtarı + 4 gizli anahtar** | İmzalı APK'nın **tek** engeli | `docs/yayin.md` |
-| 2 | **KVKK aydınlatma metni için bilgiler** (ticari unvan, adres, saklama süresi) | Sitedeki yasal açığı | `docs/site-plani-kalanlar.md` md. 1 |
-| 3 | **En az şifre uzunluğu 6 → 8** (Supabase panelinden) | Sunucuyu istemciyle aynı kurala getirir | `supabase/README.md` → "Panelden açılabilecek iki ayar" |
-| 4 | **Sızmış şifre koruması** (Supabase panelinden) | Zayıf şifreleri eler | aynı bölüm |
-| 5 | **MX kaydı** (Turhost panelinde) | Kurumsal e-postayı | `docs/site-yonetimi.md` → "E-posta" |
-| 6 | **Karşılama videosu** (`kahraman.mp4`) | Banner videosunu (isteğe bağlı) | `web/varliklar/BENIOKU.md` |
+| 1 | **KVKK aydınlatma metni için bilgiler** (ticari unvan, adres, saklama süresi) — *ertelendi, aşağıya bakın* | Sitedeki yasal açığı | `docs/site-plani-kalanlar.md` md. 1 |
+| 2 | **En az şifre uzunluğu 6 → 8** (Supabase panelinden) | Sunucuyu istemciyle aynı kurala getirir | `supabase/README.md` → "Panelden açılabilecek iki ayar" |
+| 3 | **Sızmış şifre koruması** (Supabase panelinden) | Zayıf şifreleri eler | aynı bölüm |
+| 4 | **MX kaydı** (Turhost panelinde) | Kurumsal e-postayı | `docs/site-yonetimi.md` → "E-posta" |
+| 5 | **Karşılama videosu** (`kahraman.mp4`) | Banner videosunu (isteğe bağlı) | `web/varliklar/BENIOKU.md` |
 
-1. madde en kritik olanı: uygulama kod olarak hazır ama imzalanamadığı için
-dağıtılamıyor.
-
-3. madde **en ucuz olanı ve bu listeye sonradan eklendi** — önce yalnızca
-4. madde yazılıydı ve ikisi aynı panel bölümünde olduğu için gözden
+2. madde **en ucuz olanı ve bu listeye sonradan eklendi** — önce yalnızca
+3. madde yazılıydı ve ikisi aynı panel bölümünde olduğu için gözden
 kaçmıştı. Uygulama ve panel 8 karakter dayatıyor, sunucu 6'da duruyor; yani
 istemci kontrolü atlanırsa 7 karakterli bir şifre geçiyor. **Ücretsiz planda
 da yapılabiliyor**, 1 dakika.
 
-4. madde **ücretli plan** gerektiriyor; ücretsiz plandaysan seçenek
+3. madde **ücretli plan** gerektiriyor; ücretsiz plandaysan seçenek
 görünmez ve bu madde şimdilik kapalı sayılır.
+
+**Yayın anahtarı + 4 gizli anahtar bu listeden ÇIKTI** (salon sahibinin
+kararı, 04.11.2026) ve listenin en kritik maddesiydi. Gerekçe: uygulama
+mağazada yayınlanmayacak, dağıtım kurulabilir APK ile olacak. O APK'yı
+üretmek için anahtar gerekmiyor — her CI koşusu depodaki sabit hata ayıklama
+anahtarıyla imzalanmış bir APK üretiyor ve indirme bağlantısı koşu özetinde
+duruyor (`docs/deneme.md` md. 2). Bu madde kapanmadı, **gereksizleşti**;
+kararın tamamı `docs/kararlar.md` → "Mağazada yayınlanmayacak".
 
 `SUPABASE_TENANT_ID` gizli anahtarı bu listeden **çıktı** ve iki sebebi var:
 web'den üye kaydı şimdilik kapatıldı (aşağıya bakın) ve anahtar **zaten
@@ -53,8 +57,19 @@ listeleniyordu; yanlıştı.
 
 ## Android uygulaması
 
-**Kod tarafında açık iş yok.** 13 ekranın 13'ünün de görüntü testi var,
-`TODO`/`FIXME` yok, CI `master`ta yeşil. Kalan tek şey yukarıdaki 1. madde.
+**Açık iş yok — ne kodda ne dağıtımda.** 13 ekranın 13'ünün de görüntü testi
+var, `TODO`/`FIXME` yok, CI `master`ta yeşil.
+
+Dağıtım da artık beklemiyor: uygulama **mağazada yayınlanmayacak** (karar,
+04.11.2026) ve kurulabilir APK her koşuda üretiliyor — 90 gün saklanıyor,
+indirme bağlantısı koşu özetinin başında. Nasıl kurulacağı
+`docs/deneme.md` md. 2'de.
+
+Bir uyarı: "imzasız APK" diye bir dağıtım yolu **yok**. Android imzası
+olmayan bir paketi kurmuyor (`INSTALL_PARSE_FAILED_NO_CERTIFICATES`), yani
+`:app:assembleRelease`in anahtar yokken ürettiği `app-release-unsigned.apk`
+telefona kurulamaz. Mağazasız dağıtımın doğru karşılığı hata ayıklama
+anahtarıyla imzalı APK ve zaten üretilen o.
 
 Yalnızca panelde olan üç bölüm (Duyurular, Üye Hesapları, Personel Erişimi)
 eksik değil, **bilinçli kapsam kararı** — gerekçesi `docs/site-yonetimi.md`

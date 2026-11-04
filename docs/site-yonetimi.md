@@ -305,7 +305,11 @@ Aşağıdakiler yalnızca **site** tarafını ilgilendirenler.
 | Konu | Ne gerekiyor |
 |---|---|
 | **E-posta riski** | Aşağıdaki ayrı bölüme bakın — sitede yapılacak bir şey yok, iş Turhost panelinde. |
-| **Yayın anahtarı** | Android uygulamasının mağaza sürümü için. Adımlar `docs/yayin.md` içinde. Anahtarı **yedekle** — kaybı geri dönüşsüz. |
+
+**Yayın anahtarı bu listeden çıktı** (kararın, 04.11.2026): uygulama
+mağazada yayınlanmayacak, dağıtım kurulabilir APK ile olacak ve o APK için
+anahtar gerekmiyor. Yapacak bir şey yok. Nereden indirileceği
+`docs/deneme.md` md. 2'de.
 
 ---
 

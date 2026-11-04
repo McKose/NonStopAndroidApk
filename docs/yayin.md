@@ -1,10 +1,24 @@
 # Yayın (release) sürümü çıkarmak
 
+> ### Bu belgedeki kurulum ŞU AN GEREKMİYOR
+>
+> **Karar (04.11.2026): uygulama mağazada yayınlanmayacak.** Dağıtım, her CI
+> koşusunda üretilen kurulabilir APK ile yapılıyor; o APK için **hiçbir
+> anahtar ve hiçbir gizli anahtar gerekmiyor.** İndirme bağlantısı koşu
+> özetinin başında, kurulum adımları `docs/deneme.md` md. 2'de.
+>
+> Belge silinmedi, çünkü karar dönerse yol burada hazır duruyor. Ama
+> aşağıdaki dört gizli anahtarı **bugün eklemenize gerek yok** — eklenmediği
+> için eksik kalan bir şey yok.
+>
+> Kararın tamamı ve açıkta kalan takas: `docs/kararlar.md` → "Mağazada
+> yayınlanmayacak; dağıtım kurulabilir APK ile".
+
 Hata ayıklama yapısı her CI koşusunda otomatik üretiliyor ve depodaki sabit
 anahtarla imzalanıyor — onun için hiçbir şey yapmanız gerekmiyor.
 
-Bu belge **yayın** sürümü için: kendi anahtarınızla imzalanmış, dağıtılabilir
-APK. Anahtarı **siz** üretiyorsunuz ve depoya girmiyor.
+Bu belge **yayın** sürümü için: kendi anahtarınızla imzalanmış, mağazaya
+yüklenebilir APK. Anahtarı **siz** üretiyorsunuz ve depoya girmiyor.
 
 ---
 
@@ -164,6 +178,13 @@ Sonra:
 Dosya yoksa ya da eksikse derleme **düşmüyor**; imzasız APK üretiyor ve hangi
 değerin eksik olduğunu yazıyor. Çıktının adı da söylüyor:
 `app-release-unsigned.apk`.
+
+> **O dosya telefona KURULAMAZ.** Android imzası olmayan bir paketi kabul
+> etmiyor (`INSTALL_PARSE_FAILED_NO_CERTIFICATES`) — ne `adb install` ile ne
+> dosyaya dokunarak. Yani `app-release-unsigned.apk` "imzasız ama çalışır bir
+> sürüm" değil, yalnızca derlemenin geçtiğini gösteren bir çıktı. Telefonda
+> denemek için istediğiniz dosya her zaman hata ayıklama APK'sı
+> (`app-debug.apk`).
 
 **Hata ayıklama anahtarına bilinçli olarak düşülmüyor.** Debug anahtarıyla
 imzalı bir "yayın" APK'sı kurulur, çalışır ve yayın gibi görünür — ama gerçek

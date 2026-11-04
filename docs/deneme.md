@@ -132,7 +132,13 @@ Ayrıntılı anlatım: `supabase/README.md` → "Kim neyi yazabilir".
 
 ## 2. Uygulamayı APK indirerek denemek (Android Studio gerekmez)
 
-Her CI koşusu kurulabilir bir APK üretiyor.
+Her CI koşusu kurulabilir bir APK üretiyor. **Uygulamanın dağıtım yolu bu** —
+mağazada yayınlanmayacak (karar, 04.11.2026; `docs/kararlar.md` → "Mağazada
+yayınlanmayacak").
+
+**En kısa yol:** koşuyu açın; **özetin en başında** "Kurulabilir APK" başlığı
+ve doğrudan indirme bağlantısı duruyor. Aşağıdaki adımlar onu bulamazsanız
+diye:
 
 1. Şu adresi açın: **<https://github.com/McKose/NonStopAndroidApk/actions>**
 2. Listenin **en üstündeki yeşil tikli** koşuya tıklayın. (Kırmızı çarpı varsa
@@ -141,19 +147,29 @@ Her CI koşusu kurulabilir bir APK üretiyor.
 4. **`nonstop-debug-apk`** yazısına tıklayın — zip olarak iner.
 5. Zip'i açın; içinden `app-debug.apk` çıkar.
 6. Dosyayı telefona kopyalayıp açın. Android "bilinmeyen kaynak" uyarısı
-   verirse izin verin — imzasız bir geliştirme sürümü.
+   verirse izin verin.
 
-Yapıt **14 gün** duruyor; süresi dolmuşsa yeni bir koşu gerekiyor (depoya
+Yapıt **90 gün** duruyor; süresi dolmuşsa yeni bir koşu gerekiyor (depoya
 herhangi bir değişiklik gönderildiğinde ya da Actions sayfasından iş elle
 tetiklendiğinde üretilir).
 
-> **İmza uyarısı.** Projede özel bir imzalama ayarı yok, yani hata ayıklama
-> derlemeleri makinedeki `~/.android/debug.keystore` ile imzalanıyor. CI
-> koşucuları her seferinde sıfırdan kurulduğu için **her CI koşusu farklı bir
-> anahtarla imzalıyor**. Sonucu: bir APK'yı diğerinin üzerine kurmaya
-> çalıştığınızda `INSTALL_FAILED_UPDATE_INCOMPATIBLE` alırsınız. Bozuk bir şey
-> değil; tek çözümü önce kaldırıp sonra kurmak. Aynı sebeple Android Studio'dan
-> derlediğinizi CI APK'sının üzerine de kuramazsınız.
+> **Yeni APK eskisinin üzerine kurulur; önce kaldırmanız gerekmiyor.** CI
+> APK'ları depodaki **sabit** anahtarla (`app/debug.keystore`) imzalanıyor,
+> yani her koşu aynı imzayı atıyor. Bu bilinçli bir karar ve sebebi tam olarak
+> buydu: anahtar sabit olmadan iki koşu arasında veritabanı göçünü gerçek
+> veriyle denemek mümkün değildi, çünkü kaldır-kur döngüsü veriyi siliyordu.
+> Gerekçesi `docs/kararlar.md` → "Hata ayıklama imzası sabit ve depoda".
+>
+> Tek istisna **Android Studio'dan kendi makinenizde** derlediğiniz APK:
+> o `~/.android/debug.keystore` ile imzalanıyor, yani CI APK'sının üzerine
+> kurulmuyor (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). İkisini aynı telefonda
+> dönüşümlü kullanıyorsanız arada bir kaldırmak gerekiyor.
+
+> **"İmzasız APK" diye bir seçenek yok.** Android imzası olmayan bir paketi
+> kurmuyor (`INSTALL_PARSE_FAILED_NO_CERTIFICATES`), yani
+> `:app:assembleRelease`in anahtar yokken ürettiği `app-release-unsigned.apk`
+> telefona **kurulamaz**. Mağazasız dağıtımda istediğiniz dosya her zaman
+> yukarıdaki `app-debug.apk`.
 
 ## 2b. Uygulamayı tarayıcıda denemek (Appetize)
 
@@ -366,4 +382,4 @@ Hata mesajları ne yapılması gerektiğini söyleyecek şekilde yazıldı.
 | Panelde "Kurulum tamamlanmamış" | `web/config.js` oluşturulmamış — ya da adrese `?demo` ekleyin |
 | Panelde liste boş ama hata yok | O tabloda veri yok; erişim sorunu olsaydı hata görürdünüz |
 | Panelde "Süzgece uyan kayıt yok" | Veri var ama arama/tarih süzgeci eliyor — **Temizle** düğmesine basın |
-| Actions'ta `nonstop-debug-apk` yok | Koşu başarısız bitmiş ya da yapıtın 14 günü dolmuş |
+| Actions'ta `nonstop-debug-apk` yok | Koşu başarısız bitmiş ya da yapıtın 90 günü dolmuş |
