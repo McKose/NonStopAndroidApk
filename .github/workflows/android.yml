@@ -279,12 +279,93 @@ jobs:
           # çekmek yetmedi. Artık koşu sayfasının başında tek satır olarak
           # duruyor.
 
-      - name: Debug APK derle
+      # Derlenen APK `debug` DEĞİL, `dagitim`.
+      #
+      # Fark tek satır ama dağıtılan dosyada önemli: `debug` yapısı
+      # `debuggable`, yani telefona fiziksel erişimi olup USB hata ayıklamayı
+      # açabilen biri uygulamanın veritabanını (üye adları, telefonları, sağlık
+      # beyanları) root olmadan okuyabiliyor. `dagitim` hem `debuggable` değil
+      # hem depodaki sabit anahtarla imzalı, yani kurulabilir. Gerekçesi
+      # `app/build.gradle.kts` içinde o yapı tipinin başında.
+      #
+      # `debug` yapısı KALDIRILMADI, yalnızca APK'sı artık yayınlanmıyor:
+      # birim testleri (`testDebugUnitTest`) hâlâ onu derliyor ve hata
+      # ayıklayıcı bağlamak isteyen Android Studio'dan derliyor.
+      - name: Dağıtım APK'sı derle
         run: |
           # `pipefail` şart: `tee` başarılı döner ve Gradle'ın hata kodu
           # yutulurdu — kırmızı koşu sessizce yeşile dönerdi.
           set -o pipefail
-          ./gradlew --no-daemon :app:assembleDebug 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
+          ./gradlew --no-daemon :app:assembleDagitim 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
+
+      # APK'nın İÇİNDEN doğruluyor: hata ayıklamaya kapalı ve imzalı.
+      #
+      # İkisi de dosyaya bakarak anlaşılmıyor ve ikisi de sessizce bozulabilir:
+      #
+      #   - `isDebuggable = false` satırı silinse ya da `initWith` kaynağı
+      #     `debug` yapılsa, APK yine derleniyor, yine kuruluyor ve yalnızca
+      #     koruma kaybolmuş oluyor. Hiçbir test bunu yakalamazdı.
+      #   - İmza yapılandırması bir şekilde boş kalsa AGP derlemeyi DÜŞÜRMÜYOR,
+      #     yalnızca dosya adına `-unsigned` ekliyor — ve o dosya telefona
+      #     kurulamıyor (`INSTALL_PARSE_FAILED_NO_CERTIFICATES`). Hata ancak
+      #     salon sahibi telefonda denerken görünürdü.
+      #
+      # Yani bu adım "derledi, bitti" ile "dağıtılabilir" arasındaki farkı
+      # sınıyor. `yayin.yml`deki imza doğrulamasının aynı gerekçesi.
+      - name: APK dağıtılabilir mi (debuggable değil + imzalı)
+        run: |
+          set -o pipefail
+
+          apk=$(ls app/build/outputs/apk/dagitim/*.apk 2>/dev/null | head -1)
+          if [ -z "$apk" ]; then
+            echo "::error::Dağıtım APK'sı bulunamadı; derleme adımına bakın."
+            exit 1
+          fi
+          echo "APK: $apk"
+
+          # Dosya adı imzasızlığı da söylüyor; en ucuz kontrol o.
+          case "$apk" in
+            *unsigned*)
+              echo "::error::APK imzasız ($apk) — telefona kurulamaz."
+              exit 1
+              ;;
+          esac
+
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [ -z "$sdk" ]; then
+            echo "::error::ANDROID_HOME tanımsız; APK içi doğrulanamıyor."
+            exit 1
+          fi
+
+          # Araçlar Gradle derlemesi sırasında kuruluyor, o yüzden bu adım
+          # derlemeden SONRA. En yeni sürüm seçiliyor.
+          aapt=$(find "$sdk/build-tools" -name aapt2 -type f 2>/dev/null \
+            | sort -V | tail -1)
+          if [ -z "$aapt" ]; then
+            echo "::error::aapt2 bulunamadı ($sdk/build-tools)."
+            echo "Doğrulama ATLANMIYOR, iş düşüyor: sessizce doğrulamayan bir"
+            echo "koruma, hiç olmamasından kötü."
+            exit 1
+          fi
+
+          # `application-debuggable` satırı YALNIZCA bayrak açıkken basılıyor.
+          if "$aapt" dump badging "$apk" | grep -q "application-debuggable"; then
+            echo "::error::APK hata ayıklamaya AÇIK (debuggable) — dağıtılamaz."
+            echo "Sebep büyük olasılıkla app/build.gradle.kts içindeki"
+            echo "\`dagitim\` yapı tipinde \`isDebuggable = false\` satırının"
+            echo "kaybolması ya da \`initWith\` kaynağının değişmesi."
+            exit 1
+          fi
+          echo "debuggable bayrağı YOK — doğrulandı."
+
+          apksigner=$(find "$sdk/build-tools" -name apksigner -type f 2>/dev/null \
+            | sort -V | tail -1)
+          if [ -z "$apksigner" ]; then
+            echo "::error::apksigner bulunamadı ($sdk/build-tools)."
+            exit 1
+          fi
+          "$apksigner" verify --verbose "$apk"
+          echo "İmza kriptografik olarak doğrulandı."
 
       # Kurulabilir APK. Android Studio kurmadan denemenin tek yolu bu: Actions
       # sekmesinden koşuyu açıp aşağıdaki dosyayı indirmek yeterli.
@@ -301,13 +382,15 @@ jobs:
       # indirme bağlantısı ölüyor. 90 gün GitHub'ın üst sınırı; depo ayarı
       # daha düşük bir sınır koyarsa `upload-artifact` sessizce kırpıyor, o
       # yüzden gerçek son gün yapıt satırından doğrulandı.
-      - name: Debug APK'yı yayınla
+      - name: APK'yı yayınla
         id: apk
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nonstop-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          # Adında artık `debug` YOK, çünkü APK da artık `debug` yapısı değil.
+          # Adı bırakmak, dosyanın ne olduğu konusunda yanlış bilgi vermekti.
+          name: nonstop-apk
+          path: app/build/outputs/apk/dagitim/*.apk
           retention-days: 90
           if-no-files-found: warn
 
@@ -320,24 +403,28 @@ jobs:
       #
       # Boyut da yazılıyor: 25 MB'lık bir indirmeyi mobil veriyle başlatmak
       # ile Wi-Fi'de başlatmak farklı kararlar.
+      # `success()`, `always()` değil: doğrulama adımı düşmüşse APK'yı
+      # "kurulabilir" diye duyurmak yanlış bilgi olurdu. Yapıt yine yükleniyor
+      # (yukarıdaki adım `always()`) ki bozuk dosyaya bakılabilsin, ama özette
+      # onu öneren bir banner çıkmıyor.
       - name: APK'yı özete yaz
-        if: always() && steps.apk.outputs.artifact-url != ''
+        if: success() && steps.apk.outputs.artifact-url != ''
         run: |
-          boyut=$(du -m app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1 | cut -f1)
+          boyut=$(du -m app/build/outputs/apk/dagitim/*.apk 2>/dev/null | head -1 | cut -f1)
           {
             echo "## Kurulabilir APK"
             echo ""
-            echo "[nonstop-debug-apk indir](${{ steps.apk.outputs.artifact-url }})"
+            echo "[nonstop-apk indir](${{ steps.apk.outputs.artifact-url }})"
             echo " — ${boyut:-?} MB, 90 gün saklanıyor."
             echo ""
             echo "İndirilen dosya bir **zip**; içinden \`.apk\` çıkarılıp"
             echo "telefona atılıyor. Android \"bilinmeyen kaynak\" onayı"
             echo "isteyecek."
             echo ""
-            echo "Bu APK **hata ayıklama anahtarıyla imzalı** ve dağıtım yolu"
-            echo "bu: mağazada yayınlanmayacak (karar, 04.11.2026). İmza her"
-            echo "koşuda AYNI, yani yeni APK eskisinin üzerine kuruluyor —"
-            echo "önce kaldırmak gerekmiyor."
+            echo "Mağaza sürümü değil (karar, 04.11.2026); depodaki sabit"
+            echo "anahtarla imzalı, yani **yeni APK eskisinin üzerine"
+            echo "kuruluyor** — önce kaldırmak gerekmiyor. Hata ayıklamaya"
+            echo "**kapalı** ve imzalı olduğu APK'nın içinden doğrulandı."
           } >> "$GITHUB_STEP_SUMMARY"
 
       # APK'yı tarayıcıda çalıştırılabilir hâle getirir.
@@ -365,7 +452,7 @@ jobs:
             exit 0
           fi
 
-          apk=$(ls app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1)
+          apk=$(ls app/build/outputs/apk/dagitim/*.apk 2>/dev/null | head -1)
           if [ -z "$apk" ]; then
             echo "::error::APK bulunamadı; derleme adımı düşmüş olmalı."
             exit 1

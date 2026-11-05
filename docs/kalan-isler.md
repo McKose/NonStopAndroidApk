@@ -65,6 +65,12 @@ Dağıtım da artık beklemiyor: uygulama **mağazada yayınlanmayacak** (karar,
 indirme bağlantısı koşu özetinin başında. Nasıl kurulacağı
 `docs/deneme.md` md. 2'de.
 
+Dağıtılan APK `dagitim` yapı tipinden geliyor ve hata ayıklamaya **kapalı**
+(05.11.2026). Önceden `debug` yapısı dağıtılıyordu; o `debuggable` olduğu için
+telefona fiziksel erişimi olan biri üye verisini okuyabiliyordu. Her koşu bunu
+APK'nın içinden doğruluyor. Gerekçe: `docs/kararlar.md` → "Dağıtım yapısı hata
+ayıklamaya kapalı".
+
 Bir uyarı: "imzasız APK" diye bir dağıtım yolu **yok**. Android imzası
 olmayan bir paketi kurmuyor (`INSTALL_PARSE_FAILED_NO_CERTIFICATES`), yani
 `:app:assembleRelease`in anahtar yokken ürettiği `app-release-unsigned.apk`

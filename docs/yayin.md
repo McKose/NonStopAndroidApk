@@ -14,8 +14,9 @@
 > Kararın tamamı ve açıkta kalan takas: `docs/kararlar.md` → "Mağazada
 > yayınlanmayacak; dağıtım kurulabilir APK ile".
 
-Hata ayıklama yapısı her CI koşusunda otomatik üretiliyor ve depodaki sabit
-anahtarla imzalanıyor — onun için hiçbir şey yapmanız gerekmiyor.
+Dağıtım APK'sı (`dagitim` yapı tipi) her CI koşusunda otomatik üretiliyor ve
+depodaki sabit anahtarla imzalanıyor — onun için hiçbir şey yapmanız
+gerekmiyor.
 
 Bu belge **yayın** sürümü için: kendi anahtarınızla imzalanmış, mağazaya
 yüklenebilir APK. Anahtarı **siz** üretiyorsunuz ve depoya girmiyor.
@@ -182,9 +183,9 @@ değerin eksik olduğunu yazıyor. Çıktının adı da söylüyor:
 > **O dosya telefona KURULAMAZ.** Android imzası olmayan bir paketi kabul
 > etmiyor (`INSTALL_PARSE_FAILED_NO_CERTIFICATES`) — ne `adb install` ile ne
 > dosyaya dokunarak. Yani `app-release-unsigned.apk` "imzasız ama çalışır bir
-> sürüm" değil, yalnızca derlemenin geçtiğini gösteren bir çıktı. Telefonda
-> denemek için istediğiniz dosya her zaman hata ayıklama APK'sı
-> (`app-debug.apk`).
+> sürüm" değil, yalnızca derlemenin geçtiğini gösteren bir çıktı. Telefona
+> kurmak için istediğiniz dosya her zaman dağıtım APK'sı
+> (`app-dagitim.apk`, `./gradlew :app:assembleDagitim`).
 
 **Hata ayıklama anahtarına bilinçli olarak düşülmüyor.** Debug anahtarıyla
 imzalı bir "yayın" APK'sı kurulur, çalışır ve yayın gibi görünür — ama gerçek

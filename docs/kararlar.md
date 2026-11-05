@@ -404,9 +404,15 @@ kurulumda yok oluyordu. Göç hatası bu projede yapılabilecek en pahalı
 hatalardan biri olduğu için, onu telefonda deneyememek kabul edilebilir değil.
 
 **Anahtarın depoda olması bilinçli.** Gizli değil ve gizli olması beklenmiyor:
-şifresi Android'in kendi varsayılanıyla aynı (`android`), yalnızca hata ayıklama
-yapısını imzalıyor ve hiçbir mağazaya bir şey yüklemiyor. Yayın imzası buna
-bağlanmayacak — o anahtar depoya değil depo gizli anahtarlarına girer.
+şifresi Android'in kendi varsayılanıyla aynı (`android`) ve hiçbir mağazaya bir
+şey yüklemiyor. Yayın imzası buna bağlanmayacak — o anahtar depoya değil depo
+gizli anahtarlarına girer.
+
+**Bu anahtar `dagitim` yapısını da imzalıyor** (05.11.2026, "Dağıtım yapısı
+hata ayıklamaya kapalı"): telefonlara dağıtılan APK o ve sabit imzanın asıl
+kıymeti orada görünüyor — yeni APK eskisinin üzerine kuruluyor, veri silinmiyor.
+Yani anahtar artık yalnızca hata ayıklama yapısını imzalamıyor; mağazaya
+gitmeme durumu değişmedi.
 
 ## Panelin rol görünürlüğü uygulamayla aynı kaynaktan sınanıyor
 
@@ -547,23 +553,60 @@ yapılması gereken bir kurulum sanırdı.
 geliştirme iki hafta durduğunda koşu yeşil göründüğü hâlde indirme
 bağlantısı ölüyor.
 
-**Açıkta kalan takas — dağıtılan APK `debuggable`.** `debug` yapı tipi
-AGP'nin varsayılanlarını kullanıyor, yani manifestoda
-`android:debuggable="true"`. Sonucu: telefona fiziksel erişimi olan ve USB
-hata ayıklamayı açabilen biri, root olmadan uygulamanın özel verisini
-(Room veritabanı — üye adları, telefonları, sağlık beyanları) okuyabilir.
-Oturum belirteci şifreli saklanıyor ("Oturum cihazda şifreli saklanır") ama
-veritabanı şifreli değil.
+**Dağıtılan APK `debuggable` idi; bu takas KAPANDI** (05.11.2026, bir sonraki
+bölüm). Karar verildiğinde dağıtım `debug` yapısıyla yapılıyordu ve o yapı
+`debuggable`; ayrı bir yapı tipi tanımlanıp kapatıldı.
 
-Bu karar **imza** ile ilgili, `debuggable` ise ondan ayrı bir özellik:
-hata ayıklama anahtarıyla imzalı ama `debuggable` OLMAYAN bir yapı tipi
-tanımlanabilir. Bugüne kadar yapılmamasının gerekçesi — "debug anahtarıyla
-imzalı bir yayın, gerçek yayın anahtarıyla bir daha güncellenemez" —
-mağaza kararıyla **geçersizleşti**, çünkü gelecek bir yayın anahtarı yok.
-Yani bu artık yapılabilir bir iş; yapılmadı çünkü yeni bir yapı tipi
-tanımlamak salon sahibinin istediği kapsamın dışındaydı ve bedeli
-(fiziksel erişim + USB hata ayıklama gerektiren bir risk) kararı tek
-başına vermeyi gerektirmeyecek kadar sınırlı. Karar sahibine bildirildi.
+## Dağıtım yapısı hata ayıklamaya kapalı
+
+**Karar:** Telefonlara dağıtılan APK `debug` yapısından değil, `dagitim` adlı
+ayrı bir yapı tipinden geliyor: `isDebuggable = false`, imza depodaki sabit
+`app/debug.keystore`.
+
+**Neden:** Bir önceki karar dağıtımı kurulabilir APK'ya bağladı ve o APK `debug`
+yapısıydı — yani manifestoda `android:debuggable="true"`. Sonucu: telefona
+fiziksel erişimi olan ve USB hata ayıklamayı açabilen biri, root olmadan
+uygulamanın özel verisini okuyabiliyor (`adb shell run-as`). O veritabanında üye
+adları, telefonları ve **sağlık beyanları** var. Oturum belirteci şifreli
+saklanıyor ("Oturum cihazda şifreli saklanır"), veritabanı değil.
+
+Risk fiziksel erişim gerektiriyor, yani acil değildi; kapatılmasının ucuz olması
+kapatmaya değer kıldı.
+
+**Neden `debug`a `isDebuggable = false` YAZILMADI.** En kısa yol o görünüyordu
+ama hata ayıklama yapısını hata ayıklamaya elverişsiz hâle getirirdi: Android
+Studio'dan hata ayıklayıcı bağlamak ve düzen denetçisi o bayrağa bağlı.
+Geliştirmeyi bozmadan dağıtmak iki ayrı yapı gerektiriyor.
+
+**Neden `release`in imzasız kalması DEĞİŞTİRİLMEDİ.** "Yayın anahtarı yoksa
+depodaki anahtarla imzala" da tek satırdı ve mağaza kararı, bunu engelleyen
+gerekçeyi ("bir daha güncellenemez") bugün geçersiz kılıyor. Yine yapılmadı:
+"Yayın anahtarı depoda değil" kararının reddettiği şey, mağazaya gidebilecek
+GÖRÜNÜMDE ama gidemeyecek bir dosya üretmek — ve mağaza kararı dönerse o gerekçe
+geri gelir. Adı açık, ayrı bir yapı tipi `app-release.apk`ın anlamını bozmadan
+aynı sonucu veriyor.
+
+**`matchingFallbacks = listOf("release")` şart.** `:shared` ve `:arayuz` birer
+Android kütüphanesi ve onlarda yalnızca `debug`/`release` var. Bu satır olmadan
+Gradle hangi kütüphane türevine bağlanacağını çözemiyor ve derleme düşüyor.
+
+**İki özellik de APK'nın İÇİNDEN sınanıyor** (`aapt2 dump badging` +
+`apksigner verify`), çünkü ikisi de sessizce bozulabiliyor: `isDebuggable = false`
+satırı silinse APK yine derlenir, yine kurulur ve yalnızca koruma kaybolur; imza
+yapılandırması boş kalsa AGP derlemeyi düşürmez, yalnızca dosya adına `-unsigned`
+ekler — ve o dosya telefona kurulamaz. İkisi de ancak telefonda denenirken
+görülürdü. Araç bulunamazsa adım **düşüyor**, atlanmıyor: sessizce doğrulamayan
+bir koruma hiç olmamasından kötü.
+
+**CI artık `debug` APK'sını YAYINLAMIYOR**, yapıt adı `nonstop-debug-apk`
+yerine `nonstop-apk`. `debug` yapısı kaldırılmadı — birim testleri
+(`testDebugUnitTest`) hâlâ onu derliyor ve hata ayıklayıcı bağlayan Android
+Studio'dan derliyor. Yayınlanmaması bilinçli: iki APK yayınlamak, "hangisini
+indireyim" sorusunu geri getirirdi ve yanlış olanı indirmenin bedeli tam da
+kapatılan açık.
+
+**Sürüm adına `-dagitim` eklendi.** APK hangi yapı tipinden geldiğini kendisi
+söylüyor; etiketsiz derlemelerin `0.0.0-gelistirme` olmasıyla aynı desen.
 
 ## Sürüm numarası etiketten türer
 

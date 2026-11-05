@@ -62,13 +62,23 @@ kendi anahtarını üretiyordu; `INSTALL_FAILED_UPDATE_INCOMPATIBLE` alıp
 `adb uninstall` yapmak gerekiyordu ve o komut **uygulama verisini de siliyordu**.
 Göçü denemek için gereken eski veri, denemeye başlamadan yok oluyordu.
 
-Anahtar gizli değil (şifresi `android`, Android'in kendi varsayılanı) ve yalnızca
-hata ayıklama yapısını imzalıyor. Yayın imzası bundan tamamen ayrı —
-bkz. [`docs/yayin.md`](docs/yayin.md).
+Anahtar gizli değil (şifresi `android`, Android'in kendi varsayılanı). **Aynı
+anahtar `dagitim` yapısını da imzalıyor** — telefonlara dağıtılan, CI'ın
+ürettiği APK o. Yani buradan `assembleDebug` ile kurduğunuz APK ile Actions'tan
+indirilen APK birbirinin üzerine kurulur; ikisi arasında geçmek veri silmiyor.
 
-> **Dikkat:** Hata ayıklama ve yayın APK'ları **farklı** anahtarlarla imzalı,
-> dolayısıyla biri diğerinin üzerine kurulamaz. Yayın sürümüne geçerken bir kez
-> kaldırmak gerekiyor ve o uygulama verisini siler.
+`dagitim`in `debug`ten tek farkı hata ayıklamaya **kapalı** olması
+(`isDebuggable = false`). Geliştirirken `debug` kullanın — hata ayıklayıcı
+bağlamak ve düzen denetçisi o bayrağa bağlı; `dagitim` yalnızca dağıtım için.
+Gerekçe: `docs/kararlar.md` → "Dağıtım yapısı hata ayıklamaya kapalı".
+
+Yayın (`release`) imzası bundan tamamen ayrı — bkz.
+[`docs/yayin.md`](docs/yayin.md); uygulama mağazada yayınlanmayacağı için o yol
+şimdilik kullanılmıyor.
+
+> **Dikkat:** `debug`/`dagitim` ile **yayın** APK'ları farklı anahtarlarla
+> imzalı, dolayısıyla biri diğerinin üzerine kurulamaz. Yayın sürümüne geçerken
+> bir kez kaldırmak gerekiyor ve o uygulama verisini siler.
 
 > **Göçü denemek için:** önce **eski** sürümün APK'sını kurup veri girin, sonra
 > yeni APK'yı `adb install -r` ile üzerine kurun. Uygulama açılıyor ve veriler
@@ -90,8 +100,10 @@ Toolbar'dan hedef cihazı seç:
 ▶ Run  (veya Shift+F10)
 ```
 
-**Build variant:** `debug` (geliştirme için yeterli; depodaki sabit hata ayıklama
-anahtarıyla imzalanır, yayın anahtarıyla değil)
+**Build variant:** `debug` (geliştirme için doğrusu bu; depodaki sabit hata
+ayıklama anahtarıyla imzalanır, yayın anahtarıyla değil). Telefonlara
+dağıtılacak dosyayı üretmek istiyorsanız `dagitim` — aynı anahtar, ama hata
+ayıklamaya kapalı.
 
 ---
 
