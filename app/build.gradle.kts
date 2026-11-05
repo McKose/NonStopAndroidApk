@@ -162,10 +162,14 @@ android {
     // koşusu arasında veritabanı göçünü telefonda denemek mümkün değildi:
     // denenecek eski veri her kurulumda yok oluyordu.
     //
-    // Anahtar gizli değil ve gizli olması da beklenmiyor: yalnızca hata ayıklama
-    // yapısını imzalıyor, Play Store'a hiçbir şey yüklemiyor ve şifresi
-    // Android'in kendi varsayılanıyla aynı ("android"). Yayın imzası buna
-    // bağlanmayacak; o anahtar depoya değil depo gizli anahtarlarına girer.
+    // Anahtar gizli değil ve gizli olması da beklenmiyor: şifresi Android'in
+    // kendi varsayılanıyla aynı ("android") ve hiçbir mağazaya bir şey
+    // yüklemiyor. Yayın imzası buna bağlanmayacak; o anahtar depoya değil depo
+    // gizli anahtarlarına girer.
+    //
+    // Aynı anahtar aşağıdaki `dagitim` yapı tipini de imzalıyor — telefonlara
+    // dağıtılan APK o. Sabit imzanın asıl kıymeti orada: yeni APK eskisinin
+    // üzerine kuruluyor ve veri silinmiyor.
     signingConfigs {
         getByName("debug") {
             storeFile = file("debug.keystore")
@@ -203,6 +207,81 @@ android {
             // `app-release-unsigned.apk` diye adlandırıyor ve imzasız olduğu
             // dosya adından anlaşılıyor.
             signingConfig = if (yayinImzasiVar) signingConfigs.getByName("yayin") else null
+        }
+
+        // -------------------------------------------------------------------
+        // `dagitim`: telefona GERÇEKTEN kurulan yapı
+        // -------------------------------------------------------------------
+        // Uygulama mağazada yayınlanmayacak (karar, 04.11.2026) ve dağıtım
+        // elden kurulan APK ile yapılıyor. O iş için ne `debug` ne `release`
+        // doğru:
+        //
+        //   - `debug` KURULUR ama `debuggable`. Yani telefona fiziksel erişimi
+        //     olup USB hata ayıklamayı açabilen biri, root olmadan uygulamanın
+        //     özel verisini okuyabiliyor (`adb shell run-as`). Bu veritabanında
+        //     üye adları, telefonları ve SAĞLIK BEYANLARI var.
+        //   - `release` `debuggable` DEĞİL ama yayın anahtarı olmadan imzasız
+        //     kalıyor ve Android imzasız paketi kurmuyor
+        //     (`INSTALL_PARSE_FAILED_NO_CERTIFICATES`). Yani kurulamıyor.
+        //
+        // Bu yapı tipi ikisinin kesişimi: `release` gibi `debuggable` değil,
+        // `debug` gibi depodaki sabit anahtarla imzalı — yani kurulabilir.
+        //
+        // ### Neden `debug`a `isDebuggable = false` yazılmadı
+        //
+        // En kısa yol o görünüyordu ama hata ayıklama yapısını hata ayıklamaya
+        // elverişsiz hâle getirirdi: Android Studio'dan hata ayıklayıcı
+        // bağlamak ve düzen denetçisi o bayrağa bağlı. Geliştirmeyi bozmadan
+        // dağıtmak için iki ayrı yapı gerekiyor.
+        //
+        // ### Neden `release`in imzasız kalması DEĞİŞTİRİLMEDİ
+        //
+        // "Yayın anahtarı yoksa depodaki anahtarla imzala" da bir satırdı ama
+        // `kararlar.md` → "Yayın anahtarı depoda değil"in tam olarak
+        // reddettiği şey: mağazaya gidebilecek görünümde, aslında gidemeyecek
+        // bir dosya üretmek. Mağaza kararı o gerekçeyi bugün geçersiz kılıyor
+        // ama karar dönerse geri gelir. Ayrı ve ADI AÇIK bir yapı tipi,
+        // `app-release.apk`ın anlamını bozmadan aynı sonucu veriyor.
+        // `getByName` BİLEREK burada, `create` lambdasının içinde değil: orada
+        // alıcı yapı tipinin kendisi oluyor ve çağrı yalnızca dış alıcıya
+        // düştüğü için çözülüyor. Dışarıda tutmak o belirsizliği kaldırıyor.
+        val yayinTipi = getByName("release")
+
+        create("dagitim") {
+            // `release`ten türüyor: R8 ayarı ve proguard dosyaları oradan
+            // geliyor, iki yerde kopya durmasın diye. Buradaki satırlar
+            // yalnızca FARKLARI söylüyor. `initWith` ilk çağrı olmalı —
+            // sonrasında yazılanları ezer.
+            initWith(yayinTipi)
+
+            // Bu satır bu yapı tipinin VAROLUŞ SEBEBİ. AGP'nin varsayılanı da
+            // `false` ama varsayılana güvenmek, bir gün birinin `initWith`
+            // kaynağını `debug` yapıp bunu sessizce `true`ya çevirmesi demek.
+            // Açıkça yazılı; CI ayrıca APK'nın içinden doğruluyor.
+            isDebuggable = false
+
+            // Depodaki SABİT anahtar. Sabit olması önemli: imza her koşuda aynı
+            // olduğu için yeni APK eskisinin üzerine kuruluyor ve veri
+            // silinmiyor (gerekçesi yukarıdaki imza bölümünde).
+            signingConfig = signingConfigs.getByName("debug")
+
+            // APK hangi yapı tipinden geldiğini KENDİSİ söylesin. Depodaki
+            // desenin aynısı: etiketsiz derlemelerin sürümü `0.0.0-gelistirme`,
+            // çünkü "yayın olmadığı APK'nın kendisinden anlaşılıyor".
+            versionNameSuffix = "-dagitim"
+
+            // `:shared` ve `:arayuz` birer Android kütüphanesi ve onlarda bu
+            // yapı tipi YOK — yalnızca `debug`/`release` var. Bu satır olmadan
+            // Gradle hangi kütüphane türevine bağlanacağını bulamıyor ve
+            // derleme "Could not resolve project :shared ... no matching
+            // variant" diye düşüyor. `release`e düşmesi doğru eşleşme: bu yapı
+            // tipi de `debuggable` değil.
+            //
+            // `= listOf(...)` DEĞİL: AGP'de `matchingFallbacks` bir
+            // `val MutableList<String>`, yani atanamıyor — eklenmesi
+            // gerekiyor. Atama denendi ve betik derlemesi düştü
+            // ("'val' cannot be reassigned").
+            matchingFallbacks.add("release")
         }
     }
     compileOptions {

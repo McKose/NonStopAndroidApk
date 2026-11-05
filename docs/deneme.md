@@ -144,8 +144,8 @@ diye:
 2. Listenin **en üstündeki yeşil tikli** koşuya tıklayın. (Kırmızı çarpı varsa
    o koşu başarısız; bir alttakini seçin.)
 3. Açılan sayfayı **en alta** kaydırın. **Artifacts** başlığı orada.
-4. **`nonstop-debug-apk`** yazısına tıklayın — zip olarak iner.
-5. Zip'i açın; içinden `app-debug.apk` çıkar.
+4. **`nonstop-apk`** yazısına tıklayın — zip olarak iner.
+5. Zip'i açın; içinden `app-dagitim.apk` çıkar.
 6. Dosyayı telefona kopyalayıp açın. Android "bilinmeyen kaynak" uyarısı
    verirse izin verin.
 
@@ -153,23 +153,33 @@ Yapıt **90 gün** duruyor; süresi dolmuşsa yeni bir koşu gerekiyor (depoya
 herhangi bir değişiklik gönderildiğinde ya da Actions sayfasından iş elle
 tetiklendiğinde üretilir).
 
-> **Yeni APK eskisinin üzerine kurulur; önce kaldırmanız gerekmiyor.** CI
-> APK'ları depodaki **sabit** anahtarla (`app/debug.keystore`) imzalanıyor,
-> yani her koşu aynı imzayı atıyor. Bu bilinçli bir karar ve sebebi tam olarak
-> buydu: anahtar sabit olmadan iki koşu arasında veritabanı göçünü gerçek
-> veriyle denemek mümkün değildi, çünkü kaldır-kur döngüsü veriyi siliyordu.
-> Gerekçesi `docs/kararlar.md` → "Hata ayıklama imzası sabit ve depoda".
+> **Bu APK hata ayıklamaya KAPALI.** `dagitim` adlı ayrı bir yapı tipinden
+> geliyor; `debug` yapısı `debuggable` ve o bayrak, telefona fiziksel erişimi
+> olup USB hata ayıklamayı açabilen birinin uygulamanın veritabanını (üye
+> adları, telefonları, sağlık beyanları) root olmadan okuması demek. Her koşu
+> bunu APK'nın İÇİNDEN doğruluyor — bayrak açık çıkarsa iş düşüyor, çünkü
+> dosyaya bakarak anlaşılmıyor. Gerekçesi `docs/kararlar.md` → "Dağıtım yapısı
+> hata ayıklamaya kapalı".
+
+> **Yeni APK eskisinin üzerine kurulur; önce kaldırmanız gerekmiyor.** Hem
+> `dagitim` hem `debug` yapısı depodaki **sabit** anahtarla
+> (`app/debug.keystore`) imzalanıyor. Yani hangi makinede ya da hangi CI
+> koşusunda derlendiği fark etmiyor, imza her zaman aynı: Android Studio'dan
+> kendi makinenizde derlediğiniz APK da CI'ın ürettiğinin üzerine kurulur.
 >
-> Tek istisna **Android Studio'dan kendi makinenizde** derlediğiniz APK:
-> o `~/.android/debug.keystore` ile imzalanıyor, yani CI APK'sının üzerine
-> kurulmuyor (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). İkisini aynı telefonda
-> dönüşümlü kullanıyorsanız arada bir kaldırmak gerekiyor.
+> Bu bilinçli bir karar ve sebebi tam olarak buydu: anahtar sabit olmadan iki
+> koşu arasında veritabanı göçünü gerçek veriyle denemek mümkün değildi, çünkü
+> kaldır-kur döngüsü veriyi siliyordu. Gerekçesi `docs/kararlar.md` → "Hata
+> ayıklama imzası sabit ve depoda".
+>
+> Üzerine kurulamayan tek şey **yayın** (`release`) APK'sı: o, varsa, ayrı bir
+> anahtarla imzalı.
 
 > **"İmzasız APK" diye bir seçenek yok.** Android imzası olmayan bir paketi
 > kurmuyor (`INSTALL_PARSE_FAILED_NO_CERTIFICATES`), yani
 > `:app:assembleRelease`in anahtar yokken ürettiği `app-release-unsigned.apk`
 > telefona **kurulamaz**. Mağazasız dağıtımda istediğiniz dosya her zaman
-> yukarıdaki `app-debug.apk`.
+> yukarıdaki `app-dagitim.apk`.
 
 ## 2b. Uygulamayı tarayıcıda denemek (Appetize)
 
@@ -297,7 +307,7 @@ panelde yalnızca üzerine yazabilirsiniz, değerini göremezsiniz. Üç yol var
 2. **Elinizdeki APK'nın içine bakın.** Adres derleme sırasında gömülüyor:
 
    ```bash
-   unzip -p app-debug.apk classes.dex | strings | grep -i 'supabase.co'
+   unzip -p app-dagitim.apk classes.dex | strings | grep -i 'supabase.co'
    ```
 
    Çıkan değer uygulamanın gerçekten kullandığı adres. Yol içeriyorsa ya da
@@ -382,4 +392,4 @@ Hata mesajları ne yapılması gerektiğini söyleyecek şekilde yazıldı.
 | Panelde "Kurulum tamamlanmamış" | `web/config.js` oluşturulmamış — ya da adrese `?demo` ekleyin |
 | Panelde liste boş ama hata yok | O tabloda veri yok; erişim sorunu olsaydı hata görürdünüz |
 | Panelde "Süzgece uyan kayıt yok" | Veri var ama arama/tarih süzgeci eliyor — **Temizle** düğmesine basın |
-| Actions'ta `nonstop-debug-apk` yok | Koşu başarısız bitmiş ya da yapıtın 90 günü dolmuş |
+| Actions'ta `nonstop-apk` yok | Koşu başarısız bitmiş ya da yapıtın 90 günü dolmuş |
