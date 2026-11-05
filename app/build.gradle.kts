@@ -276,7 +276,12 @@ android {
             // derleme "Could not resolve project :shared ... no matching
             // variant" diye düşüyor. `release`e düşmesi doğru eşleşme: bu yapı
             // tipi de `debuggable` değil.
-            matchingFallbacks = listOf("release")
+            //
+            // `= listOf(...)` DEĞİL: AGP'de `matchingFallbacks` bir
+            // `val MutableList<String>`, yani atanamıyor — eklenmesi
+            // gerekiyor. Atama denendi ve betik derlemesi düştü
+            // ("'val' cannot be reassigned").
+            matchingFallbacks.add("release")
         }
     }
     compileOptions {

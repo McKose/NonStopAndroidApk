@@ -586,9 +586,14 @@ GÖRÜNÜMDE ama gidemeyecek bir dosya üretmek — ve mağaza kararı dönerse 
 geri gelir. Adı açık, ayrı bir yapı tipi `app-release.apk`ın anlamını bozmadan
 aynı sonucu veriyor.
 
-**`matchingFallbacks = listOf("release")` şart.** `:shared` ve `:arayuz` birer
+**`matchingFallbacks.add("release")` şart.** `:shared` ve `:arayuz` birer
 Android kütüphanesi ve onlarda yalnızca `debug`/`release` var. Bu satır olmadan
 Gradle hangi kütüphane türevine bağlanacağını çözemiyor ve derleme düşüyor.
+
+`add`, atama değil: AGP'de `matchingFallbacks` bir `val MutableList<String>`.
+`= listOf("release")` yazılırsa betik derlemesi düşüyor ("'val' cannot be
+reassigned"). İlk denemede tam olarak bu yaşandı — Android SDK geliştirme
+ortamında olmadığı için hata ancak CI'da görüldü.
 
 **İki özellik de APK'nın İÇİNDEN sınanıyor** (`aapt2 dump badging` +
 `apksigner verify`), çünkü ikisi de sessizce bozulabiliyor: `isDebuggable = false`
