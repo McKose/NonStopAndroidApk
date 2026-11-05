@@ -613,6 +613,14 @@ kapatılan açık.
 **Sürüm adına `-dagitim` eklendi.** APK hangi yapı tipinden geldiğini kendisi
 söylüyor; etiketsiz derlemelerin `0.0.0-gelistirme` olmasıyla aynı desen.
 
+**APK 25,1 MiB'den 17,8 MiB'ye indi (−7,3 MiB, %29) ve bu BEKLENEN bir
+sonuç** — ölçüldü (05.11.2026, aynı kaynak kodu). Sebebi `debugImplementation`
+bağımlılıkları: `compose.ui.tooling` ve `compose.ui.test.manifest` yalnızca
+`debug` türevine giriyor, `dagitim`e girmiyor. İkisi de kaynak kodda
+kullanılmıyordu (`@Preview` yok) ama dağıtılan APK'nın içinde taşınıyordu.
+Bu not, altı ay sonra boyut farkını görüp "bir şey mi eksik kaldı" diye
+soracak kişi için duruyor: eksilen şey araç, kod değil.
+
 ## Sürüm numarası etiketten türer
 
 **Karar:** `versionName` yayın etiketinden geliyor (`-PsurumAdi=1.2.0`),
