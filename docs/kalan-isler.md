@@ -15,43 +15,93 @@ ama **tanımlıymış**. Bu daha sinsi bir hata — eksik sanılan bir ayar, asl
 çalışan bir akışı "zaten bozuk" sandırıyor. Bir maddenin durumu belgeden
 değil, kaynağından doğrulanmalı.
 
-Son gözden geçirme: 4 Kasım 2026, `master` (`17f0e42`).
+Son gözden geçirme: 8 Kasım 2026, `master` (`2fcffa2`).
 
 ---
 
-## Önce: seni bekleyenler
+## Planda olan tek iş: Supabase panelinde iki ayar
 
-Bunlar bende yapılamaz; hiçbiri kod işi değil.
+Salon sahibinin kararı (08.11.2026): **geri kalan her şey plandan çıktı**
+(aşağıdaki bölüm). Planda duran tek iş bu ikisi ve ikisi de kod işi değil —
+Supabase panelinde **Authentication → Sign In / Providers → Email** altında,
+aynı ekranda.
 
-| # | Ne | Neyi açar | Ayrıntı |
+| # | Ne | Neyi açar | Plan |
 |---|---|---|---|
-| 1 | **KVKK aydınlatma metni için bilgiler** (ticari unvan, adres, saklama süresi) — *ertelendi, aşağıya bakın* | Sitedeki yasal açığı | `docs/site-plani-kalanlar.md` md. 1 |
-| 2 | **En az şifre uzunluğu 6 → 8** (Supabase panelinden) | Sunucuyu istemciyle aynı kurala getirir | `supabase/README.md` → "Panelden açılabilecek iki ayar" |
-| 3 | **Sızmış şifre koruması** (Supabase panelinden) | Zayıf şifreleri eler | aynı bölüm |
-| 4 | **MX kaydı** (Turhost panelinde) | Kurumsal e-postayı | `docs/site-yonetimi.md` → "E-posta" |
-| 5 | **Karşılama videosu** (`kahraman.mp4`) | Banner videosunu (isteğe bağlı) | `web/varliklar/BENIOKU.md` |
+| 1 | **En az şifre uzunluğu 6 → 8** | Sunucuyu istemciyle aynı kurala getirir | **ücretsiz planda da var**, ~1 dakika |
+| 2 | **Prevent use of leaked passwords** | Sızmış şifreleri eler | **Pro ve üstü**; ücretsiz planda görünmez |
 
-2. madde **en ucuz olanı ve bu listeye sonradan eklendi** — önce yalnızca
-3. madde yazılıydı ve ikisi aynı panel bölümünde olduğu için gözden
-kaçmıştı. Uygulama ve panel 8 karakter dayatıyor, sunucu 6'da duruyor; yani
-istemci kontrolü atlanırsa 7 karakterli bir şifre geçiyor. **Ücretsiz planda
-da yapılabiliyor**, 1 dakika.
+**1. madde neden var:** uygulama ve panel 8 karakter dayatıyor
+(`SifreKurali.EN_AZ_UZUNLUK`, `SIFRE_EN_AZ_UZUNLUK`), Supabase'in varsayılanı
+6. Yani istemci kontrolü atlanırsa 7 karakterli bir şifre sunucudan geçiyor.
+Panelde alanın değerine bakıp 8 değilse 8 yapmak yeterli; **değerin bugünkü
+hâli depodan okunamıyor**, proje danışmanı bu ayarı denetlemiyor.
 
-3. madde **ücretli plan** gerektiriyor; ücretsiz plandaysan seçenek
-görünmez ve bu madde şimdilik kapalı sayılır.
+**2. madde neden var:** personel kendi şifresini kendisi seçiyor ve en olası
+zayıf şifre, kişinin başka bir sitede zaten kullandığı şifre. Supabase bunu
+HaveIBeenPwned listesine karşı denetliyor. **Canlıda ölçüldü (08.11.2026):
+kapalı** — proje danışmanı `auth_leaked_password_protection` uyarısını hâlâ
+veriyor.
 
-**Yayın anahtarı + 4 gizli anahtar bu listeden ÇIKTI** (salon sahibinin
-kararı, 04.11.2026) ve listenin en kritik maddesiydi. Gerekçe: uygulama
-mağazada yayınlanmayacak, dağıtım kurulabilir APK ile olacak. O APK'yı
-üretmek için anahtar gerekmiyor — her CI koşusu depodaki sabit hata ayıklama
-anahtarıyla imzalanmış bir APK üretiyor ve indirme bağlantısı koşu özetinde
-duruyor (`docs/deneme.md` md. 2). Bu madde kapanmadı, **gereksizleşti**;
-kararın tamamı `docs/kararlar.md` → "Mağazada yayınlanmayacak".
+> **Aynı ekrandaki üçüncü ayarı AÇMA:** *Require current password when
+> changing password*. Doğru fikir ama açıldığında `PUT /auth/v1/user` isteği
+> gövdesinde `current_password` bekliyor; uygulama ve panel bunu göndermiyor,
+> yani **şifre değiştirme akışının tamamı kırılır.** Aynı korumayı bugün
+> istemci sağlıyor. Ayrıntı: `supabase/README.md` → "Panelden açılabilecek
+> iki ayar".
 
-`SUPABASE_TENANT_ID` gizli anahtarı bu listeden **çıktı** ve iki sebebi var:
-web'den üye kaydı şimdilik kapatıldı (aşağıya bakın) ve anahtar **zaten
-tanımlı** — yayın günlüğünden doğrulandı. Önceden "sende bekliyor" diye
-listeleniyordu; yanlıştı.
+Panelde ayrıca **4 adet "Signed-In Users Can Execute SECURITY DEFINER
+Function"** uyarısı göreceksin. Bunlar yeni iş değil, **bilinçli**: o dört
+fonksiyon satır bazlı güvenlik kurallarının içinde çağrılıyor, yani
+`authenticated` rolünün onları çalıştırabilmesi zorunlu. `anon` erişimi
+`0009` ile kapatıldı. Gerekçe `supabase/README.md`de.
+
+---
+
+## Plan dışı — ertelendi (salon sahibinin kararı, 08.11.2026)
+
+> "diğer kalanlar acil değil şimdilik bunları iş planından çıkart"
+
+Aşağıdakiler **kapanmadı, plandan çıktı.** Aradaki fark önemli: hiçbiri
+"yarım kalmış iş" değil ve yeniden ele alınması **yeni bir karar**
+gerektiriyor. Gerekçeleri ve ölçümleri kendi belgelerinde **silinmedi**,
+çünkü yeniden açılırsa işin yarısı o analiz.
+
+| Ne | Nerede duruyor |
+|---|---|
+| **KVKK aydınlatma metni için bilgiler** (ticari unvan, adres, saklama süresi) | `docs/site-plani-kalanlar.md` md. 1 |
+| **MX kaydı** (Turhost panelinde) — kurumsal e-posta | `docs/site-yonetimi.md` → "E-posta" |
+| **Karşılama videosu** (`kahraman.mp4`) — dosyayı sen veriyorsun | `web/varliklar/BENIOKU.md` |
+| Web sitesinin kalan altı maddesi (künye, arama motoru kayıtları, içerik bölümleri, **video**, ölçüm, görsel ağırlığı) | `docs/site-plani-kalanlar.md` |
+
+Listedeki **video iki satırda görünüyor ve bu bir kopya değil**: aynı işin iki
+yarısı. Dosyayı salon veriyor (üçüncü satır), siteye bağlamak kod işi
+(dördüncü satırın içindeki "video"). Dosya gelmeden kod yarısının yapılacak
+bir şeyi yok.
+| Sunucunun dört maddesi (`anon` yetkileri, personel silme, iOS oturumu, `MigrationTestHelper`) | `supabase/README.md` → "Henüz yapılmadı" |
+
+**İkisinin bedeli ötekilerden farklı ve bu not o yüzden burada** — karar
+salon sahibinin, ama "acil değil" ikisi için "bedelsiz" demiyor:
+
+- **KVKK.** Canlıda ölçüldü (04.11.2026): **girilmiş 1 sağlık beyanı** var ve
+  aydınlatma metni yok. Beyan formunda açık rıza kutusu var ama açık rıza
+  aydınlatmanın yerini tutmuyor. Yani bu, ileride doğabilecek bir risk değil,
+  bir kez olmuş bir veri toplama.
+- **`anon` rolünün tablo yetkileri.** Belgelenen niyetten geniş: `0005`
+  "yalnızca duyurular" diyor, canlıda `anon` 15 tablonun hepsinde
+  `select`/`insert`/`update` yetkisine sahip. **Veri sızmıyor** — kurallar
+  `{authenticated}` kapsamlı ve `anon` 0 satır alıyor — ama yetki katmanı
+  kural katmanından geniş durdukça, ileride yazılacak geniş bir kural bunu
+  sessizce açabilir.
+
+Ötekiler (MX, video, künye, arama motoru, içerik, ölçüm, görsel ağırlığı,
+personel silme, iOS, `MigrationTestHelper`) gerçekten bedelsiz bekliyor.
+
+**Daha önce bu listeden çıkanlar** (kayıt olarak duruyor): **yayın anahtarı +
+4 gizli anahtar** — uygulama mağazada yayınlanmayacağı için *gereksizleşti*
+(04.11.2026, `docs/kararlar.md` → "Mağazada yayınlanmayacak").
+**`SUPABASE_TENANT_ID`** — zaten tanımlıydı, "bekliyor" diye listelenmesi
+yanlıştı.
 
 ---
 
@@ -89,11 +139,14 @@ eksik değil, **bilinçli kapsam kararı** — gerekçesi `docs/site-yonetimi.md
 açmak `web/uye/kayit.js` içindeki `KAYIT_ACIK` değerini `true` yapmak;
 ayrıntı `docs/site-yonetimi.md` → "3b. Üye kayıtları".
 
-Sekiz açık madde, öncelik sırasıyla `docs/site-plani-kalanlar.md` içinde.
-İlk ikisi:
+**Sitede planda duran iş kalmadı** (08.11.2026 kararı). Sekiz madde
+`docs/site-plani-kalanlar.md` içinde duruyor ama hepsi **plan dışı**; liste
+bir kuyruk değil, yeniden açılırsa okunacak bir kayıt. İlk ikisinin durumu
+burada, çünkü ikisi de "yapılacak iş" değil birer karar:
 
 1. **KVKK aydınlatma metni** — **ertelendi** (salon sahibinin kararı,
-   04.11.2026) ama **kapanmadı**. Gerekçe "web'den üyelik almayacağız" idi;
+   04.11.2026, 08.11.2026'da yeniden onaylandı) ama **kapanmadı**.
+   Gerekçe "web'den üyelik almayacağız" idi;
    o gerekçe kayıt formu için doğru, bu madde için değil. Sağlık verisini
    toplayan yer kayıt formu DEĞİL, giriş yapmış üyenin panosundaki beyan
    formu — ve orası açık. Canlıda ölçüldü (04.11.2026): 2 bağlı hesap ve
@@ -122,12 +175,15 @@ düzeltildi. Yerine daha dar bir madde girdi: **görsel ağırlığı** —
 `reformer.jpg`ın %70'i boşa gidiyor ve LCP 3.5 s'nin sebebi o.
 
 Kalan altı madde (künye, arama motoru kayıtları, içerik bölümleri, video,
-ölçüm, görsel ağırlığı) daha düşük öncelikli.
+ölçüm, görsel ağırlığı) **plan dışı**.
 
 ## Sunucu
 
-Dört madde, hepsi `supabase/README.md` → "Henüz yapılmadı" içinde ve hiçbiri
-acil değil:
+Planda duran iş yok; **Supabase panelindeki iki ayar hariç** (en üstteki
+bölüm) — onlar sunucu tarafı ama kod işi değil.
+
+Dört madde `supabase/README.md` → "Henüz yapılmadı" içinde duruyor ve hepsi
+**plan dışı** (08.11.2026). Yalnızca ilki bedelsiz değil:
 
 - **`anon` rolünün tablo yetkileri belgelenen niyetten geniş.** `0005`
   "yalnızca duyurular" diyor, canlıda ise `anon` 15 tablonun hepsinde

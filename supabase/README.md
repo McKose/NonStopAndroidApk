@@ -408,6 +408,20 @@ görünmeye devam ederdi.
 Bütün yüzeylerin açık işleri için: [`../docs/kalan-isler.md`](../docs/kalan-isler.md).
 Aşağıdakiler yalnızca **sunucu** tarafını ilgilendirenler.
 
+> **Bu dört madde PLAN DIŞI** (salon sahibinin kararı, 08.11.2026: *"diğer
+> kalanlar acil değil şimdilik bunları iş planından çıkart"*). Liste bir kuyruk
+> değil; biri yeniden ele alınacaksa bu yeni bir karar. Gerekçeler silinmedi,
+> çünkü yeniden açılırsa işin yarısı onlar.
+>
+> Birincisinin bedeli ötekilerden farklı: `anon`un yetki katmanı kural
+> katmanından geniş durdukça, ileride yazılacak geniş bir kural yazmayı
+> sessizce açabilir. Bugün veri sızmıyor (kurallar `{authenticated}` kapsamlı,
+> `anon` 0 satır alıyor).
+>
+> Panelden açılacak iki ayar (en az şifre uzunluğu, sızmış şifre koruması) bu
+> listede DEĞİL — onlar planda duruyor; bkz. aşağıdaki "Panelden açılabilecek
+> iki ayar" ve `../docs/kalan-isler.md`nin en üstü.
+
 - **`anon` rolünün tablo yetkileri hâlâ belgelenen niyetten geniş.** `0005`
   şöyle diyor: "`anon` YALNIZCA duyuruları okuyor. Başka hiçbir tabloya,
   hiçbir yetki." Canlıda ölçülen durum farklı — `anon` **15 tablonun

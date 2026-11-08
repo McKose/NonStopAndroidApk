@@ -299,12 +299,20 @@ Sitenin planlanan işleri bitti. Bundan sonrası isteğe bağlı ekler ve aşağ
 
 ### 📌 Sende bekleyenler
 
-Bütün yüzeylerin açık işleri için: [`kalan-isler.md`](kalan-isler.md).
-Aşağıdakiler yalnızca **site** tarafını ilgilendirenler.
+**Site tarafında seni bekleyen iş kalmadı** (kararın, 08.11.2026: *"diğer
+kalanlar acil değil şimdilik bunları iş planından çıkart"*).
 
-| Konu | Ne gerekiyor |
+Planda duran tek iş sunucu tarafında ve kod işi değil: **Supabase panelinde
+iki şifre ayarı**. Ne olduğu ve hangisinin ücretli plan gerektirdiği
+[`kalan-isler.md`](kalan-isler.md)'nin en üstünde.
+
+Plan dışı kalanlar (yapılmayı beklemiyor; biri gerekirse yeni bir karar):
+
+| Konu | Durum |
 |---|---|
-| **E-posta riski** | Aşağıdaki ayrı bölüme bakın — sitede yapılacak bir şey yok, iş Turhost panelinde. |
+| **E-posta riski / MX kaydı** | Aşağıdaki ayrı bölüme bakın — sitede yapılacak bir şey yok, iş Turhost panelinde. **Plan dışı.** |
+| **KVKK aydınlatma metni** | Ertelendi (04.11.2026, 08.11.2026'da yeniden onaylandı). Tek bedelli madde: canlıda **girilmiş 1 sağlık beyanı** var ve aydınlatma yok. |
+| **Karşılama videosu, künye, arama motoru kayıtları, içerik bölümleri, ölçüm, görsel ağırlığı** | Plan dışı, hiçbirinin bedeli yok. |
 
 **Yayın anahtarı bu listeden çıktı** (kararın, 04.11.2026): uygulama
 mağazada yayınlanmayacak, dağıtım kurulabilir APK ile olacak ve o APK için
