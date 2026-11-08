@@ -8,6 +8,19 @@ neyin hâlâ açık olduğunu tek yerde tutmak için. Eski plan artık kaynak de
 
 Karşılaştırma tarihi: 2 Kasım 2026, `master` (`cea85a6`).
 
+> ### Bu belgedeki açık maddeler PLAN DIŞI (08.11.2026)
+>
+> Salon sahibinin kararı: *"diğer kalanlar acil değil şimdilik bunları iş
+> planından çıkart."* Yani aşağıdaki liste **bir kuyruk değil** — hiçbir madde
+> yapılmayı beklemiyor ve biri yeniden ele alınacaksa bu **yeni bir karar**.
+>
+> Liste silinmedi, çünkü yeniden açılırsa işin yarısı buradaki analiz
+> (özellikle md. 1'in canlı ölçümü). Durum dizini:
+> [`kalan-isler.md`](kalan-isler.md) → "Plan dışı".
+>
+> Kararın kendisi md. 1 için **ikinci kez** verildi: 04.11.2026'da ertelendi,
+> 08.11.2026'da yeniden onaylandı.
+
 ## Plandan farklı yapılanlar (bilinçli)
 
 | Plan | Yapılan | Neden önemli değil |
