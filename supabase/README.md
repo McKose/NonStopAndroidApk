@@ -283,22 +283,73 @@ yapılıyor ve **yazmadan önce**: ters sırada, yanlış şifre girildiğinde �
 Yönetici başkasının şifresini **değiştiremiyor**; yalnızca yeni bir davet
 gönderip yeni bir geçici şifre üretebiliyor.
 
-#### Panelden açılabilecek iki ayar
+#### Panelden açılabilecek ayarlar
 
 İkisi de Supabase panelinde **Authentication → Sign In / Providers → Email**
-altında ve ikisi de bugünkü davranışı iyileştiriyor. Kod tarafında yapılacak bir
-şey olmadığı için burada duruyorlar:
+altında ve kod tarafında yapılacak bir şey olmadığı için burada duruyorlar.
+**İkincisi için karar verildi: değişmiyor.**
 
 - **Prevent use of leaked passwords.** Sızmış şifre listelerinde
-  (HaveIBeenPwned) geçen şifreleri reddediyor. Şu anda **kapalı** — proje
-  danışmanı da (`get_advisors`) bunu uyarı olarak veriyor. Personel kendi
-  şifresini kendisi seçtiği için doğrudan bu akışı ilgilendiriyor: en olası
+  (HaveIBeenPwned) geçen şifreleri reddediyor. **Canlıda ölçüldü (08.11.2026):
+  kapalı** — proje danışmanı (`get_advisors`)
+  `auth_leaked_password_protection` uyarısını veriyor. Personel şifresini
+  kendisi değiştirebildiği için doğrudan bu akışı ilgilendiriyor: en olası
   zayıf şifre, kişinin başka bir sitede zaten kullandığı şifre.
   **Ücretli plan gerektiriyor** (Pro ve üstü); ücretsiz planda görünmüyor.
-- **Minimum password length.** Supabase'in varsayılanı 6, uygulama ve panel ise
-  8 dayatıyor (`SifreKurali.EN_AZ_UZUNLUK`, `SIFRE_EN_AZ_UZUNLUK`). Sunucuyu da
-  8'e çekmek istemci kuralını yedeklerdi; bugün 7 karakterli bir şifre yalnızca
-  istemci kontrolü atlanırsa geçer.
+
+- **Minimum password length — OLDUĞU GİBİ KALIYOR** (salon sahibinin kararı,
+  09.11.2026). Supabase'in varsayılanı 6, uygulama ve panel 8 dayatıyor
+  (`SifreKurali.EN_AZ_UZUNLUK`, `SIFRE_EN_AZ_UZUNLUK`).
+
+  ##### Açığın gerçek kapsamı: kodda izlendi, varsayılmadı
+
+  Bu belge daha önce "7 karakterli bir şifre yalnızca istemci kontrolü
+  atlanırsa geçer" diyordu. Doğru ama **eksik**, ve eksikliği açığı
+  olduğundan büyük gösteriyordu. İnsanın şifre seçtiği her yol izlendi:
+
+  | Yol | Şifreyi kim seçiyor | Kaç karakter |
+  |---|---|---|
+  | **Personel hesabı açılışı** (`personel-davet`) | kimse — sunucu üretiyor | **14**, `crypto.getRandomValues`, 57 karakterlik alfabe |
+  | **Şifre değiştirme** (uygulama: `SettingsViewModel`; panel: `app.js`) | personel | **en az 8**, istemci dayatıyor |
+  | Personelin kendi kaydı | **yok** — self-servis akış yok | — |
+  | **Web'den üye kaydı** (`web/uye/index.html`) | üye | **en az 6** — `minlength="6"`; akış şu an KAPALI (`KAYIT_ACIK = false`) |
+
+  **Personel tarafında** 8'in altına düşebilecek tek kişi, uygulamayı ve
+  paneli atlayıp `PUT /auth/v1/user`a kendi jetonuyla istek atan personel —
+  kendi hesabını kendi eliyle zayıflatan kişi. Orada sunucu minimumunun
+  yedeklediği şey kullanıcının kendisine karşı korunması.
+
+  **Üye tarafında durum farklı ve bu ilk yazımda atlanmıştı.** Kayıt formu
+  31.10.2026'da kapatıldı ama o güne kadar AÇIKTI ve 6 karakter kabul
+  ediyordu; etiketi de bunu yazıyor ("Şifre — en az 6 karakter"). Canlıda
+  **2 bağlı üye hesabı** var ve ikisi o dönemden. Yani bugün 6–7 karakterlik
+  bir üye şifresi mevcut OLABİLİR, ve üye alanında o üyenin sağlık beyanı
+  duruyor. Bu, personel akışının aksine dışarıdan denenebilecek bir şey.
+
+  **Ama sunucu minimumunu 8'e çekmek bunu DÜZELTMEZ.** Minimum, şifre
+  belirlenirken ya da değiştirilirken uygulanıyor; geriye dönük çalışmıyor.
+  Zaten var olan bir şifre, ayar ne olursa olsun olduğu gibi kalıyor. Yani
+  "olduğu gibi kalsın" kararının o iki hesap için bir bedeli yok — ayarı
+  değiştirmek de onları düzeltmeyecekti.
+
+  Gerçekten etkisi olan şey **sunucu ayarı değil, formun kendisi**:
+  `web/uye/index.html` içindeki `minlength="6"`. `KAYIT_ACIK` bir gün `true`
+  yapılırsa insanın şifre seçtiği canlı bir yol 6'dan açılmış olur — ve bu,
+  bu depodaki "istemci şifre kuralları uygulamayla aynı olmak zorunda"
+  kuralına (`web/admin/sifre.js` başı: `SifreKurali.EN_AZ_UZUNLUK` ile aynı)
+  aykırı. Panel 8, uygulama 8, üye formu 6.
+
+  Karar bu ölçümle verildi ve **sunucu ayarı için geçerli.** Yeniden ele
+  alınması gereken durumlar: üye kaydının açılması (`KAYIT_ACIK`), formun
+  `minlength`i 8'e çekilmeden, ya da `personel-davet`in geçici şifre
+  üretmeyi bırakıp şifreyi kullanıcıya seçtirmesi.
+
+  Yan bulgu — **sunucu minimumunun bugünkü değeri muhtemelen 6**, ama bu
+  ölçüm değil: `web/uye/uye.js` içindeki bir yorum sunucunun döndürdüğü
+  "Password should be at least 6 characters" mesajını birebir aktarıyor,
+  yani o mesajı bir zamanlar biri görmüş. Kesin değer yalnızca panelden
+  okunur; `get_advisors` bu ayarı denetlemiyor ve GoTrue yapılandırması
+  veritabanında durmuyor (`auth` şemasında `config` tablosu yok — bakıldı).
 
 Üçüncü bir ayar var ama **açılmamalı**: *Require current password when changing
 password*. Doğru fikir, ama açıldığında `PUT /auth/v1/user` isteği gövdesinde
@@ -418,9 +469,10 @@ Aşağıdakiler yalnızca **sunucu** tarafını ilgilendirenler.
 > sessizce açabilir. Bugün veri sızmıyor (kurallar `{authenticated}` kapsamlı,
 > `anon` 0 satır alıyor).
 >
-> Panelden açılacak iki ayar (en az şifre uzunluğu, sızmış şifre koruması) bu
-> listede DEĞİL — onlar planda duruyor; bkz. aşağıdaki "Panelden açılabilecek
-> iki ayar" ve `../docs/kalan-isler.md`nin en üstü.
+> Panelden açılacak **sızmış şifre koruması** bu listede DEĞİL — planda
+> duruyor (ücretli plana bağlı). **En az şifre uzunluğu** da bu listede değil:
+> olduğu gibi bırakılmasına karar verildi (09.11.2026). İkisi de aşağıdaki
+> "Panelden açılabilecek ayarlar" bölümünde.
 
 - **`anon` rolünün tablo yetkileri hâlâ belgelenen niyetten geniş.** `0005`
   şöyle diyor: "`anon` YALNIZCA duyuruları okuyor. Başka hiçbir tabloya,
