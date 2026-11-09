@@ -302,9 +302,11 @@ Sitenin planlanan işleri bitti. Bundan sonrası isteğe bağlı ekler ve aşağ
 **Site tarafında seni bekleyen iş kalmadı** (kararın, 08.11.2026: *"diğer
 kalanlar acil değil şimdilik bunları iş planından çıkart"*).
 
-Planda duran tek iş sunucu tarafında ve kod işi değil: **Supabase panelinde
-iki şifre ayarı**. Ne olduğu ve hangisinin ücretli plan gerektirdiği
-[`kalan-isler.md`](kalan-isler.md)'nin en üstünde.
+**Sunucu tarafında da yapacağın iş kalmadı.** Supabase panelinde duran tek
+madde *sızmış şifre koruması* ve o **ücretli plan** gerektiriyor; ücretsiz
+plandaysan seçenek hiç görünmüyor. En az şifre uzunluğunu ise **olduğu gibi
+bırakma kararını verdin** (09.11.2026) — gerekçesi ölçüldü ve
+[`kalan-isler.md`](kalan-isler.md)'nin en üstünde yazılı.
 
 Plan dışı kalanlar (yapılmayı beklemiyor; biri gerekirse yeni bir karar):
 

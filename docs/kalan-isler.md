@@ -15,40 +15,66 @@ ama **tanımlıymış**. Bu daha sinsi bir hata — eksik sanılan bir ayar, asl
 çalışan bir akışı "zaten bozuk" sandırıyor. Bir maddenin durumu belgeden
 değil, kaynağından doğrulanmalı.
 
-Son gözden geçirme: 8 Kasım 2026, `master` (`2fcffa2`).
+Son gözden geçirme: 9 Kasım 2026, `master` (`89428a0`).
 
 ---
 
-## Planda olan tek iş: Supabase panelinde iki ayar
+## Planda kalan tek iş (ve o da ücretli plana bağlı)
 
 Salon sahibinin kararı (08.11.2026): **geri kalan her şey plandan çıktı**
-(aşağıdaki bölüm). Planda duran tek iş bu ikisi ve ikisi de kod işi değil —
-Supabase panelinde **Authentication → Sign In / Providers → Email** altında,
-aynı ekranda.
+(aşağıdaki bölüm). 09.11.2026'da bir madde daha karara bağlandı, aşağıda.
 
 | # | Ne | Neyi açar | Plan |
 |---|---|---|---|
-| 1 | **En az şifre uzunluğu 6 → 8** | Sunucuyu istemciyle aynı kurala getirir | **ücretsiz planda da var**, ~1 dakika |
-| 2 | **Prevent use of leaked passwords** | Sızmış şifreleri eler | **Pro ve üstü**; ücretsiz planda görünmez |
+| 1 | **Prevent use of leaked passwords** (Supabase paneli → Authentication → Sign In / Providers → Email) | Sızmış şifreleri eler | **Pro ve üstü**; ücretsiz planda görünmez |
 
-**1. madde neden var:** uygulama ve panel 8 karakter dayatıyor
-(`SifreKurali.EN_AZ_UZUNLUK`, `SIFRE_EN_AZ_UZUNLUK`), Supabase'in varsayılanı
-6. Yani istemci kontrolü atlanırsa 7 karakterli bir şifre sunucudan geçiyor.
-Panelde alanın değerine bakıp 8 değilse 8 yapmak yeterli; **değerin bugünkü
-hâli depodan okunamıyor**, proje danışmanı bu ayarı denetlemiyor.
-
-**2. madde neden var:** personel kendi şifresini kendisi seçiyor ve en olası
-zayıf şifre, kişinin başka bir sitede zaten kullandığı şifre. Supabase bunu
+**Neden var:** personel şifresini kendisi değiştirebiliyor ve en olası zayıf
+şifre, kişinin başka bir sitede zaten kullandığı şifre. Supabase bunu
 HaveIBeenPwned listesine karşı denetliyor. **Canlıda ölçüldü (08.11.2026):
 kapalı** — proje danışmanı `auth_leaked_password_protection` uyarısını hâlâ
-veriyor.
+veriyor. Ücretsiz plandaysan seçenek görünmez, yani bu madde fiilen kapalı ve
+**planda yapılacak iş kalmıyor.**
+
+### En az şifre uzunluğu: OLDUĞU GİBİ KALIYOR (karar, 09.11.2026)
+
+Bu madde listenin başındaydı ("sunucuyu istemciyle aynı kurala getirir") ve
+**plandan çıktı.** Karar, kodda izlenen bir ölçümle verildi — insanın şifre
+seçtiği her yol tarandı:
+
+| Yol | Şifreyi kim seçiyor | Kaç karakter |
+|---|---|---|
+| Personel hesabı açılışı (`personel-davet`) | kimse — sunucu üretiyor | **14**, kriptografik rastgele |
+| Şifre değiştirme (uygulama + panel) | personel | **en az 8**, istemci dayatıyor |
+| Personelin kendi kaydı | **yok** | — |
+| Web'den üye kaydı (`web/uye/index.html`) | üye | **en az 6** (`minlength="6"`); akış kapalı |
+
+**Personel tarafında** 8'in altına düşebilecek tek kişi, uygulamayı ve paneli
+atlayıp Auth API'sine kendi jetonuyla istek atan personel — kendi hesabını
+kendi eliyle zayıflatan kişi.
+
+**Üye tarafında durum farklı.** Kayıt 31.10.2026'da kapatıldı ama o güne kadar
+açıktı ve form 6 karakter kabul ediyordu; canlıdaki **2 üye hesabı** o
+dönemden. Yani 6–7 karakterlik bir üye şifresi mevcut olabilir.
+**Sunucu minimumunu 8 yapmak bunu düzeltmezdi** — minimum geriye dönük
+çalışmıyor, var olan şifre olduğu gibi kalıyor. Yani kararın o hesaplar için
+bedeli yok.
+
+Etkisi olan şey sunucu ayarı değil, **formun kendisi**: `minlength="6"`.
+`KAYIT_ACIK` bir gün açılırsa 6'dan insan şifresi girilen canlı bir yol
+doğar — ve bu, depodaki "istemci şifre kuralları uygulamayla aynı" kuralına
+aykırı (panel 8, uygulama 8, üye formu 6). **Ayrı bir madde ve karar
+bekliyor.**
+
+Bu belge daha önce yalnızca "istemci kontrolü atlanırsa 7 karakterli şifre
+geçer" diyordu; doğru ama eksikti. Tam ölçüm: `supabase/README.md` →
+"Panelden açılabilecek ayarlar".
 
 > **Aynı ekrandaki üçüncü ayarı AÇMA:** *Require current password when
 > changing password*. Doğru fikir ama açıldığında `PUT /auth/v1/user` isteği
 > gövdesinde `current_password` bekliyor; uygulama ve panel bunu göndermiyor,
 > yani **şifre değiştirme akışının tamamı kırılır.** Aynı korumayı bugün
 > istemci sağlıyor. Ayrıntı: `supabase/README.md` → "Panelden açılabilecek
-> iki ayar".
+> ayarlar".
 
 Panelde ayrıca **4 adet "Signed-In Users Can Execute SECURITY DEFINER
 Function"** uyarısı göreceksin. Bunlar yeni iş değil, **bilinçli**: o dört
@@ -179,8 +205,9 @@ Kalan altı madde (künye, arama motoru kayıtları, içerik bölümleri, video,
 
 ## Sunucu
 
-Planda duran iş yok; **Supabase panelindeki iki ayar hariç** (en üstteki
-bölüm) — onlar sunucu tarafı ama kod işi değil.
+Planda duran iş yok. Supabase panelindeki **sızmış şifre koruması** (en üstteki
+bölüm) sunucu tarafı ama kod işi değil ve ücretli plana bağlı; en az şifre
+uzunluğu ise karara bağlandı, olduğu gibi kalıyor.
 
 Dört madde `supabase/README.md` → "Henüz yapılmadı" içinde duruyor ve hepsi
 **plan dışı** (08.11.2026). Yalnızca ilki bedelsiz değil:
